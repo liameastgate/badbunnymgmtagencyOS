@@ -237,7 +237,7 @@
       <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>OF Account</th><th>Platform</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
           <tbody id="models-body"></tbody>
         </table></div>
         <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
@@ -346,7 +346,7 @@
     <div class="form-grid">
       <div class="form-group"><label>Model Name</label><input type="text" id="model-name" placeholder="e.g. Nelly"></div>
       <div class="form-group"><label>OF Account Handle</label><input type="text" id="model-of" placeholder="@handle"></div>
-      <div class="form-group"><label>Platform</label><select id="model-platform"><option>Liam Free</option><option>Liam VIP</option><option>Independent</option></select></div>
+      <div class="form-group"><label>Status</label><select id="model-platform"><option>Active</option><option>Onboarding</option><option>Paused</option><option>Offboarded</option></select></div>
       <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="70" min="0" max="100"></div>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
