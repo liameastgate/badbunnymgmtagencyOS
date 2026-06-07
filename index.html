@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgencyOS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f0f11; --surface: #1a1a1f; --surface2: #222228;
+    --border: #2e2e38; --accent: #7c5cfc; --accent2: #a78bfa;
+    --text: #f0f0f5; --text2: #9090a8; --green: #22c55e;
+    --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  #auth-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 36px; width: 380px; }
+  .auth-logo { font-size: 24px; font-weight: 800; color: var(--accent2); margin-bottom: 6px; }
+  .auth-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+  .auth-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .auth-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .auth-tab.active { color: var(--accent2); border-color: var(--accent2); }
+  .auth-error { background: #2a0f0f; color: var(--red); border: 1px solid #3d1515; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+  .auth-success { background: #0f2a1a; color: var(--green); border: 1px solid #1a4a2a; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+  .pending-msg { text-align: center; padding: 20px; color: var(--text2); font-size: 14px; line-height: 1.6; display: none; }
+  .pending-msg strong { color: var(--text); display: block; margin-bottom: 8px; font-size: 16px; }
+  #app { display: none; min-height: 100vh; }
+  #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+  .logo { padding: 20px 18px 14px; font-weight: 800; font-size: 18px; color: var(--accent2); letter-spacing: -0.5px; }
+  nav { flex: 1; padding: 8px 10px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 2px; transition: all 0.15s; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent); color: #fff; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .user-info { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; }
+  .user-email { color: var(--text2); word-break: break-all; margin-bottom: 4px; }
+  .user-role { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: var(--accent); color: #fff; }
+  .btn-signout { margin-top: 8px; background: none; border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; width: 100%; font-family: inherit; }
+  .btn-signout:hover { color: var(--red); border-color: var(--red); }
+  #main { margin-left: 220px; padding: 28px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .page-sub { color: var(--text2); font-size: 13px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 800; }
+  .stat-value.green { color: var(--green); } .stat-value.purple { color: var(--accent2); } .stat-value.blue { color: var(--blue); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.pending { background: #2a2010; color: var(--yellow); }
+  .badge.done { background: #0f2a1a; color: var(--green); }
+  .badge.approved { background: #0f2a1a; color: var(--green); }
+  .badge.rejected { background: #2a0f0f; color: var(--red); }
+  .badge.processing { background: #0f1a2a; color: var(--blue); }
+  .badge.admin { background: #2a1a40; color: var(--accent2); }
+  .badge.chatter { background: #0f2a1a; color: var(--green); }
+  .badge.model { background: #0f1a2a; color: var(--blue); }
+  .badge.traffic { background: #2a1a10; color: var(--yellow); }
+  .badge.va { background: #1a2a2a; color: #67e8f9; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--text2); }
+  input, select, textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 13px; outline: none; transition: border-color 0.15s; font-family: inherit; width: 100%; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select option { background: var(--surface2); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; font-family: inherit; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-block { width: 100%; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: #2a0f0f; color: var(--red); border: 1px solid #3d1515; }
+  .btn-green { background: #0f2a1a; color: var(--green); border: 1px solid #1a4a2a; }
+  .btn-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .modal-close { cursor: pointer; background: none; border: none; color: var(--text2); font-size: 18px; font-family: inherit; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--accent2); border-color: var(--accent2); }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+  .alert-success { background: #0f2a1a; color: var(--green); border: 1px solid #1a4a2a; }
+  .alert-error { background: #2a0f0f; color: var(--red); border: 1px solid #3d1515; }
+  .empty { text-align: center; padding: 48px 24px; color: var(--text2); }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .file-drop { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: border-color 0.15s; }
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); }
+  .file-drop p { color: var(--text2); font-size: 13px; margin-top: 8px; }
+  .profit { color: var(--green); font-weight: 700; }
+  .loss { color: var(--red); font-weight: 700; }
+  .platform-ig { color: #e1306c; font-weight: 700; }
+  .platform-tt { color: #69c9d0; font-weight: 700; }
+  #loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; font-size: 14px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">Loading AgencyOS…</div>
+
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">AgencyOS</div>
+    <div class="auth-sub">Sign in to your agency dashboard</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login')">Sign In</div>
+      <div class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</div>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div id="auth-success" class="auth-success"></div>
+    <div id="pending-screen" class="pending-msg">
+      <strong>⏳ Account Pending</strong>
+      Your account has been created. Please wait for an admin to assign your role.
+    </div>
+    <div id="login-form">
+      <div class="form-group" style="margin-bottom:14px;"><label>Email</label><input type="email" id="login-email" placeholder="you@gmail.com"></div>
+      <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()"></div>
+      <button class="btn btn-primary btn-block" onclick="signIn()">Sign In →</button>
+    </div>
+    <div id="signup-form" style="display:none;">
+      <div class="form-group" style="margin-bottom:14px;"><label>Full Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
+      <div class="form-group" style="margin-bottom:14px;"><label>Email</label><input type="email" id="signup-email" placeholder="you@gmail.com"></div>
+      <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="signup-password" placeholder="Min 6 characters"></div>
+      <button class="btn btn-primary btn-block" onclick="signUp()">Create Account →</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="logo">AgencyOS</div>
+    <nav id="nav"></nav>
+    <div class="user-info">
+      <div class="user-email" id="user-email-display"></div>
+      <span class="user-role" id="user-role-display"></span>
+      <button class="btn-signout" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+  <div id="main">
+
+    <!-- Overview -->
+    <div class="page" id="page-overview">
+      <div class="page-title">Agency Overview</div>
+      <div class="page-sub">This week at a glance</div>
+      <div class="stats-grid" id="overview-stats"></div>
+      <div class="card">
+        <div class="card-title">Model Leaderboard — Latest Week</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Model</th><th>Earnings</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- Content Orders -->
+    <div class="page" id="page-content">
+      <div class="page-title">Content Orders</div>
+      <div class="page-sub">Assign Instagram/TikTok content for models to copy and re-upload</div>
+      <div id="content-admin-panel" style="display:none;">
+        <div class="card">
+          <div class="card-title">New Content Order</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Model</label><select id="co-model"></select></div>
+            <div class="form-group"><label>Platform</label>
+              <select id="co-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="other">Other</option></select>
+            </div>
+            <div class="form-group full"><label>Content URL (Instagram / TikTok post link)</label><input type="url" id="co-url" placeholder="https://www.instagram.com/reel/..."></div>
+            <div class="form-group full"><label>Google Drive Link (optional)</label><input type="url" id="co-drive" placeholder="https://drive.google.com/..."></div>
+            <div class="form-group full"><label>Notes / Instructions</label><textarea id="co-notes" placeholder="e.g. Copy this reel and repost with caption: …"></textarea></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="submitContentOrder()">➕ Add Order</button></div>
+          <div id="co-alert" class="alert"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="co-filter-model" onchange="filterContentOrders()" style="width:180px;"><option value="">All Models</option></select>
+          <select id="co-filter-status" onchange="filterContentOrders()" style="width:140px;"><option value="">All Statuses</option><option value="pending">Pending</option><option value="done">Done</option></select>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Model</th><th>Platform</th><th>Content Link</th><th>Drive</th><th>Notes</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody id="content-orders-body"></tbody>
+        </table></div>
+        <div id="content-empty" class="empty" style="display:none;"><div class="empty-icon">📭</div><p>No content orders yet</p></div>
+      </div>
+    </div>
+
+    <!-- Weekly Reports -->
+    <div class="page" id="page-reports">
+      <div class="page-title">Weekly Reports</div>
+      <div class="page-sub">Upload Infloww CSV to calculate earnings, splits and agency profit</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchReportTab('upload')">Upload CSV</div>
+        <div class="tab" onclick="switchReportTab('history')">History</div>
+      </div>
+      <div id="report-tab-upload">
+        <div class="card">
+          <div class="form-group" style="max-width:220px;margin-bottom:16px;"><label>Week Of</label><input type="date" id="report-week"></div>
+          <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
+            <div style="font-size:32px;">📄</div>
+            <p>Click or drag CSV to upload</p>
+            <p style="font-size:11px;margin-top:4px;">Infloww Creator Statistics export</p>
+          </div>
+          <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCsvFile(this.files[0])">
+          <div id="csv-preview" style="margin-top:16px;"></div>
+          <div id="report-alert" class="alert"></div>
+        </div>
+      </div>
+      <div id="report-tab-history" style="display:none;">
+        <div class="card">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Week Of</th><th>Model</th><th>Earnings</th><th>Model Payout</th><th>Agency Net</th><th>Agency Profit</th><th>Renew %</th></tr></thead>
+            <tbody id="report-history-body"></tbody>
+          </table></div>
+          <div id="report-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No reports yet</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Settings -->
+    <div class="page" id="page-models">
+      <div class="page-title">Model Settings</div>
+      <div class="page-sub">Configure each model's split, chatters and account details</div>
+      <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>OF Account</th><th>Platform</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
+          <tbody id="models-body"></tbody>
+        </table></div>
+        <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
+      </div>
+    </div>
+
+    <!-- Chatter Management -->
+    <div class="page" id="page-chatters">
+      <div class="page-title">Chatter Management</div>
+      <div class="page-sub">Track hours, wages and commission per chatter</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchChatterTab('roster')">Roster</div>
+        <div class="tab" onclick="switchChatterTab('hours')">Log Hours</div>
+        <div class="tab" onclick="switchChatterTab('summary')">Weekly Summary</div>
+      </div>
+      <div id="chatter-tab-roster">
+        <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('chatter-modal')">➕ Add Chatter</button></div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Email</th><th>Base Rate</th><th>Commission %</th><th></th></tr></thead>
+          <tbody id="chatters-body"></tbody>
+        </table></div></div>
+      </div>
+      <div id="chatter-tab-hours" style="display:none;">
+        <div class="card">
+          <div class="card-title">Log Weekly Hours</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Chatter</label><select id="hours-chatter" onchange="previewWage()"></select></div>
+            <div class="form-group"><label>Week Of</label><input type="date" id="hours-week"></div>
+            <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count" placeholder="168" oninput="previewWage()"></div>
+            <div class="form-group"><label>Total Model Earnings (for commission)</label><input type="number" id="hours-earnings" placeholder="0.00" step="0.01" oninput="previewWage()"></div>
+          </div>
+          <div id="hours-preview" style="margin-top:14px;font-size:13px;color:var(--text2);"></div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="logHours()">💾 Save Hours</button></div>
+          <div id="hours-alert" class="alert"></div>
+        </div>
+      </div>
+      <div id="chatter-tab-summary" style="display:none;">
+        <div class="card">
+          <div style="margin-bottom:12px;"><select id="summary-week" onchange="loadHoursSummary()" style="width:180px;"><option value="">Select week…</option></select></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Chatter</th><th>Hours</th><th>Base Wage</th><th>Commission</th><th>Total</th></tr></thead>
+            <tbody id="summary-body"></tbody>
+          </table></div>
+          <div id="summary-total" style="margin-top:12px;font-size:14px;font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoices -->
+    <div class="page" id="page-invoices">
+      <div class="page-title">Invoice Submission</div>
+      <div class="page-sub">Submit your invoice — admin reviews and processes payment</div>
+      <div class="card">
+        <div class="card-title">Submit Invoice</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Your Role</label><select id="inv-role"><option value="chatter">Chatter</option><option value="traffic">Traffic Team</option><option value="va">VA / Manager</option></select></div>
+          <div class="form-group"><label>Week Of</label><input type="date" id="inv-week"></div>
+          <div class="form-group"><label>Amount ($)</label><input type="number" id="inv-amount" placeholder="0.00" step="0.01" min="0"></div>
+          <div class="form-group"><label>Description</label><input type="text" id="inv-desc" placeholder="e.g. 168hrs @ $3/hr + 5% commission"></div>
+          <div class="form-group full"><label>Bank / Payment Details</label><textarea id="inv-bank" placeholder="PayPal: you@email.com or Bank: Sort 00-00-00 Acc 12345678"></textarea></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="submitInvoice()">📤 Submit Invoice</button></div>
+        <div id="inv-alert" class="alert"></div>
+      </div>
+      <div id="invoice-admin-panel" style="display:none;">
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">All Invoices</div>
+          <div style="margin-bottom:12px;"><select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Amount</th><th>Description</th><th>Payment Details</th><th>Status</th><th></th></tr></thead>
+            <tbody id="invoices-body"></tbody>
+          </table></div>
+          <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No invoices yet</p></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">My Invoices</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Week</th><th>Amount</th><th>Description</th><th>Status</th><th>Submitted</th></tr></thead>
+          <tbody id="my-invoices-body"></tbody>
+        </table></div>
+        <div id="my-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="page" id="page-team">
+      <div class="page-title">Team Access</div>
+      <div class="page-sub">Anyone who signs up appears here — assign their role to grant access</div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th></tr></thead>
+          <tbody id="team-body"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Model Modal -->
+<div class="modal-overlay" id="model-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="model-modal-title">Add Model</span><button class="modal-close" onclick="closeModal('model-modal')">✕</button></div>
+    <input type="hidden" id="model-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Model Name</label><input type="text" id="model-name" placeholder="e.g. Nelly"></div>
+      <div class="form-group"><label>OF Account Handle</label><input type="text" id="model-of" placeholder="@handle"></div>
+      <div class="form-group"><label>Platform</label><select id="model-platform"><option>Liam Free</option><option>Liam VIP</option><option>Independent</option></select></div>
+      <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="70" min="0" max="100"></div>
+      <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
+      <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
+      <button class="btn btn-ghost" onclick="closeModal('model-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chatter Modal -->
+<div class="modal-overlay" id="chatter-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="chatter-modal-title">Add Chatter</span><button class="modal-close" onclick="closeModal('chatter-modal')">✕</button></div>
+    <input type="hidden" id="chatter-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="chatter-name" placeholder="Full name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="chatter-email" placeholder="chatter@gmail.com"></div>
+      <div class="form-group"><label>Hourly Rate ($)</label><input type="number" id="chatter-rate" value="3"></div>
+      <div class="form-group"><label>Commission %</label><input type="number" id="chatter-commission" value="5"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveChatter()">💾 Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('chatter-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────
+const SUPABASE_URL = 'https://supabase.com/dashboard/project/wdppbcmirldkviqxtjml';
+const SUPABASE_ANON_KEY = 'sb_publishable_QVFNm5swDIM1V93qHHiT-Q_yELzQFiC';
+// ────────────────────────────────────────────────────────────
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
+
+var NAV = [
+  { id: 'overview', icon: '🏠', label: 'Overview',       roles: ['admin','va','chatter','traffic','model'] },
+  { id: 'content',  icon: '📹', label: 'Content Orders', roles: ['admin','va','model'] },
+  { id: 'reports',  icon: '📊', label: 'Weekly Reports', roles: ['admin','va'] },
+  { id: 'models',   icon: '👤', label: 'Model Settings', roles: ['admin','va'] },
+  { id: 'chatters', icon: '💬', label: 'Chatter Mgmt',   roles: ['admin','va'] },
+  { id: 'invoices', icon: '🧾', label: 'Invoices',       roles: ['admin','va','chatter','traffic','model'] },
+  { id: 'team',     icon: '🔑', label: 'Team Access',    roles: ['admin'] }
+];
+
+// ── Init ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { await initApp(session.user); }
+  else { hide('loading-overlay'); show('auth-screen'); }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) await initApp(session.user);
+    if (event === 'SIGNED_OUT') { hide('app'); show('auth-screen'); }
+  });
+});
+
+async function initApp(user) {
+  STATE.user = user;
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  STATE.profile = profile;
+  hide('loading-overlay');
+  if (!profile || profile.role === 'pending') {
+    show('auth-screen');
+    hide('login-form'); hide('signup-form'); show('pending-screen');
+    return;
+  }
+  hide('auth-screen');
+  show('app');
+  document.getElementById('user-email-display').textContent = profile.email;
+  document.getElementById('user-role-display').textContent = profile.role;
+  buildNav(profile.role);
+  await loadAllData();
+  navigate('overview');
+}
+
+function buildNav(role) {
+  const nav = document.getElementById('nav'); nav.innerHTML = '';
+  NAV.forEach(item => {
+    if (!item.roles.includes(role)) return;
+    const div = document.createElement('div');
+    div.className = 'nav-item'; div.id = 'nav-' + item.id;
+    div.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
+    div.onclick = () => navigate(item.id);
+    nav.appendChild(div);
+  });
+}
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const el = document.getElementById('page-' + page); if (el) el.classList.add('active');
+  const nav = document.getElementById('nav-' + page); if (nav) nav.classList.add('active');
+  if (page === 'overview') renderOverview();
+  if (page === 'invoices') renderInvoicePage();
+  if (page === 'team') loadTeam();
+  if (page === 'chatters') loadChatterWeeks();
+  if (page === 'reports') loadReportHistory();
+}
+
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='signup')));
+  document.getElementById('login-form').style.display = tab==='login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = tab==='signup' ? 'block' : 'none';
+  document.getElementById('pending-screen').style.display = 'none';
+}
+
+async function signIn() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) showAuthMsg(error.message, 'error');
+}
+
+async function signUp() {
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!name || !email || !password) return showAuthMsg('Please fill in all fields.', 'error');
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) return showAuthMsg(error.message, 'error');
+  if (data.user) {
+    await sb.from('profiles').upsert({ id: data.user.id, email, name, role: 'pending' });
+    hide('login-form'); hide('signup-form'); show('pending-screen');
+    showAuthMsg('Account created! Waiting for admin to assign your role.', 'success');
+  }
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+function showAuthMsg(msg, type) {
+  const el = document.getElementById(type==='error' ? 'auth-error' : 'auth-success');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+// ── Data ─────────────────────────────────────────────────────
+async function loadAllData() {
+  const [m, c, o] = await Promise.all([
+    sb.from('models').select('*').order('name'),
+    sb.from('chatters').select('*').order('name'),
+    STATE.profile.role === 'model'
+      ? sb.from('content_orders').select('*').eq('model_email', STATE.profile.email).order('created_at',{ascending:false})
+      : sb.from('content_orders').select('*').order('created_at',{ascending:false})
+  ]);
+  STATE.models = m.data||[]; STATE.chatters = c.data||[]; STATE.contentOrders = o.data||[];
+  renderModels(); renderChatters(); renderContentOrders(); populateModelDropdowns(); populateChatterDropdown();
+}
+
+// ── Overview ─────────────────────────────────────────────────
+async function renderOverview() {
+  const { data } = await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
+  STATE.reports = data||[];
+  const weeks = [...new Set(STATE.reports.map(r=>r.week_of))];
+  const latest = weeks[0]||'';
+  const week = STATE.reports.filter(r=>r.week_of===latest);
+  const totalE = week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const totalP = week.reduce((s,r)=>s+parseFloat(r.agency_profit||0),0);
+  const fans   = week.reduce((s,r)=>s+parseInt(r.active_fans||0),0);
+  document.getElementById('overview-stats').innerHTML =
+    statCard('Total Earnings','$'+fmt(totalE),'purple') +
+    statCard('Agency Profit','$'+fmt(totalP),'green') +
+    statCard('Active Fans',fans.toLocaleString(),'blue') +
+    statCard('Models Active',week.length,'');
+  const sorted = week.slice().sort((a,b)=>parseFloat(b.total_earnings)-parseFloat(a.total_earnings));
+  const tbody = document.getElementById('leaderboard-body'); tbody.innerHTML='';
+  if (!sorted.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);">No data — upload a weekly report first</td></tr>'; return; }
+  sorted.forEach((r,i) => {
+    tbody.innerHTML += `<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||'—'}</td></tr>`;
+  });
+}
+function statCard(l,v,c){return `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value ${c}">${v}</div></div>`;}
+
+// ── Content Orders ───────────────────────────────────────────
+function populateModelDropdowns() {
+  const sel=document.getElementById('co-model');
+  if(sel) sel.innerHTML=STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  const fsel=document.getElementById('co-filter-model');
+  if(fsel) fsel.innerHTML='<option value="">All Models</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
+}
+
+function renderContentOrders(filtered) {
+  const orders = filtered!==undefined ? filtered : STATE.contentOrders;
+  const tbody=document.getElementById('content-orders-body'); const empty=document.getElementById('content-empty');
+  tbody.innerHTML='';
+  if(!orders.length){empty.style.display='block';return;} empty.style.display='none';
+  orders.forEach(o=>{
+    const pl=o.platform==='instagram'?'<span class="platform-ig">IG</span>':o.platform==='tiktok'?'<span class="platform-tt">TT</span>':o.platform;
+    const canEdit=['admin','va'].includes(STATE.profile.role)||STATE.profile.email===o.model_email;
+    tbody.innerHTML+=`<tr>
+      <td><strong>${o.model_name||'—'}</strong></td><td>${pl}</td>
+      <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
+      <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
+      <td style="max-width:180px;">${o.notes||'—'}</td>
+      <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
+      <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
+      <td style="display:flex;gap:4px;">
+        ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓</button>`:''}
+        ${STATE.profile.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>`:''}
+      </td></tr>`;
+  });
+}
+
+function filterContentOrders() {
+  const m=document.getElementById('co-filter-model').value;
+  const s=document.getElementById('co-filter-status').value;
+  renderContentOrders(STATE.contentOrders.filter(o=>(!m||o.model_id===m)&&(!s||o.status===s)));
+}
+
+async function submitContentOrder() {
+  const modelId=document.getElementById('co-model').value;
+  const model=STATE.models.find(m=>m.id===modelId);
+  const url=document.getElementById('co-url').value.trim();
+  if(!url) return showAlert('co-alert','Content URL required.','error');
+  const{data,error}=await sb.from('content_orders').insert({model_id:modelId,model_name:model?.name,model_email:model?.email,platform:document.getElementById('co-platform').value,url,drive_link:document.getElementById('co-drive').value.trim(),notes:document.getElementById('co-notes').value.trim(),status:'pending'}).select().single();
+  if(error) return showAlert('co-alert',error.message,'error');
+  STATE.contentOrders.unshift(data); renderContentOrders();
+  showAlert('co-alert','Order added!','success');
+  document.getElementById('co-url').value=''; document.getElementById('co-drive').value=''; document.getElementById('co-notes').value='';
+}
+
+async function markDone(id) {
+  await sb.from('content_orders').update({status:'done'}).eq('id',id);
+  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='done'; renderContentOrders();
+}
+
+async function deleteOrder(id) {
+  if(!confirm('Delete?'))return;
+  await sb.from('content_orders').delete().eq('id',id);
+  STATE.contentOrders=STATE.contentOrders.filter(o=>o.id!==id); renderContentOrders();
+}
+
+// ── Reports ──────────────────────────────────────────────────
+function switchReportTab(tab) {
+  document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='upload')||(i===1&&tab==='history')));
+  document.getElementById('report-tab-upload').style.display=tab==='upload'?'block':'none';
+  document.getElementById('report-tab-history').style.display=tab==='history'?'block':'none';
+  if(tab==='history') loadReportHistory();
+}
+
+function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
+
+function handleCsvFile(file){const r=new FileReader();r.onload=e=>{const rows=parseCSV(e.target.result);if(!rows.length)return showAlert('report-alert','Could not parse CSV.','error');previewReport(rows);};r.readAsText(file);}
+
+function parseCSV(text){const lines=text.trim().split('\n');if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));return lines.slice(1).map(line=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});return obj;});}
+
+function previewReport(rows) {
+  const weekOf=document.getElementById('report-week').value;
+  if(!weekOf) return showAlert('report-alert','Select a Week Of date first.','error');
+  const parsed=rows.map(row=>{
+    const name=row['Account']||row['Creator']||row['Model']||row['Name']||'';
+    const earnings=parseFloat(row['Total Earnings']||row['Earnings']||row['Net Revenue']||0);
+    let renewPct=parseFloat(row['Renew %']||row['Renewal Rate']||0); if(renewPct>1)renewPct=renewPct/100;
+    const activeFans=parseInt(row['Active Fans']||row['Fans']||0);
+    const newFans=parseInt(row['New Fans']||row['New Subscribers']||0);
+    const model=STATE.models.find(m=>m.name.toLowerCase()===name.toLowerCase()||(m.of_account||'').toLowerCase()===name.toLowerCase());
+    const split=model?parseFloat(model.split||70):70;
+    const modelPayout=earnings*(split/100); const agencyNet=earnings-modelPayout;
+    return{week_of:weekOf,model_id:model?.id||null,model_name:name,total_earnings:earnings,model_split:split,model_payout:modelPayout,agency_net:agencyNet,chatter_wages:0,agency_profit:agencyNet,renew_pct:renewPct,active_fans:activeFans,new_fans:newFans};
+  }).filter(r=>r.total_earnings>0||r.model_name);
+  const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
+  const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
+  let html=`<div class="card"><div class="card-title">Preview — ${parsed.length} accounts</div><div class="table-wrap"><table><thead><tr><th>Account</th><th>Earnings</th><th>Split %</th><th>Model Payout</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  parsed.forEach(r=>{html+=`<tr><td>${r.model_name}</td><td>$${fmt(r.total_earnings)}</td><td>${r.model_split}%</td><td>$${fmt(r.model_payout)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(r.renew_pct*100).toFixed(1)}%</td><td>${r.active_fans}</td></tr>`;});
+  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div>`;
+  html+=`<div class="btn-row"><button class="btn btn-primary" onclick='saveReport(${JSON.stringify(parsed)})'>💾 Save Report</button></div></div>`;
+  document.getElementById('csv-preview').innerHTML=html;
+}
+
+async function saveReport(rows){const{error}=await sb.from('weekly_reports').insert(rows);if(error)return showAlert('report-alert',error.message,'error');showAlert('report-alert',`Saved! ${rows.length} rows recorded.`,'success');}
+
+async function loadReportHistory(){
+  const{data}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
+  const tbody=document.getElementById('report-history-body'); const empty=document.getElementById('report-empty');
+  tbody.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+  data.forEach(r=>{const p=parseFloat(r.agency_profit||0);tbody.innerHTML+=`<tr><td>${fmtDate(r.week_of)}</td><td>${r.model_name}</td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td>$${fmt(r.agency_net)}</td><td class="${p>=0?'profit':'loss'}">$${fmt(p)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`;});
+}
+
+// ── Models ───────────────────────────────────────────────────
+function renderModels(){
+  const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
+  if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
+  STATE.models.forEach(m=>{tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td>${m.split||70}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function editModel(id){
+  const m=STATE.models.find(x=>x.id===id);
+  document.getElementById('model-modal-title').textContent='Edit Model';
+  document.getElementById('model-id').value=m.id; document.getElementById('model-name').value=m.name;
+  document.getElementById('model-of').value=m.of_account||''; document.getElementById('model-platform').value=m.platform||'Liam Free';
+  document.getElementById('model-split').value=m.split||70; document.getElementById('model-chatters').value=m.chatters||'';
+  document.getElementById('model-email').value=m.email||''; openModal('model-modal');
+}
+
+async function saveModel(){
+  const id=document.getElementById('model-id').value;
+  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim()};
+  if(!p.name)return alert('Name required');
+  if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
+  else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
+  renderModels();populateModelDropdowns();closeModal('model-modal');
+  document.getElementById('model-id').value=''; document.getElementById('model-modal-title').textContent='Add Model';
+}
+
+async function delModel(id){if(!confirm('Remove model?'))return;await sb.from('models').delete().eq('id',id);STATE.models=STATE.models.filter(m=>m.id!==id);renderModels();populateModelDropdowns();}
+
+// ── Chatters ─────────────────────────────────────────────────
+function renderChatters(){
+  const tbody=document.getElementById('chatters-body'); tbody.innerHTML='';
+  STATE.chatters.forEach(c=>{tbody.innerHTML+=`<tr><td><strong>${c.name}</strong></td><td style="color:var(--text2);">${c.email||'—'}</td><td>$${c.hourly_rate||3}/hr</td><td>${c.commission_pct||5}%</td><td><button class="btn btn-sm btn-ghost" onclick="editChatter('${c.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delChatter('${c.id}')">✕</button></td></tr>`;});
+}
+
+function populateChatterDropdown(){const sel=document.getElementById('hours-chatter');if(sel)sel.innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}
+
+function editChatter(id){
+  const c=STATE.chatters.find(x=>x.id===id);
+  document.getElementById('chatter-modal-title').textContent='Edit Chatter';
+  document.getElementById('chatter-id').value=c.id; document.getElementById('chatter-name').value=c.name;
+  document.getElementById('chatter-email').value=c.email||''; document.getElementById('chatter-rate').value=c.hourly_rate||3;
+  document.getElementById('chatter-commission').value=c.commission_pct||5; openModal('chatter-modal');
+}
+
+async function saveChatter(){
+  const id=document.getElementById('chatter-id').value;
+  const p={name:document.getElementById('chatter-name').value.trim(),email:document.getElementById('chatter-email').value.trim(),hourly_rate:document.getElementById('chatter-rate').value,commission_pct:document.getElementById('chatter-commission').value};
+  if(!p.name)return alert('Name required');
+  if(id){await sb.from('chatters').update(p).eq('id',id);const i=STATE.chatters.findIndex(c=>c.id===id);if(i>-1)STATE.chatters[i]={...STATE.chatters[i],...p};}
+  else{const{data}=await sb.from('chatters').insert(p).select().single();STATE.chatters.push(data);}
+  renderChatters();populateChatterDropdown();closeModal('chatter-modal');
+  document.getElementById('chatter-id').value=''; document.getElementById('chatter-modal-title').textContent='Add Chatter';
+}
+
+async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();}
+
+function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));}
+
+function previewWage(){const id=document.getElementById('hours-chatter').value;const c=STATE.chatters.find(x=>x.id===id);if(!c)return;const h=parseFloat(document.getElementById('hours-count').value||0);const e=parseFloat(document.getElementById('hours-earnings').value||0);const base=h*(parseFloat(c.hourly_rate||3));const comm=e*(parseFloat(c.commission_pct||5)/100);document.getElementById('hours-preview').textContent=`Base: $${fmt(base)} + Commission: $${fmt(comm)} = Total: $${fmt(base+comm)}`;}
+
+async function logHours(){
+  const id=document.getElementById('hours-chatter').value; const c=STATE.chatters.find(x=>x.id===id); if(!c)return showAlert('hours-alert','Select a chatter.','error');
+  const h=parseFloat(document.getElementById('hours-count').value||0); const e=parseFloat(document.getElementById('hours-earnings').value||0);
+  const base=h*(parseFloat(c.hourly_rate||3)); const comm=e*(parseFloat(c.commission_pct||5)/100); const total=base+comm;
+  const{error}=await sb.from('chatter_hours').insert({chatter_id:c.id,chatter_name:c.name,week_of:document.getElementById('hours-week').value,hours:h,hourly_rate:c.hourly_rate||3,commission_earned:e,commission_pct:c.commission_pct||5,total_wage:total});
+  if(error)return showAlert('hours-alert',error.message,'error');
+  showAlert('hours-alert',`Logged! Total: $${fmt(total)}`,'success');
+}
+
+async function loadChatterWeeks(){
+  const{data}=await sb.from('chatter_hours').select('week_of').order('week_of',{ascending:false});
+  const weeks=[...new Set((data||[]).map(h=>h.week_of))];
+  const sel=document.getElementById('summary-week');
+  sel.innerHTML='<option value="">Select week…</option>'+weeks.map(w=>`<option value="${w}">${w}</option>`).join('');
+}
+
+async function loadHoursSummary(){
+  const week=document.getElementById('summary-week').value; if(!week)return;
+  const{data}=await sb.from('chatter_hours').select('*').eq('week_of',week);
+  const tbody=document.getElementById('summary-body'); tbody.innerHTML=''; let grand=0;
+  (data||[]).forEach(h=>{const wage=parseFloat(h.total_wage||0);grand+=wage;tbody.innerHTML+=`<tr><td>${h.chatter_name}</td><td>${h.hours}h</td><td>$${fmt(h.hours*(h.hourly_rate||3))}</td><td>$${fmt(h.commission_earned*((h.commission_pct||5)/100))}</td><td><strong>$${fmt(wage)}</strong></td></tr>`;});
+  document.getElementById('summary-total').innerHTML=`Total wages: <span class="loss">$${fmt(grand)}</span>`;
+}
+
+// ── Invoices ─────────────────────────────────────────────────
+async function renderInvoicePage(){
+  const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va';
+  document.getElementById('invoice-admin-panel').style.display=isAdmin?'block':'none';
+  const wk=document.getElementById('inv-week'); if(!wk.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+1);wk.value=d.toISOString().split('T')[0];}
+  if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderInvoicesTable(STATE.invoices);}
+  renderMyInvoices();
+}
+
+function renderInvoicesTable(invs){
+  const tbody=document.getElementById('invoices-body'); const empty=document.getElementById('invoices-empty'); tbody.innerHTML='';
+  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
+  invs.forEach(inv=>{tbody.innerHTML+=`<tr><td>${inv.submitted_by_name}</td><td><span class="badge ${inv.role}">${inv.role}</span></td><td>${fmtDate(inv.week_of)}</td><td><strong>$${fmt(inv.amount)}</strong></td><td>${inv.description||'—'}</td><td style="font-size:11px;color:var(--text2);">${inv.bank_details||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="display:flex;gap:4px;"><button class="btn btn-sm btn-green" onclick="updateInvoice('${inv.id}','approved')">✓</button><button class="btn btn-sm btn-ghost" onclick="updateInvoice('${inv.id}','processing')">⏳</button><button class="btn btn-sm btn-danger" onclick="updateInvoice('${inv.id}','rejected')">✕</button></td></tr>`;});
+}
+
+function filterInvoices(){const s=document.getElementById('inv-filter').value;renderInvoicesTable(s?STATE.invoices.filter(i=>i.status===s):STATE.invoices);}
+
+async function renderMyInvoices(){
+  const{data}=await sb.from('invoices').select('*').eq('submitted_by_email',STATE.profile.email).order('created_at',{ascending:false});
+  const tbody=document.getElementById('my-invoices-body'); const empty=document.getElementById('my-invoices-empty'); tbody.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+  data.forEach(inv=>{tbody.innerHTML+=`<tr><td>${fmtDate(inv.week_of)}</td><td>$${fmt(inv.amount)}</td><td>${inv.description||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(inv.created_at)}</td></tr>`;});
+}
+
+async function submitInvoice(){
+  const inv={submitted_by_email:STATE.profile.email,submitted_by_name:STATE.profile.name,role:document.getElementById('inv-role').value,week_of:document.getElementById('inv-week').value,amount:document.getElementById('inv-amount').value,description:document.getElementById('inv-desc').value.trim(),bank_details:document.getElementById('inv-bank').value.trim(),status:'pending'};
+  if(!inv.amount||!inv.week_of)return showAlert('inv-alert','Fill in week and amount.','error');
+  const{error}=await sb.from('invoices').insert(inv);
+  if(error)return showAlert('inv-alert',error.message,'error');
+  showAlert('inv-alert','Invoice submitted! 🎉','success');
+  document.getElementById('inv-amount').value=''; document.getElementById('inv-desc').value='';
+  renderMyInvoices();
+}
+
+async function updateInvoice(id,status){
+  await sb.from('invoices').update({status}).eq('id',id);
+  const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status; renderInvoicesTable(STATE.invoices);
+}
+
+// ── Team ─────────────────────────────────────────────────────
+async function loadTeam(){
+  const{data}=await sb.from('profiles').select('*').order('created_at');
+  const tbody=document.getElementById('team-body'); tbody.innerHTML='';
+  (data||[]).forEach(u=>{
+    tbody.innerHTML+=`<tr><td>${u.name||'—'}</td><td>${u.email}</td><td><span class="badge ${u.role}">${u.role}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(u.created_at)}</td><td><select onchange="updateRole('${u.id}',this.value)" style="width:120px;padding:4px 8px;font-size:12px;"><option value="">Change role…</option><option value="admin">Admin</option><option value="va">VA</option><option value="chatter">Chatter</option><option value="traffic">Traffic</option><option value="model">Model</option><option value="pending">Pending</option></select></td></tr>`;
+  });
+}
+
+async function updateRole(id,role){if(!role)return;await sb.from('profiles').update({role}).eq('id',id);loadTeam();}
+
+// ── Utils ────────────────────────────────────────────────────
+function fmt(n){return parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function showAlert(id,msg,type){const el=document.getElementById(id);if(!el)return;el.className='alert alert-'+(type==='success'?'success':'error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',4000);}
+function show(id){const el=document.getElementById(id);if(el)el.style.display='flex';}
+function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
+</script>
+</body>
+</html>
