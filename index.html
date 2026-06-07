@@ -7,16 +7,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0f0f11; --surface: #1a1a1f; --surface2: #222228;
-    --border: #2e2e38; --accent: #7c5cfc; --accent2: #a78bfa;
-    --text: #f0f0f5; --text2: #9090a8; --green: #22c55e;
-    --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
+    --bg: #080808; --surface: #0a0a12; --surface2: #0f0f1a;
+    --border: #1a1a2e; --accent: #1e4fff; --accent2: #6b8fff;
+    --text: #e8eaf0; --text2: #3a4060; --green: #4a9eff;
+    --red: #ef4444; --yellow: #ffc83c; --blue: #6b8fff;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
   #auth-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; }
-  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 36px; width: 380px; }
-  .auth-logo { font-size: 24px; font-weight: 800; color: var(--accent2); margin-bottom: 6px; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 36px; width: 380px; border-top: 2px solid var(--accent); }
+  .auth-logo { font-size: 26px; font-weight: 800; color: #ffffff; margin-bottom: 4px; letter-spacing: 1px; }
+  .auth-logo span { display: block; font-size: 9px; color: var(--text2); letter-spacing: 3px; font-weight: 500; text-transform: uppercase; margin-bottom: 4px; }
   .auth-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
   .auth-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
   .auth-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -27,12 +28,15 @@
   .pending-msg strong { color: var(--text); display: block; margin-bottom: 8px; font-size: 16px; }
   #app { display: none; min-height: 100vh; }
   #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
-  .logo { padding: 20px 18px 14px; font-weight: 800; font-size: 18px; color: var(--accent2); letter-spacing: -0.5px; }
-  nav { flex: 1; padding: 8px 10px; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 2px; transition: all 0.15s; }
+  .logo { padding: 20px 18px 16px; font-weight: 800; font-size: 18px; color: #ffffff; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  .logo::after { content: ''; display: block; width: 28px; height: 2px; background: var(--accent); margin-top: 8px; border-radius: 1px; }
+  .logo span { display: block; font-size: 9px; color: var(--text2); letter-spacing: 3px; font-weight: 500; margin-top: 3px; text-transform: uppercase; }
+  .nav-section { font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #1e2640; padding: 10px 12px 4px; }
+  nav { flex: 1; padding: 8px 8px; overflow-y: auto; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 1px; transition: all 0.15s; letter-spacing: 0.2px; border-left: 2px solid transparent; }
   .nav-item:hover { background: var(--surface2); color: var(--text); }
-  .nav-item.active { background: var(--accent); color: #fff; }
-  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-item.active { background: rgba(30,79,255,0.1); color: #ffffff; border-left-color: var(--accent); border-radius: 0 6px 6px 0; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
   .user-info { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; }
   .user-email { color: var(--text2); word-break: break-all; margin-bottom: 4px; }
   .user-role { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: var(--accent); color: #fff; }
@@ -41,14 +45,17 @@
   #main { margin-left: 220px; padding: 28px; min-height: 100vh; }
   .page { display: none; }
   .page.active { display: block; }
-  .page-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-  .page-sub { color: var(--text2); font-size: 13px; margin-bottom: 24px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  .card-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+  .page-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.5px; color: #ffffff; }
+  .page-sub { color: var(--text2); font-size: 10px; margin-bottom: 22px; letter-spacing: 2px; text-transform: uppercase; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-bottom: 14px; }
+  .card-title { font-size: 9px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 14px; }
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
-  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 8px; }
-  .stat-value { font-size: 26px; font-weight: 800; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; border-top: 2px solid var(--border); }
+  .stat-card.accent { border-top-color: var(--accent); }
+  .stat-card.white { border-top-color: #ffffff; }
+  .stat-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--text2); margin-bottom: 8px; }
+  .stat-value { font-size: 24px; font-weight: 800; }
+  .stat-value.blue { color: var(--accent2); }
   .stat-value.green { color: var(--green); } .stat-value.purple { color: var(--accent2); } .stat-value.blue { color: var(--blue); }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -75,7 +82,7 @@
   input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   textarea { resize: vertical; min-height: 80px; }
   select option { background: var(--surface2); }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; font-family: inherit; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; letter-spacing: 0.3px; }
   .btn:hover { opacity: 0.85; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-block { width: 100%; }
@@ -89,9 +96,9 @@
   .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
   .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
   .modal-close { cursor: pointer; background: none; border: none; color: var(--text2); font-size: 18px; font-family: inherit; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
-  .tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .tab.active { color: var(--accent2); border-color: var(--accent2); }
+  .tabs { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 16px; font-size: 11px; font-weight: 600; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; letter-spacing: 1px; text-transform: uppercase; }
+  .tab.active { color: #ffffff; border-color: var(--accent); }
   .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
   .alert-success { background: #0f2a1a; color: var(--green); border: 1px solid #1a4a2a; }
   .alert-error { background: #2a0f0f; color: var(--red); border: 1px solid #3d1515; }
@@ -113,7 +120,7 @@
 
 <div id="auth-screen">
   <div class="auth-box">
-    <div class="auth-logo">AgencyOS</div>
+    <div class="auth-logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <div class="auth-sub">Sign in to your agency dashboard</div>
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchAuthTab('login')">Sign In</div>
@@ -141,7 +148,7 @@
 
 <div id="app">
   <div id="sidebar">
-    <div class="logo">AgencyOS</div>
+    <div class="logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <nav id="nav"></nav>
     <div class="user-info">
       <div class="user-email" id="user-email-display"></div>
@@ -153,8 +160,15 @@
 
     <!-- Overview -->
     <div class="page" id="page-overview">
-      <div class="page-title">Agency Overview</div>
-      <div class="page-sub">This week at a glance</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;">
+        <div>
+          <div class="page-title">Agency Overview</div>
+          <div class="page-sub" id="overview-period">Latest week</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(30,79,255,0.1);border:1px solid rgba(30,79,255,0.25);border-radius:4px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;"></span>Live
+        </div>
+      </div>
       <div class="stats-grid" id="overview-stats"></div>
       <div class="card">
         <div class="card-title">Model Leaderboard — Latest Week</div>
@@ -162,6 +176,10 @@
           <thead><tr><th>#</th><th>Model</th><th>Earnings</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead>
           <tbody id="leaderboard-body"></tbody>
         </table></div>
+      </div>
+      <div id="overview-ticker" style="margin-top:4px;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:14px;overflow:hidden;">
+        <span style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--accent);flex-shrink:0;border-right:1px solid var(--border);padding-right:14px;">Feed</span>
+        <div id="overview-ticker-text" style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
       </div>
     </div>
 
@@ -215,29 +233,49 @@
       <div class="page-title">Weekly Reports</div>
       <div class="page-sub">Upload Infloww CSV to calculate earnings, splits and agency profit</div>
       <div class="tabs">
-        <div class="tab active" onclick="switchReportTab('upload')">Upload CSV</div>
+        <div class="tab active" onclick="switchReportTab('upload')">Creator Stats</div>
+        <div class="tab" onclick="switchReportTab('chatters')">Chatter Performance</div>
         <div class="tab" onclick="switchReportTab('history')">History</div>
       </div>
+
+      <!-- Creator Stats Upload -->
       <div id="report-tab-upload">
         <div class="card">
+          <div class="card-title">Upload Infloww Creator Statistics</div>
           <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
             <div class="form-group" style="max-width:180px;"><label>From</label><input type="date" id="report-week-start"></div>
             <div class="form-group" style="max-width:180px;"><label>To</label><input type="date" id="report-week-end"></div>
+            <div style="font-size:12px;color:var(--text2);padding-bottom:10px;">Dates auto-fill from file</div>
           </div>
           <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
             <div style="font-size:32px;">📄</div>
-            <p>Click or drag CSV to upload</p>
-            <p style="font-size:11px;margin-top:4px;">Infloww Creator Statistics export</p>
+            <p>Click or drag Creator Statistics CSV/XLSX</p>
           </div>
-          <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCsvFile(this.files[0])">
+          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
           <div id="csv-preview" style="margin-top:16px;"></div>
           <div id="report-alert" class="alert"></div>
         </div>
       </div>
+
+      <!-- Chatter Performance Upload -->
+      <div id="report-tab-chatters" style="display:none;">
+        <div class="card">
+          <div class="card-title">Upload Infloww Employee Report</div>
+          <div class="file-drop" onclick="document.getElementById('chatter-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)">
+            <div style="font-size:32px;">📄</div>
+            <p>Click or drag Employee Performance CSV/XLSX</p>
+          </div>
+          <input type="file" id="chatter-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
+          <div id="chatter-csv-preview" style="margin-top:16px;"></div>
+          <div id="chatter-report-alert" class="alert"></div>
+        </div>
+      </div>
+
+      <!-- History -->
       <div id="report-tab-history" style="display:none;">
         <div class="card">
           <div class="table-wrap"><table>
-            <thead><tr><th>Week Of</th><th>Model</th><th>Earnings</th><th>Model Payout</th><th>Agency Net</th><th>Agency Profit</th><th>Renew %</th></tr></thead>
+            <thead><tr><th>Period</th><th>Model</th><th>Earnings</th><th>Model Payout</th><th>Agency Net</th><th>Agency Profit</th><th>Renew %</th></tr></thead>
             <tbody id="report-history-body"></tbody>
           </table></div>
           <div id="report-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No reports yet</p></div>
@@ -309,7 +347,8 @@
         <div class="card-title">Submit Invoice</div>
         <div class="form-grid">
           <div class="form-group"><label>Your Role</label><select id="inv-role"><option value="chatter">Chatter</option><option value="traffic">Traffic Team</option><option value="va">VA / Manager</option></select></div>
-          <div class="form-group"><label>Week Of</label><input type="date" id="inv-week"></div>
+          <div class="form-group"><label>Week From</label><input type="date" id="inv-week-start" onchange="syncInvWeek()"></div>
+          <div class="form-group"><label>Week To</label><input type="date" id="inv-week-end"></div>
           <div class="form-group"><label>Salary Earnings ($)</label><input type="number" id="inv-salary" placeholder="0.00" step="0.01" min="0"></div>
           <div class="form-group"><label>Commission Earnings ($)</label><input type="number" id="inv-commission" placeholder="0.00" step="0.01" min="0"></div>
           <div class="form-group full"><label>Description / Notes (optional)</label><input type="text" id="inv-desc" placeholder="e.g. 168hrs chatting, 5% commission on $X earnings"></div>
@@ -562,17 +601,17 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
 
 var NAV = [
-  { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic','model'] },
-  { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'] },
-  { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'] },
-  { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'] },
-  { id: 'content',    icon: '📹', label: 'Content Orders',  roles: ['admin','va','model'] },
-  { id: 'reports',    icon: '📊', label: 'Weekly Reports',  roles: ['admin','va'] },
-  { id: 'models',     icon: '👤', label: 'Model Settings',  roles: ['admin','va'] },
-  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',    roles: ['admin','va'] },
-  { id: 'expenses',   icon: '💸', label: 'Expenses',        roles: ['admin','va'] },
-  { id: 'invoices',   icon: '🧾', label: 'Invoices',        roles: ['admin','va','chatter','traffic','model'] },
-  { id: 'team',       icon: '🔑', label: 'Team Access',     roles: ['admin'] }
+  { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic','model'], section: 'Workspace' },
+  { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'],         section: null },
+  { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'],         section: null },
+  { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'],                             section: null },
+  { id: 'content',    icon: '📹', label: 'Content Orders',  roles: ['admin','va','model'],                     section: 'Operations' },
+  { id: 'reports',    icon: '📊', label: 'Weekly Reports',  roles: ['admin','va'],                             section: null },
+  { id: 'models',     icon: '👤', label: 'Model Settings',  roles: ['admin','va'],                             section: null },
+  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',    roles: ['admin','va'],                             section: null },
+  { id: 'expenses',   icon: '💸', label: 'Expenses',        roles: ['admin','va'],                             section: 'Finance' },
+  { id: 'invoices',   icon: '🧾', label: 'Invoices',        roles: ['admin','va','chatter','traffic','model'], section: null },
+  { id: 'team',       icon: '🔑', label: 'Team Access',     roles: ['admin'],                                  section: 'Admin' }
 ];
 
 // ── Init ─────────────────────────────────────────────────────
@@ -608,11 +647,19 @@ async function initApp(user) {
 
 function buildNav(role) {
   const nav = document.getElementById('nav'); nav.innerHTML = '';
-  const customPerms = STATE.profile?.permissions; // array of page ids or null
+  const customPerms = STATE.profile?.permissions;
+  let lastSection = null;
   NAV.forEach(item => {
-    // If user has custom permissions set, use those; otherwise fall back to role defaults
     const allowed = customPerms ? customPerms.includes(item.id) : item.roles.includes(role);
     if (!allowed) return;
+    // Add section label if new section
+    if (item.section && item.section !== lastSection) {
+      const sec = document.createElement('div');
+      sec.className = 'nav-section';
+      sec.textContent = item.section;
+      nav.appendChild(sec);
+      lastSection = item.section;
+    }
     const div = document.createElement('div');
     div.className = 'nav-item'; div.id = 'nav-' + item.id;
     div.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
@@ -707,20 +754,35 @@ async function renderOverview() {
   }).reduce((s,e)=>s+parseFloat(e.amount||0),0);
   const netProfit=totalP-weekExpenses;
   document.getElementById('overview-stats').innerHTML =
-    statCard('Total Earnings','$'+fmt(totalE),'purple') +
-    statCard('Agency Net','$'+fmt(totalP),'blue') +
-    statCard('Expenses','$'+fmt(weekExpenses),'') +
-    statCard('Net Profit','$'+fmt(netProfit),netProfit>=0?'green':'') +
-    statCard('Active Fans',fans.toLocaleString(),'') +
-    statCard('Models Active',week.length,'');
+    statCard('Total Earnings','$'+fmt(totalE),'white','purple') +
+    statCard('Agency Net','$'+fmt(totalP),'accent','blue') +
+    statCard('Expenses','-$'+fmt(weekExpenses),'','') +
+    statCard('Net Profit','$'+fmt(netProfit),'accent',netProfit>=0?'green':'red') +
+    statCard('Active Fans',fans.toLocaleString(),'','') +
+    statCard('Models Active',week.length,'','');
+  // Update period label
+  if(latest){const p=document.getElementById('overview-period');if(p)p.textContent=week[0]?.week_end?`${fmtDate(latest)} – ${fmtDate(week[0].week_end)}`:fmtDate(latest);}
+  // Build ticker
   const sorted = week.slice().sort((a,b)=>parseFloat(b.total_earnings)-parseFloat(a.total_earnings));
+  const tickerParts=[];
+  if(sorted.length)tickerParts.push(`Top model: ${sorted[0].model_name} at $${fmt(sorted[0].total_earnings)}`);
+  if(week.length)tickerParts.push(`${week.length} active models this week`);
+  const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
+  if(avgRenew)tickerParts.push(`Avg renewal rate: ${(avgRenew*100).toFixed(1)}%`);
+  tickerParts.push(`Agency net: $${fmt(totalP)}  ·  Net profit after expenses: $${fmt(netProfit)}`);
+  const tickerEl=document.getElementById('overview-ticker-text');
+  if(tickerEl)tickerEl.textContent=tickerParts.join('   ·   ');
   const tbody = document.getElementById('leaderboard-body'); tbody.innerHTML='';
   if (!sorted.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);">No data — upload a weekly report first</td></tr>'; return; }
   sorted.forEach((r,i) => {
     tbody.innerHTML += `<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||'—'}</td></tr>`;
   });
 }
-function statCard(l,v,c){return `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value ${c}">${v}</div></div>`;}
+function statCard(l,v,borderCls,valCls){
+  const colorMap={green:'#4a9eff',blue:'#6b8fff',purple:'#ffffff',red:'var(--red)'};
+  const col=colorMap[valCls]||'var(--text)';
+  return `<div class="stat-card ${borderCls||''}"><div class="stat-label">${l}</div><div class="stat-value" style="color:${col};">${v}</div></div>`;
+}
 
 // ── Content Orders ───────────────────────────────────────────
 function populateModelDropdowns() {
@@ -751,7 +813,8 @@ function renderContentOrders(filtered) {
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="display:flex;gap:4px;">
-        ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓</button>`:''}
+        ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓ Done</button>`:''}
+        ${canEdit&&o.status==='done'?`<button class="btn btn-sm btn-ghost" onclick="markPending('${o.id}')" style="font-size:11px;">↩ Undo</button>`:''}
         ${STATE.profile.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>`:''}
       </td></tr>`;
   });
@@ -819,6 +882,11 @@ async function markDone(id) {
   const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='done'; renderContentOrders();
 }
 
+async function markPending(id) {
+  await sb.from('content_orders').update({status:'pending'}).eq('id',id);
+  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='pending'; renderContentOrders();
+}
+
 async function deleteOrder(id) {
   if(!confirm('Delete?'))return;
   await sb.from('content_orders').delete().eq('id',id);
@@ -827,10 +895,63 @@ async function deleteOrder(id) {
 
 // ── Reports ──────────────────────────────────────────────────
 function switchReportTab(tab) {
-  document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='upload')||(i===1&&tab==='history')));
+  document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active',
+    (i===0&&tab==='upload')||(i===1&&tab==='chatters')||(i===2&&tab==='history')));
   document.getElementById('report-tab-upload').style.display=tab==='upload'?'block':'none';
+  document.getElementById('report-tab-chatters').style.display=tab==='chatters'?'block':'none';
   document.getElementById('report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='history') loadReportHistory();
+}
+
+function handleChatterCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFile(e.dataTransfer.files[0]);}
+
+function handleChatterCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{const rows=parseCSV(e.target.result);if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');previewChatterReport(rows);};
+  r.readAsText(file);
+}
+
+function previewChatterReport(rows) {
+  const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const dates=parseInflowwDate(dateRaw);
+  const period=dates.start&&dates.end?`${dates.start} to ${dates.end}`:'Unknown period';
+
+  let html=`<div class="card"><div class="card-title">Chatter Performance — ${rows.length} chatters · ${period}</div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>Chatter</th><th>Models</th><th>Sales</th><th>PPV Sales</th><th>Tips</th>
+    <th>DMs Sent</th><th>Fans Chatted</th><th>Fan CVR</th><th>Golden Ratio</th>
+    <th>Sched Hours</th><th>Sales/Hr</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(row=>{
+    const name=row['Employees']||row['Employee']||'—';
+    const creators=row['Creators']||'—';
+    const sales=cleanAmount(row['Sales']||0);
+    const ppv=cleanAmount(row['PPV sales']||row['PPV Sales']||0);
+    const tips=cleanAmount(row['Tips']||0);
+    const dms=row['Direct messages sent']||row['DMs sent']||'—';
+    const fans=row['Fans chatted']||'—';
+    const cvr=row['Fan CVR']||'—';
+    const golden=row['Golden ratio']||row['Golden Ratio']||'—';
+    const hours=row['Scheduled hours']||row['Scheduled Hours']||'—';
+    const sph=row['Sales per hour']||row['Sales Per Hour']||'—';
+    html+=`<tr>
+      <td><strong>${name}</strong></td>
+      <td style="font-size:11px;color:var(--text2);max-width:150px;">${creators}</td>
+      <td class="profit">$${fmt(sales)}</td>
+      <td>$${fmt(ppv)}</td>
+      <td>$${fmt(tips)}</td>
+      <td>${dms}</td>
+      <td>${fans}</td>
+      <td>${cvr}</td>
+      <td>${golden}</td>
+      <td>${hours}</td>
+      <td>${sph}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('chatter-csv-preview').innerHTML=html;
+  showAlert('chatter-report-alert','Chatter report loaded — review above. This is view-only for now.','success');
 }
 
 function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
@@ -839,32 +960,68 @@ function handleCsvFile(file){const r=new FileReader();r.onload=e=>{const rows=pa
 
 function parseCSV(text){const lines=text.trim().split('\n');if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));return lines.slice(1).map(line=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});return obj;});}
 
+function parseInflowwDate(raw) {
+  // Format: "2026-06-01 - 2026-06-07" or "2026-06-01 00:00:00 - 2026-06-06 23:59:59"
+  if(!raw) return {start:'',end:''};
+  const parts = String(raw).split(' - ');
+  const start = parts[0]?.trim().split(' ')[0]||'';
+  const end = parts[1]?.trim().split(' ')[0]||'';
+  return {start, end};
+}
+
+function cleanAmount(val) {
+  if(!val) return 0;
+  return parseFloat(String(val).replace(/[$,%]/g,'').trim())||0;
+}
+
 function previewReport(rows) {
-  const weekStart=document.getElementById('report-week-start').value;
-  const weekEnd=document.getElementById('report-week-end').value;
-  if(!weekStart||!weekEnd) return showAlert('report-alert','Select a date range first.','error');
-  const weekOf=weekStart; // use start date as primary key for grouping
+  // Auto-extract dates from first row if present
+  const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const autoDate = parseInflowwDate(firstDate);
+  let weekStart = document.getElementById('report-week-start').value || autoDate.start;
+  let weekEnd   = document.getElementById('report-week-end').value   || autoDate.end;
+  // Fill in the pickers if auto-detected
+  if(autoDate.start && !document.getElementById('report-week-start').value) document.getElementById('report-week-start').value=autoDate.start;
+  if(autoDate.end   && !document.getElementById('report-week-end').value)   document.getElementById('report-week-end').value=autoDate.end;
+  if(!weekStart||!weekEnd) return showAlert('report-alert','Could not detect date range — please select manually.','error');
+
   const parsed=rows.map(row=>{
-    const name=row['Account']||row['Creator']||row['Model']||row['Name']||'';
-    const earnings=parseFloat(row['Total Earnings']||row['Earnings']||row['Net Revenue']||0);
-    let renewPct=parseFloat(row['Renew %']||row['Renewal Rate']||0); if(renewPct>1)renewPct=renewPct/100;
-    const activeFans=parseInt(row['Active Fans']||row['Fans']||0);
-    const newFans=parseInt(row['New Fans']||row['New Subscribers']||0);
-    const model=STATE.models.find(m=>m.name.toLowerCase()===name.toLowerCase()||(m.of_account||'').toLowerCase()===name.toLowerCase());
-    const split=model?parseFloat(model.split||20):20;
-    const mgmtType=model?.mgmt_type||'full_scale';
-    // For chatting models, agency cut applies to messages+tips only
-    const msgTips=parseFloat(row['Messages']||row['Tips']||row['Net from Messages']||row['Message Net']||row['Tips Net']||0)+parseFloat(row['Tips']||row['Tips Net']||0);
-    const revenueBase=mgmtType==='chatting'?msgTips:earnings;
-    const agencyNet=revenueBase*(split/100);
-    const modelPayout=earnings-agencyNet;
-    return{week_of:weekOf,week_end:weekEnd,model_id:model?.id||null,model_name:name,mgmt_type:mgmtType,total_earnings:earnings,model_split:split,model_payout:modelPayout,agency_net:agencyNet,chatter_wages:0,agency_profit:agencyNet,renew_pct:renewPct,active_fans:activeFans,new_fans:newFans};
+    // Exact Infloww Creator Statistics column names
+    const name = row['Creator']||row['Account']||row['Model']||row['Name']||'';
+    const earnings    = cleanAmount(row['Total earnings Net']||row['Total Earnings']||row['Earnings']||0);
+    const msgNet      = cleanAmount(row['Message Net']||row['Messages']||0);
+    const tipsNet     = cleanAmount(row['Tips Net']||row['Tips']||0);
+    const subNet      = cleanAmount(row['Subscription Net']||row['Subscriptions']||0);
+    let renewPct      = cleanAmount(row['Renew on %']||row['Renew %']||row['Renewal Rate']||0);
+    if(renewPct>1) renewPct=renewPct/100;
+    const activeFans  = parseInt(row['Active fans']||row['Active Fans']||row['Fans']||0)||0;
+    const newFans     = parseInt(row['New fans']||row['New Fans']||row['New Subscribers']||0)||0;
+
+    const model = STATE.models.find(m=>m.name.toLowerCase()===name.toLowerCase()||(m.of_account||'').toLowerCase()===name.toLowerCase());
+    const split = model ? parseFloat(model.split||20) : 20;
+    const mgmtType = model?.mgmt_type||'full_scale';
+
+    // Chatting models: agency % of messages+tips only. Full scale: % of total earnings
+    const revenueBase = mgmtType==='chatting' ? (msgNet+tipsNet) : earnings;
+    const agencyNet   = revenueBase*(split/100);
+    const modelPayout = earnings-agencyNet;
+
+    return{
+      week_of:weekStart, week_end:weekEnd,
+      model_id:model?.id||null, model_name:name, mgmt_type:mgmtType,
+      total_earnings:earnings, model_split:split,
+      model_payout:modelPayout, agency_net:agencyNet,
+      chatter_wages:0, agency_profit:agencyNet,
+      renew_pct:renewPct, active_fans:activeFans, new_fans:newFans,
+      msg_net:msgNet, tips_net:tipsNet, sub_net:subNet
+    };
   }).filter(r=>r.total_earnings>0||r.model_name);
+
   const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
   const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
-  let html=`<div class="card"><div class="card-title">Preview — ${parsed.length} accounts</div><div class="table-wrap"><table><thead><tr><th>Account</th><th>Earnings</th><th>Split %</th><th>Model Payout</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
-  parsed.forEach(r=>{html+=`<tr><td>${r.model_name}</td><td>$${fmt(r.total_earnings)}</td><td>${r.model_split}%</td><td>$${fmt(r.model_payout)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(r.renew_pct*100).toFixed(1)}%</td><td>${r.active_fans}</td></tr>`;});
-  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div>`;
+  let html=`<div class="card"><div class="card-title">Creator Report Preview — ${parsed.length} accounts · ${weekStart} to ${weekEnd}</div><div class="table-wrap"><table><thead><tr><th>Creator</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  parsed.forEach(r=>{html+=`<tr><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt((r.msg_net||0)+(r.tips_net||0))}</td><td style="font-size:11px;">${r.mgmt_type==='chatting'?'Chatting':'Full Scale'}</td><td>${r.model_split}%</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(r.renew_pct*100).toFixed(1)}%</td><td>${r.active_fans}</td></tr>`;});
+  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div>`;
   html+=`<div class="btn-row"><button class="btn btn-primary" onclick='saveReport(${JSON.stringify(parsed)})'>💾 Save Report</button></div></div>`;
   document.getElementById('csv-preview').innerHTML=html;
 }
@@ -971,7 +1128,10 @@ async function loadHoursSummary(){
 async function renderInvoicePage(){
   const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va';
   document.getElementById('invoice-admin-panel').style.display=isAdmin?'block':'none';
-  const wk=document.getElementById('inv-week'); if(!wk.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+1);wk.value=d.toISOString().split('T')[0];}
+  const wkStart=document.getElementById('inv-week-start');
+  const wkEnd=document.getElementById('inv-week-end');
+  if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+1);wkStart.value=d.toISOString().split('T')[0];}
+  if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+7);wkEnd.value=d.toISOString().split('T')[0];}
   if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderInvoicesTable(STATE.invoices);}
   renderMyInvoices();
 }
@@ -1038,12 +1198,21 @@ async function uploadInvFile(){
   }catch(e){console.error(e);return null;}
 }
 
+function syncInvWeek(){
+  const start=document.getElementById('inv-week-start').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('inv-week-end').value=d.toISOString().split('T')[0];
+}
+
 async function submitInvoice(){
   const salary=parseFloat(document.getElementById('inv-salary').value||0);
   const commission=parseFloat(document.getElementById('inv-commission').value||0);
   const total=salary+commission;
-  const weekOf=document.getElementById('inv-week').value;
-  if(!weekOf||total===0)return showAlert('inv-alert','Fill in week and at least one earnings amount.','error');
+  const weekStart=document.getElementById('inv-week-start').value;
+  const weekEnd=document.getElementById('inv-week-end').value;
+  const weekOf=weekStart&&weekEnd?`${weekStart} – ${weekEnd}`:(weekStart||weekEnd||'');
+  if(!weekOf||total===0)return showAlert('inv-alert','Fill in week dates and at least one earnings amount.','error');
   const fileUrl=await uploadInvFile();
   const inv={
     submitted_by_email:STATE.profile.email,
