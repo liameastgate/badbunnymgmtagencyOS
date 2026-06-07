@@ -237,7 +237,7 @@
       <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
           <tbody id="models-body"></tbody>
         </table></div>
         <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
@@ -326,12 +326,95 @@
     <!-- Team -->
     <div class="page" id="page-team">
       <div class="page-title">Team Access</div>
-      <div class="page-sub">Anyone who signs up appears here — assign their role to grant access</div>
+      <div class="page-sub">Assign roles and customise exactly which pages each person can access</div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th><th>Custom Pages</th></tr></thead>
           <tbody id="team-body"></tbody>
         </table></div>
+      </div>
+      <!-- Permission editor panel -->
+      <div class="card" id="perm-editor" style="display:none;margin-top:16px;">
+        <div class="card-title" id="perm-editor-title">Page Permissions</div>
+        <div class="page-sub" style="margin-bottom:16px;">Toggle which pages this user can access. Leave all off to use role defaults.</div>
+        <div id="perm-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="savePerms()">💾 Save Permissions</button>
+          <button class="btn btn-ghost" onclick="clearPerms()">↩ Reset to Role Defaults</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('perm-editor').style.display='none'">Cancel</button>
+        </div>
+        <div id="perm-alert" class="alert"></div>
+      </div>
+    </div>
+
+    <!-- Model Sheets -->
+    <div class="page" id="page-sheets">
+      <div class="page-title">Model Sheets</div>
+      <div class="page-sub">Click a model to view their info sheet</div>
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="width:180px;flex-shrink:0;">
+          <div id="sheets-model-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+        <div style="flex:1;">
+          <div id="sheets-content">
+            <div class="empty"><div class="empty-icon">📋</div><p>Select a model to view their sheet</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chatting SOPs -->
+    <div class="page" id="page-sops">
+      <div class="page-title">Chatting SOPs</div>
+      <div class="page-sub">Standard operating procedures for chatters</div>
+      <div id="sops-admin-controls" style="display:none;margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="addSOP()">➕ Add SOP</button>
+      </div>
+      <div id="sops-list"></div>
+      <div id="sops-empty" class="empty" style="display:none;"><div class="empty-icon">📖</div><p>No SOPs added yet</p></div>
+    </div>
+
+    <!-- Management -->
+    <div class="page" id="page-management">
+      <div class="page-title">Management</div>
+      <div class="page-sub">Agency goals and KPI tracking</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Weekly Revenue Target</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="font-size:18px;font-weight:700;">$</span>
+            <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:120px;" onchange="saveKPI()">
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Model Target</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:80px;" onchange="saveKPI()">
+            <span style="font-size:18px;font-weight:700;">models</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Agency Net Target (weekly)</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="font-size:18px;font-weight:700;">$</span>
+            <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:120px;" onchange="saveKPI()">
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Renewal Rate Target</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:80px;" onchange="saveKPI()">
+            <span style="font-size:18px;font-weight:700;">%</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Agency Notes</div>
+        <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:200px;background:var(--surface2);" onchange="saveKPI()"></textarea>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">KPI vs Actuals — Latest Week</div>
+        <div id="kpi-comparison"></div>
       </div>
     </div>
 
@@ -347,7 +430,8 @@
       <div class="form-group"><label>Model Name</label><input type="text" id="model-name" placeholder="e.g. Nelly"></div>
       <div class="form-group"><label>OF Account Handle</label><input type="text" id="model-of" placeholder="@handle"></div>
       <div class="form-group"><label>Status</label><select id="model-platform"><option>Active</option><option>Onboarding</option><option>Paused</option><option>Offboarded</option></select></div>
-      <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="70" min="0" max="100"></div>
+      <div class="form-group"><label>Management Type</label><select id="model-mgmt-type"><option value="full_scale">Full Scale</option><option value="chatting">Chatting</option></select></div>
+      <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
     </div>
@@ -388,13 +472,16 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
 
 var NAV = [
-  { id: 'overview', icon: '🏠', label: 'Overview',       roles: ['admin','va','chatter','traffic','model'] },
-  { id: 'content',  icon: '📹', label: 'Content Orders', roles: ['admin','va','model'] },
-  { id: 'reports',  icon: '📊', label: 'Weekly Reports', roles: ['admin','va'] },
-  { id: 'models',   icon: '👤', label: 'Model Settings', roles: ['admin','va'] },
-  { id: 'chatters', icon: '💬', label: 'Chatter Mgmt',   roles: ['admin','va'] },
-  { id: 'invoices', icon: '🧾', label: 'Invoices',       roles: ['admin','va','chatter','traffic','model'] },
-  { id: 'team',     icon: '🔑', label: 'Team Access',    roles: ['admin'] }
+  { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic','model'] },
+  { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'] },
+  { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'] },
+  { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'] },
+  { id: 'content',    icon: '📹', label: 'Content Orders',  roles: ['admin','va','model'] },
+  { id: 'reports',    icon: '📊', label: 'Weekly Reports',  roles: ['admin','va'] },
+  { id: 'models',     icon: '👤', label: 'Model Settings',  roles: ['admin','va'] },
+  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',    roles: ['admin','va'] },
+  { id: 'invoices',   icon: '🧾', label: 'Invoices',        roles: ['admin','va','chatter','traffic','model'] },
+  { id: 'team',       icon: '🔑', label: 'Team Access',     roles: ['admin'] }
 ];
 
 // ── Init ─────────────────────────────────────────────────────
@@ -430,8 +517,11 @@ async function initApp(user) {
 
 function buildNav(role) {
   const nav = document.getElementById('nav'); nav.innerHTML = '';
+  const customPerms = STATE.profile?.permissions; // array of page ids or null
   NAV.forEach(item => {
-    if (!item.roles.includes(role)) return;
+    // If user has custom permissions set, use those; otherwise fall back to role defaults
+    const allowed = customPerms ? customPerms.includes(item.id) : item.roles.includes(role);
+    if (!allowed) return;
     const div = document.createElement('div');
     div.className = 'nav-item'; div.id = 'nav-' + item.id;
     div.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
@@ -448,6 +538,9 @@ function navigate(page) {
   if (page === 'overview') renderOverview();
   if (page === 'invoices') renderInvoicePage();
   if (page === 'team') loadTeam();
+  if (page === 'sheets') loadModelSheets();
+  if (page === 'sops') loadSOPs();
+  if (page === 'management') loadManagement();
   if (page === 'chatters') loadChatterWeeks();
   if (page === 'reports') loadReportHistory();
 }
@@ -611,9 +704,14 @@ function previewReport(rows) {
     const activeFans=parseInt(row['Active Fans']||row['Fans']||0);
     const newFans=parseInt(row['New Fans']||row['New Subscribers']||0);
     const model=STATE.models.find(m=>m.name.toLowerCase()===name.toLowerCase()||(m.of_account||'').toLowerCase()===name.toLowerCase());
-    const split=model?parseFloat(model.split||70):70;
-    const modelPayout=earnings*(split/100); const agencyNet=earnings-modelPayout;
-    return{week_of:weekOf,model_id:model?.id||null,model_name:name,total_earnings:earnings,model_split:split,model_payout:modelPayout,agency_net:agencyNet,chatter_wages:0,agency_profit:agencyNet,renew_pct:renewPct,active_fans:activeFans,new_fans:newFans};
+    const split=model?parseFloat(model.split||20):20;
+    const mgmtType=model?.mgmt_type||'full_scale';
+    // For chatting models, agency cut applies to messages+tips only
+    const msgTips=parseFloat(row['Messages']||row['Tips']||row['Net from Messages']||row['Message Net']||row['Tips Net']||0)+parseFloat(row['Tips']||row['Tips Net']||0);
+    const revenueBase=mgmtType==='chatting'?msgTips:earnings;
+    const agencyNet=revenueBase*(split/100);
+    const modelPayout=earnings-agencyNet;
+    return{week_of:weekOf,model_id:model?.id||null,model_name:name,mgmt_type:mgmtType,total_earnings:earnings,model_split:split,model_payout:modelPayout,agency_net:agencyNet,chatter_wages:0,agency_profit:agencyNet,renew_pct:renewPct,active_fans:activeFans,new_fans:newFans};
   }).filter(r=>r.total_earnings>0||r.model_name);
   const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
   const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
@@ -638,7 +736,7 @@ async function loadReportHistory(){
 function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
-  STATE.models.forEach(m=>{tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td>${m.split||70}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+  STATE.models.forEach(m=>{tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -648,14 +746,15 @@ function editModel(id){
   const m=STATE.models.find(x=>x.id===id);
   document.getElementById('model-modal-title').textContent='Edit Model';
   document.getElementById('model-id').value=m.id; document.getElementById('model-name').value=m.name;
-  document.getElementById('model-of').value=m.of_account||''; document.getElementById('model-platform').value=m.platform||'Liam Free';
-  document.getElementById('model-split').value=m.split||70; document.getElementById('model-chatters').value=m.chatters||'';
+  document.getElementById('model-of').value=m.of_account||''; document.getElementById('model-platform').value=m.platform||'Active';
+  document.getElementById('model-mgmt-type').value=m.mgmt_type||'full_scale';
+  document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
   document.getElementById('model-email').value=m.email||''; openModal('model-modal');
 }
 
 async function saveModel(){
   const id=document.getElementById('model-id').value;
-  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim()};
+  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim()};
   if(!p.name)return alert('Name required');
   if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
   else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
@@ -765,11 +864,191 @@ async function loadTeam(){
   const{data}=await sb.from('profiles').select('*').order('created_at');
   const tbody=document.getElementById('team-body'); tbody.innerHTML='';
   (data||[]).forEach(u=>{
-    tbody.innerHTML+=`<tr><td>${u.name||'—'}</td><td>${u.email}</td><td><span class="badge ${u.role}">${u.role}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(u.created_at)}</td><td><select onchange="updateRole('${u.id}',this.value)" style="width:120px;padding:4px 8px;font-size:12px;"><option value="">Change role…</option><option value="admin">Admin</option><option value="va">VA</option><option value="chatter">Chatter</option><option value="traffic">Traffic</option><option value="model">Model</option><option value="pending">Pending</option></select></td></tr>`;
+    const hasCustom=u.permissions&&u.permissions.length>0;
+    tbody.innerHTML+=`<tr>
+      <td>${u.name||'—'}</td>
+      <td>${u.email}</td>
+      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td style="color:var(--text2);font-size:11px;">${fmtDate(u.created_at)}</td>
+      <td><select onchange="updateRole('${u.id}',this.value)" style="width:120px;padding:4px 8px;font-size:12px;"><option value="">Change role…</option><option value="admin">Admin</option><option value="va">VA</option><option value="chatter">Chatter</option><option value="traffic">Traffic</option><option value="model">Model</option><option value="pending">Pending</option></select></td>
+      <td><button class="btn btn-sm ${hasCustom?'btn-primary':'btn-ghost'}" onclick="openPermEditor('${u.id}','${u.name||u.email}','${u.role}',${JSON.stringify(u.permissions||[]).replace(/"/g,"'")})">
+        ${hasCustom?'✏ Custom':'+ Set'}
+      </button></td>
+    </tr>`;
   });
 }
 
 async function updateRole(id,role){if(!role)return;await sb.from('profiles').update({role}).eq('id',id);loadTeam();}
+
+var PERM_USER_ID=null;
+function openPermEditor(id,name,role,currentPerms){
+  PERM_USER_ID=id;
+  document.getElementById('perm-editor-title').textContent=`Page Permissions — ${name}`;
+  document.getElementById('perm-editor').style.display='block';
+  const container=document.getElementById('perm-toggles'); container.innerHTML='';
+  const roleDefaults=NAV.filter(n=>n.roles.includes(role)).map(n=>n.id);
+  NAV.forEach(item=>{
+    const isOn=currentPerms.length>0?currentPerms.includes(item.id):roleDefaults.includes(item.id);
+    container.innerHTML+=`<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:8px;cursor:pointer;border:1px solid ${isOn?'var(--accent)':'var(--border)'};" id="perm-label-${item.id}">
+      <input type="checkbox" id="perm-${item.id}" ${isOn?'checked':''} onchange="updatePermLabel('${item.id}')">
+      <span>${item.icon} ${item.label}</span>
+    </label>`;
+  });
+  document.getElementById('perm-editor').scrollIntoView({behavior:'smooth'});
+}
+
+function updatePermLabel(id){
+  const checked=document.getElementById('perm-'+id).checked;
+  document.getElementById('perm-label-'+id).style.borderColor=checked?'var(--accent)':'var(--border)';
+}
+
+async function savePerms(){
+  if(!PERM_USER_ID)return;
+  const perms=NAV.filter(n=>document.getElementById('perm-'+n.id)?.checked).map(n=>n.id);
+  const{error}=await sb.from('profiles').update({permissions:perms}).eq('id',PERM_USER_ID);
+  if(error)return showAlert('perm-alert',error.message,'error');
+  showAlert('perm-alert','Permissions saved!','success');
+  loadTeam();
+}
+
+async function clearPerms(){
+  if(!PERM_USER_ID)return;
+  await sb.from('profiles').update({permissions:null}).eq('id',PERM_USER_ID);
+  showAlert('perm-alert','Reset to role defaults.','success');
+  document.getElementById('perm-editor').style.display='none';
+  loadTeam();
+}
+
+// ── Model Sheets ─────────────────────────────────────────────
+async function loadModelSheets(){
+  const list=document.getElementById('sheets-model-list'); list.innerHTML='';
+  if(!STATE.models.length){document.getElementById('sheets-content').innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No models added yet</p></div>';return;}
+  STATE.models.forEach((m,i)=>{
+    const btn=document.createElement('button');
+    btn.className='btn btn-ghost'; btn.style.cssText='width:100%;text-align:left;margin-bottom:4px;';
+    btn.textContent=m.name;
+    btn.onclick=()=>showModelSheet(m);
+    list.appendChild(btn);
+    if(i===0)showModelSheet(m);
+  });
+}
+
+async function showModelSheet(model){
+  document.querySelectorAll('#sheets-model-list button').forEach(b=>{b.classList.remove('btn-primary');b.classList.add('btn-ghost');});
+  const btns=[...document.querySelectorAll('#sheets-model-list button')];
+  const btn=btns.find(b=>b.textContent===model.name);
+  if(btn){btn.classList.remove('btn-ghost');btn.classList.add('btn-primary');}
+  const{data}=await sb.from('model_sheets').select('*').eq('model_id',model.id).single();
+  const sheet=data||{};
+  const isAdmin=['admin','va'].includes(STATE.profile.role);
+  const ro=isAdmin?'':'readonly';
+  document.getElementById('sheets-content').innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;">${model.name}</div>
+          <div style="font-size:12px;color:var(--text2);">${model.of_account||''} · ${model.platform||''} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'}</div>
+        </div>
+        ${isAdmin?`<button class="btn btn-primary btn-sm" onclick="saveSheet('${model.id}')">💾 Save</button>`:''}
+      </div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Bio / About</label><textarea id="sheet-bio" ${ro} style="min-height:80px;">${sheet.bio||''}</textarea></div>
+        <div class="form-group"><label>Content Style</label><textarea id="sheet-style" ${ro} style="min-height:80px;">${sheet.content_style||''}</textarea></div>
+        <div class="form-group"><label>Boundaries / Won't Do</label><textarea id="sheet-limits" ${ro} style="min-height:80px;">${sheet.limits||''}</textarea></div>
+        <div class="form-group"><label>Pricing Notes (PPV, customs)</label><textarea id="sheet-pricing" ${ro} style="min-height:80px;">${sheet.pricing||''}</textarea></div>
+        <div class="form-group"><label>Top Fan Notes</label><textarea id="sheet-fans" ${ro} style="min-height:80px;">${sheet.fan_notes||''}</textarea></div>
+        <div class="form-group"><label>Chatting Persona / Tone</label><textarea id="sheet-persona" ${ro} style="min-height:80px;">${sheet.persona||''}</textarea></div>
+        <div class="form-group full"><label>Other Notes</label><textarea id="sheet-notes" ${ro} style="min-height:80px;">${sheet.notes||''}</textarea></div>
+      </div>
+      <div id="sheet-alert" class="alert"></div>
+    </div>`;
+  window._currentSheetModelId=model.id;
+  window._currentSheetId=sheet.id||null;
+}
+
+async function saveSheet(modelId){
+  const payload={model_id:modelId,bio:document.getElementById('sheet-bio').value,content_style:document.getElementById('sheet-style').value,limits:document.getElementById('sheet-limits').value,pricing:document.getElementById('sheet-pricing').value,fan_notes:document.getElementById('sheet-fans').value,persona:document.getElementById('sheet-persona').value,notes:document.getElementById('sheet-notes').value};
+  if(window._currentSheetId){await sb.from('model_sheets').update(payload).eq('id',window._currentSheetId);}
+  else{const{data}=await sb.from('model_sheets').insert(payload).select().single();window._currentSheetId=data.id;}
+  showAlert('sheet-alert','Saved!','success');
+}
+
+// ── SOPs ──────────────────────────────────────────────────────
+async function loadSOPs(){
+  const isAdmin=['admin','va'].includes(STATE.profile.role);
+  if(isAdmin)document.getElementById('sops-admin-controls').style.display='block';
+  const{data}=await sb.from('sops').select('*').order('created_at');
+  const list=document.getElementById('sops-list'); list.innerHTML='';
+  const empty=document.getElementById('sops-empty');
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+  data.forEach(sop=>{
+    list.innerHTML+=`<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:15px;">${isAdmin?`<input value="${sop.title}" onchange="updateSOPTitle('${sop.id}',this.value)" style="background:none;border:none;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;color:var(--text);width:100%;">`:sop.title}</div>
+        ${isAdmin?`<button class="btn btn-sm btn-danger" onclick="deleteSOP('${sop.id}')">✕</button>`:''}
+      </div>
+      ${isAdmin
+        ?`<textarea onchange="updateSOPContent('${sop.id}',this.value)" style="width:100%;min-height:120px;background:var(--surface2);">${sop.content||''}</textarea>`
+        :`<div style="white-space:pre-wrap;font-size:13px;color:var(--text2);line-height:1.6;">${sop.content||''}</div>`}
+    </div>`;
+  });
+}
+
+async function addSOP(){
+  const{data}=await sb.from('sops').insert({title:'New SOP',content:''}).select().single();
+  loadSOPs();
+}
+async function updateSOPTitle(id,val){await sb.from('sops').update({title:val}).eq('id',id);}
+async function updateSOPContent(id,val){await sb.from('sops').update({content:val}).eq('id',id);}
+async function deleteSOP(id){if(!confirm('Delete this SOP?'))return;await sb.from('sops').delete().eq('id',id);loadSOPs();}
+
+// ── Management / KPIs ─────────────────────────────────────────
+async function loadManagement(){
+  const{data}=await sb.from('agency_settings').select('*').eq('key','kpis').single();
+  if(data){
+    const kpis=data.value||{};
+    document.getElementById('kpi-revenue-target').value=kpis.revenue||'';
+    document.getElementById('kpi-model-target').value=kpis.models||'';
+    document.getElementById('kpi-net-target').value=kpis.net||'';
+    document.getElementById('kpi-renew-target').value=kpis.renew||'';
+    document.getElementById('agency-notes').value=kpis.notes||'';
+  }
+  // Load latest week actuals for comparison
+  const{data:reports}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
+  if(reports&&reports.length){
+    const weeks=[...new Set(reports.map(r=>r.week_of))];
+    const latest=weeks[0];
+    const week=reports.filter(r=>r.week_of===latest);
+    const totalE=week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+    const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
+    const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
+    const kpis=data?.value||{};
+    document.getElementById('kpi-comparison').innerHTML=`
+      <div class="stats-grid" style="margin-top:0;">
+        ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
+        ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
+        ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
+        ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
+      </div>`;
+  }
+}
+
+function kpiCard(label,actual,target,prefix,isPct=false){
+  const fmt2=v=>isPct?v.toFixed(1):fmt(v);
+  const hit=target>0&&actual>=target;
+  const pct=target>0?Math.min(100,(actual/target)*100):0;
+  return`<div class="stat-card">
+    <div class="stat-label">${label}</div>
+    <div style="font-size:20px;font-weight:800;color:${hit?'var(--green)':'var(--text)'};">${prefix}${fmt2(actual)}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Target: ${prefix}${fmt2(target)}</div>
+    <div style="background:var(--border);border-radius:4px;height:4px;margin-top:8px;"><div style="background:${hit?'var(--green)':'var(--accent)'};width:${pct}%;height:4px;border-radius:4px;"></div></div>
+  </div>`;
+}
+
+async function saveKPI(){
+  const kpis={revenue:document.getElementById('kpi-revenue-target').value,models:document.getElementById('kpi-model-target').value,net:document.getElementById('kpi-net-target').value,renew:document.getElementById('kpi-renew-target').value,notes:document.getElementById('agency-notes').value};
+  await sb.from('agency_settings').upsert({key:'kpis',value:kpis},{onConflict:'key'});
+}
 
 // ── Utils ────────────────────────────────────────────────────
 function fmt(n){return parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
