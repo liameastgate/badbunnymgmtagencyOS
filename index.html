@@ -42,7 +42,10 @@
   .user-role { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: var(--accent); color: #fff; }
   .btn-signout { margin-top: 8px; background: none; border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; width: 100%; font-family: inherit; }
   .btn-signout:hover { color: var(--red); border-color: var(--red); }
-  #main { margin-left: 220px; padding: 28px; min-height: 100vh; }
+  #main { margin-left: 220px; padding: 24px 28px; min-height: 100vh; flex: 1; min-width: 0; width: calc(100vw - 220px); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .two-col-wide { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .two-col > .card, .two-col-wide > .card { margin-bottom: 0; }
   .page { display: none; }
   .page.active { display: block; }
   .page-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.5px; color: #ffffff; }
@@ -249,34 +252,44 @@
 
       <!-- Creator Stats Upload -->
       <div id="report-tab-upload">
-        <div class="card">
-          <div class="card-title">Upload Infloww Creator Statistics</div>
-          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
-            <div class="form-group" style="max-width:180px;"><label>From</label><input type="date" id="report-week-start"></div>
-            <div class="form-group" style="max-width:180px;"><label>To</label><input type="date" id="report-week-end"></div>
-            <div style="font-size:12px;color:var(--text2);padding-bottom:10px;">Dates auto-fill from file</div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Upload Creator Statistics</div>
+            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
+              <div class="form-group" style="max-width:160px;"><label>From</label><input type="date" id="report-week-start"></div>
+              <div class="form-group" style="max-width:160px;"><label>To</label><input type="date" id="report-week-end"></div>
+              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills from file</div>
+            </div>
+            <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
+              <div style="font-size:28px;">📄</div>
+              <p>Creator Statistics CSV/XLSX</p>
+            </div>
+            <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
+            <div id="report-alert" class="alert"></div>
           </div>
-          <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
-            <div style="font-size:32px;">📄</div>
-            <p>Click or drag Creator Statistics CSV/XLSX</p>
+          <div class="card">
+            <div class="card-title">Upload Employee Report</div>
+            <div class="file-drop" onclick="document.getElementById('chatter-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)" style="margin-bottom:12px;">
+              <div style="font-size:28px;">📄</div>
+              <p>Employee Performance CSV/XLSX</p>
+            </div>
+            <input type="file" id="chatter-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
+            <div id="chatter-report-alert" class="alert"></div>
           </div>
-          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
-          <div id="csv-preview" style="margin-top:16px;"></div>
-          <div id="report-alert" class="alert"></div>
         </div>
+        <div id="csv-preview" style="margin-top:14px;"></div>
+        <div id="chatter-csv-preview" style="margin-top:14px;"></div>
       </div>
 
-      <!-- Chatter Performance Upload -->
+      <!-- Chatter Performance Upload (tab) -->
       <div id="report-tab-chatters" style="display:none;">
         <div class="card">
           <div class="card-title">Upload Infloww Employee Report</div>
-          <div class="file-drop" onclick="document.getElementById('chatter-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)">
-            <div style="font-size:32px;">📄</div>
-            <p>Click or drag Employee Performance CSV/XLSX</p>
+          <div class="file-drop" onclick="document.getElementById('chatter-csv-input2').click()" style="max-width:400px;">
+            <div style="font-size:28px;">📄</div>
+            <p>Employee Performance CSV/XLSX</p>
           </div>
-          <input type="file" id="chatter-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
-          <div id="chatter-csv-preview" style="margin-top:16px;"></div>
-          <div id="chatter-report-alert" class="alert"></div>
+          <input type="file" id="chatter-csv-input2" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
         </div>
       </div>
 
@@ -296,13 +309,21 @@
     <div class="page" id="page-models">
       <div class="page-title">Model Settings</div>
       <div class="page-sub">Configure each model's split, chatters and account details</div>
-      <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
-          <tbody id="models-body"></tbody>
-        </table></div>
-        <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
+      <div class="two-col-wide">
+        <div>
+          <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
+          <div class="card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
+              <tbody id="models-body"></tbody>
+            </table></div>
+            <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
+          </div>
+        </div>
+        <div class="card" id="models-quick-stats">
+          <div class="card-title">Quick Stats</div>
+          <div id="models-stats-body" style="color:var(--text2);font-size:13px;">Add models to see stats</div>
+        </div>
       </div>
     </div>
 
@@ -316,24 +337,39 @@
         <div class="tab" onclick="switchChatterTab('summary')">Weekly Summary</div>
       </div>
       <div id="chatter-tab-roster">
-        <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" onclick="openModal('chatter-modal')">➕ Add Chatter</button></div>
-        <div class="card"><div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Email</th><th>Base Rate</th><th>Commission %</th><th></th></tr></thead>
-          <tbody id="chatters-body"></tbody>
-        </table></div></div>
+        <div class="two-col">
+          <div>
+            <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('chatter-modal')">➕ Add Chatter</button></div>
+            <div class="card"><div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>Email</th><th>Base Rate</th><th>Commission %</th><th></th></tr></thead>
+              <tbody id="chatters-body"></tbody>
+            </table></div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Log Weekly Hours</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Chatter</label><select id="hours-chatter" onchange="previewWage()"></select></div>
+              <div class="form-group"><label>Week Of</label><input type="date" id="hours-week"></div>
+              <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count" placeholder="168" oninput="previewWage()"></div>
+              <div class="form-group"><label>Model Earnings (for commission)</label><input type="number" id="hours-earnings" placeholder="0.00" step="0.01" oninput="previewWage()"></div>
+            </div>
+            <div id="hours-preview" style="margin-top:14px;font-size:13px;color:var(--text2);"></div>
+            <div class="btn-row"><button class="btn btn-primary" onclick="logHours()">💾 Save Hours</button></div>
+            <div id="hours-alert" class="alert"></div>
+          </div>
+        </div>
       </div>
       <div id="chatter-tab-hours" style="display:none;">
-        <div class="card">
+        <div class="card" style="max-width:600px;">
           <div class="card-title">Log Weekly Hours</div>
           <div class="form-grid">
-            <div class="form-group"><label>Chatter</label><select id="hours-chatter" onchange="previewWage()"></select></div>
-            <div class="form-group"><label>Week Of</label><input type="date" id="hours-week"></div>
-            <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count" placeholder="168" oninput="previewWage()"></div>
-            <div class="form-group"><label>Total Model Earnings (for commission)</label><input type="number" id="hours-earnings" placeholder="0.00" step="0.01" oninput="previewWage()"></div>
+            <div class="form-group"><label>Chatter</label><select id="hours-chatter2" onchange="previewWage()"></select></div>
+            <div class="form-group"><label>Week Of</label><input type="date" id="hours-week2"></div>
+            <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count2" placeholder="168" oninput="previewWage()"></div>
+            <div class="form-group"><label>Model Earnings</label><input type="number" id="hours-earnings2" placeholder="0.00" step="0.01" oninput="previewWage()"></div>
           </div>
-          <div id="hours-preview" style="margin-top:14px;font-size:13px;color:var(--text2);"></div>
           <div class="btn-row"><button class="btn btn-primary" onclick="logHours()">💾 Save Hours</button></div>
-          <div id="hours-alert" class="alert"></div>
+          <div id="hours-alert2" class="alert"></div>
         </div>
       </div>
       <div id="chatter-tab-summary" style="display:none;">
@@ -352,6 +388,7 @@
     <div class="page" id="page-invoices">
       <div class="page-title">Invoice Submission</div>
       <div class="page-sub">Submit your invoice — admin reviews and processes payment</div>
+      <div class="two-col-wide" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-title">Submit Invoice</div>
         <div class="form-grid">
@@ -380,8 +417,9 @@
         <div class="btn-row"><button class="btn btn-primary" onclick="submitInvoice()">📤 Submit Invoice</button></div>
         <div id="inv-alert" class="alert"></div>
       </div>
+      </div><!-- close left col -->
       <div id="invoice-admin-panel" style="display:none;">
-        <div class="card" style="margin-top:16px;">
+        <div class="card">
           <div class="card-title">All Invoices</div>
           <div style="margin-bottom:12px;"><select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select></div>
           <div class="table-wrap"><table>
@@ -391,7 +429,7 @@
           <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No invoices yet</p></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px;">
+      <div class="card">
         <div class="card-title">My Invoices</div>
         <div class="table-wrap"><table>
           <thead><tr><th>Week</th><th>Amount</th><th>Description</th><th>Status</th><th>Submitted</th></tr></thead>
@@ -399,13 +437,15 @@
         </table></div>
         <div id="my-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
       </div>
+      </div><!-- close two-col-wide -->
     </div>
 
     <!-- Expenses -->
     <div class="page" id="page-expenses">
       <div class="page-title">Expenses</div>
       <div class="page-sub">Track agency costs — deducted from profit in Overview</div>
-      <div class="stats-grid" id="expenses-summary"></div>
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;" id="expenses-summary"></div>
+      <div class="two-col-wide">
       <div class="card">
         <div class="card-title">Add Expense</div>
         <div class="form-grid">
@@ -441,7 +481,8 @@
         <div class="btn-row"><button class="btn btn-primary" onclick="addExpense()">➕ Add Expense</button></div>
         <div id="exp-alert" class="alert"></div>
       </div>
-      <div class="card" style="margin-top:16px;">
+      </div><!-- close left col -->
+      <div class="card">
         <div class="card-title">All Expenses</div>
         <div style="margin-bottom:12px;display:flex;gap:8px;">
           <select id="exp-filter-cat" onchange="filterExpenses()" style="width:160px;"><option value="">All Categories</option><option value="tools">Tools</option><option value="ads">Ad Spend</option><option value="staff">Staff</option><option value="other">Other</option></select>
@@ -452,29 +493,30 @@
         </table></div>
         <div id="expenses-empty" class="empty" style="display:none;"><div class="empty-icon">💸</div><p>No expenses logged yet</p></div>
       </div>
+      </div><!-- close two-col-wide -->
     </div>
 
     <!-- Team -->
     <div class="page" id="page-team">
       <div class="page-title">Team Access</div>
       <div class="page-sub">Assign roles and customise exactly which pages each person can access</div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th><th>Custom Pages</th></tr></thead>
-          <tbody id="team-body"></tbody>
-        </table></div>
-      </div>
-      <!-- Permission editor panel -->
-      <div class="card" id="perm-editor" style="display:none;margin-top:16px;">
-        <div class="card-title" id="perm-editor-title">Page Permissions</div>
-        <div class="page-sub" style="margin-bottom:16px;">Toggle which pages this user can access. Leave all off to use role defaults.</div>
-        <div id="perm-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;"></div>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="savePerms()">💾 Save Permissions</button>
-          <button class="btn btn-ghost" onclick="clearPerms()">↩ Reset to Role Defaults</button>
-          <button class="btn btn-ghost" onclick="document.getElementById('perm-editor').style.display='none'">Cancel</button>
+      <div class="two-col-wide">
+        <div class="card">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th><th>Custom Pages</th></tr></thead>
+            <tbody id="team-body"></tbody>
+          </table></div>
         </div>
-        <div id="perm-alert" class="alert"></div>
+        <div class="card" id="perm-editor">
+          <div class="card-title" id="perm-editor-title">Page Permissions</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">Select a user to edit their page access</div>
+          <div id="perm-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="savePerms()">💾 Save</button>
+            <button class="btn btn-ghost" onclick="clearPerms()">↩ Reset</button>
+          </div>
+          <div id="perm-alert" class="alert"></div>
+        </div>
       </div>
     </div>
 
@@ -516,43 +558,47 @@
     <div class="page" id="page-management">
       <div class="page-title">Management</div>
       <div class="page-sub">Agency goals and KPI tracking</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Weekly Revenue Target</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span style="font-size:18px;font-weight:700;">$</span>
-            <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:120px;" onchange="saveKPI()">
+      <div class="two-col">
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div class="stat-card accent">
+              <div class="stat-label">Revenue Target (weekly)</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <span style="font-weight:700;">$</span>
+                <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Model Target</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
+                <span style="font-size:13px;color:var(--text2);">models</span>
+              </div>
+            </div>
+            <div class="stat-card accent">
+              <div class="stat-label">Agency Net Target (weekly)</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <span style="font-weight:700;">$</span>
+                <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Renewal Rate Target</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
+                <span style="font-size:13px;color:var(--text2);">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Agency Notes</div>
+            <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:180px;background:var(--surface2);" onchange="saveKPI()"></textarea>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Active Model Target</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:80px;" onchange="saveKPI()">
-            <span style="font-size:18px;font-weight:700;">models</span>
-          </div>
+        <div class="card">
+          <div class="card-title">KPI vs Actuals — Latest Week</div>
+          <div id="kpi-comparison"></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Agency Net Target (weekly)</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span style="font-size:18px;font-weight:700;">$</span>
-            <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:120px;" onchange="saveKPI()">
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Renewal Rate Target</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:80px;" onchange="saveKPI()">
-            <span style="font-size:18px;font-weight:700;">%</span>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Agency Notes</div>
-        <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:200px;background:var(--surface2);" onchange="saveKPI()"></textarea>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title">KPI vs Actuals — Latest Week</div>
-        <div id="kpi-comparison"></div>
       </div>
     </div>
 
@@ -1072,6 +1118,20 @@ function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
   STATE.models.forEach(m=>{tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+  // Quick stats panel
+  const statsEl=document.getElementById('models-stats-body');
+  if(statsEl){
+    const active=STATE.models.filter(m=>m.platform==='Active'||!m.platform||m.platform==='Active').length;
+    const fullScale=STATE.models.filter(m=>m.mgmt_type!=='chatting').length;
+    const chatting=STATE.models.filter(m=>m.mgmt_type==='chatting').length;
+    statsEl.innerHTML=`
+      <div style="display:grid;gap:12px;">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Total Models</span><strong>${STATE.models.length}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Full Scale</span><strong style="color:var(--accent2);">${fullScale}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Chatting Only</span><strong style="color:var(--blue);">${chatting}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text2);font-size:12px;">Avg Split %</span><strong>${STATE.models.length?(STATE.models.reduce((s,m)=>s+parseFloat(m.split||20),0)/STATE.models.length).toFixed(1):0}%</strong></div>
+      </div>`;
+  }
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -1298,7 +1358,7 @@ var PERM_USER_ID=null;
 function openPermEditor(id,name,role,currentPerms){
   PERM_USER_ID=id;
   document.getElementById('perm-editor-title').textContent=`Page Permissions — ${name}`;
-  document.getElementById('perm-editor').style.display='block';
+  // perm editor is always visible as right panel
   const container=document.getElementById('perm-toggles'); container.innerHTML='';
   const roleDefaults=NAV.filter(n=>n.roles.includes(role)).map(n=>n.id);
   NAV.forEach(item=>{
