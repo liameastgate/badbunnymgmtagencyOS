@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgencyOS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #080808; --surface: #0a0a12; --surface2: #0f0f1a;
@@ -203,7 +204,7 @@
         <div class="card">
           <div class="card-title">New Content Order</div>
           <div class="form-grid">
-            <div class="form-group"><label>Model</label><select id="co-model"></select></div>
+            <div class="form-group"><label>Model(s) <span style="font-size:10px;color:var(--text2);font-weight:400;">(hold Ctrl/Cmd to select multiple)</span></label><select id="co-model" multiple style="min-height:80px;"></select></div>
             <div class="form-group"><label>Platform</label>
               <select id="co-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="other">Other</option></select>
             </div>
@@ -252,45 +253,35 @@
 
       <!-- Creator Stats Upload -->
       <div id="report-tab-upload">
-        <div class="two-col">
-          <div class="card">
-            <div class="card-title">Upload Creator Statistics</div>
-            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
-              <div class="form-group" style="max-width:160px;"><label>From</label><input type="date" id="report-week-start"></div>
-              <div class="form-group" style="max-width:160px;"><label>To</label><input type="date" id="report-week-end"></div>
-              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills from file</div>
-            </div>
-            <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
-              <div style="font-size:28px;">📄</div>
-              <p>Creator Statistics CSV/XLSX</p>
-            </div>
-            <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
-            <div id="report-alert" class="alert"></div>
+        <div class="card">
+          <div class="card-title">Upload Creator Statistics</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:160px;"><label>From</label><input type="date" id="report-week-start"></div>
+            <div class="form-group" style="max-width:160px;"><label>To</label><input type="date" id="report-week-end"></div>
+            <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills from file</div>
           </div>
-          <div class="card">
-            <div class="card-title">Upload Employee Report</div>
-            <div class="file-drop" onclick="document.getElementById('chatter-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)" style="margin-bottom:12px;">
-              <div style="font-size:28px;">📄</div>
-              <p>Employee Performance CSV/XLSX</p>
-            </div>
-            <input type="file" id="chatter-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
-            <div id="chatter-report-alert" class="alert"></div>
+          <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
+            <div style="font-size:28px;">📄</div>
+            <p>Creator Statistics CSV/XLSX</p>
           </div>
+          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
+          <div id="report-alert" class="alert"></div>
         </div>
         <div id="csv-preview" style="margin-top:14px;"></div>
-        <div id="chatter-csv-preview" style="margin-top:14px;"></div>
       </div>
 
       <!-- Chatter Performance Upload (tab) -->
       <div id="report-tab-chatters" style="display:none;">
         <div class="card">
           <div class="card-title">Upload Infloww Employee Report</div>
-          <div class="file-drop" onclick="document.getElementById('chatter-csv-input2').click()" style="max-width:400px;">
+          <div class="file-drop" onclick="document.getElementById('chatter-csv-input2').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)">
             <div style="font-size:28px;">📄</div>
             <p>Employee Performance CSV/XLSX</p>
           </div>
           <input type="file" id="chatter-csv-input2" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
+          <div id="chatter-report-alert" class="alert"></div>
         </div>
+        <div id="chatter-csv-preview" style="margin-top:14px;"></div>
       </div>
 
       <!-- History -->
@@ -862,7 +853,7 @@ function statCard(l,v,borderCls,valCls){
 // ── Content Orders ───────────────────────────────────────────
 function populateModelDropdowns() {
   const sel=document.getElementById('co-model');
-  if(sel) sel.innerHTML=STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  if(sel) sel.innerHTML=STATE.models.map(m=>`<option value="${m.id}" data-email="${m.email||''}" data-name="${m.name}">${m.name}</option>`).join('');
   const fsel=document.getElementById('co-filter-model');
   if(fsel) fsel.innerHTML='<option value="">All Models</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
@@ -908,47 +899,57 @@ function handleThumbFile(file){
   if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    _thumbDataUrl=e.target.result;
-    document.getElementById('co-thumb-img').src=_thumbDataUrl;
-    document.getElementById('co-thumb-preview').style.display='block';
-    document.getElementById('co-thumb-drop').style.display='none';
+    // Resize image to thumbnail via canvas before storing
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=320,maxH=180;
+      let w=img.width,h=img.height;
+      if(w>maxW||h>maxH){const r=Math.min(maxW/w,maxH/h);w=Math.round(w*r);h=Math.round(h*r);}
+      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      _thumbDataUrl=canvas.toDataURL('image/jpeg',0.8);
+      document.getElementById('co-thumb-img').src=_thumbDataUrl;
+      document.getElementById('co-thumb-preview').style.display='flex';
+      document.getElementById('co-thumb-preview').style.alignItems='center';
+      document.getElementById('co-thumb-drop').style.display='none';
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
 function clearThumb(){_thumbDataUrl=null;document.getElementById('co-thumb-preview').style.display='none';document.getElementById('co-thumb-drop').style.display='block';document.getElementById('co-thumb-input').value='';}
 
 async function uploadThumbToSupabase(modelId){
-  if(!_thumbDataUrl)return null;
-  try{
-    const res=await fetch(_thumbDataUrl);
-    const blob=await res.blob();
-    const ext=blob.type.split('/')[1]||'jpg';
-    const path=`thumbnails/${modelId}_${Date.now()}.${ext}`;
-    const{data,error}=await sb.storage.from('content-thumbnails').upload(path,blob,{contentType:blob.type,upsert:true});
-    if(error){console.error(error);return null;}
-    const{data:urlData}=sb.storage.from('content-thumbnails').getPublicUrl(path);
-    return urlData.publicUrl;
-  }catch(e){console.error(e);return null;}
+  // Store resized base64 thumbnail directly — no storage bucket required
+  return _thumbDataUrl||null;
 }
 
 async function submitContentOrder() {
-  const modelId=document.getElementById('co-model').value;
-  const model=STATE.models.find(m=>m.id===modelId);
+  const sel=document.getElementById('co-model');
+  const selectedOptions=[...sel.selectedOptions];
+  if(!selectedOptions.length) return showAlert('co-alert','Select at least one model.','error');
   const url=document.getElementById('co-url').value.trim();
   if(!url) return showAlert('co-alert','Content URL required.','error');
-  // Upload thumbnail if present
-  const thumbnailUrl=await uploadThumbToSupabase(modelId);
-  const{data,error}=await sb.from('content_orders').insert({
-    model_id:modelId,model_name:model?.name,model_email:model?.email,
-    platform:document.getElementById('co-platform').value,
-    url,drive_link:document.getElementById('co-drive').value.trim(),
-    notes:document.getElementById('co-notes').value.trim(),
+  // Upload thumbnail once (shared across all orders)
+  const thumbnailUrl=await uploadThumbToSupabase(selectedOptions[0].value);
+  const platform=document.getElementById('co-platform').value;
+  const driveLink=document.getElementById('co-drive').value.trim();
+  const notes=document.getElementById('co-notes').value.trim();
+  // Create one order per selected model
+  const inserts=selectedOptions.map(opt=>({
+    model_id:opt.value,
+    model_name:opt.dataset.name||opt.textContent,
+    model_email:opt.dataset.email||null,
+    platform,url,drive_link:driveLink,notes,
     thumbnail_url:thumbnailUrl,status:'pending'
-  }).select().single();
+  }));
+  const{data,error}=await sb.from('content_orders').insert(inserts).select();
   if(error) return showAlert('co-alert',error.message,'error');
-  STATE.contentOrders.unshift(data); renderContentOrders();
-  showAlert('co-alert','Order added!','success');
+  (data||[]).forEach(d=>STATE.contentOrders.unshift(d)); renderContentOrders();
+  showAlert('co-alert',`${inserts.length} order${inserts.length>1?'s':''} added!`,'success');
   document.getElementById('co-url').value=''; document.getElementById('co-drive').value=''; document.getElementById('co-notes').value='';
+  // Deselect all
+  [...sel.options].forEach(o=>o.selected=false);
   clearThumb();
 }
 
@@ -982,8 +983,16 @@ function handleChatterCsvDrop(e){e.preventDefault();e.currentTarget.classList.re
 
 function handleChatterCsvFile(file){
   const r=new FileReader();
-  r.onload=e=>{const rows=parseCSV(e.target.result);if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');previewChatterReport(rows);};
-  r.readAsText(file);
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');
+      previewChatterReport(rows);
+    }catch(err){showAlert('chatter-report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
 }
 
 function previewChatterReport(rows) {
@@ -1031,7 +1040,19 @@ function previewChatterReport(rows) {
 
 function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
 
-function handleCsvFile(file){const r=new FileReader();r.onload=e=>{const rows=parseCSV(e.target.result);if(!rows.length)return showAlert('report-alert','Could not parse CSV.','error');previewReport(rows);};r.readAsText(file);}
+function handleCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length)return showAlert('report-alert','Could not parse file.','error');
+      previewReport(rows);
+    }catch(err){showAlert('report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
 
 function parseCSV(text){const lines=text.trim().split('\n');if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));return lines.slice(1).map(line=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});return obj;});}
 
