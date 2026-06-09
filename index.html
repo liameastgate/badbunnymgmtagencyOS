@@ -204,7 +204,17 @@
         <div class="card">
           <div class="card-title">New Content Order</div>
           <div class="form-grid">
-            <div class="form-group"><label>Model(s) <span style="font-size:10px;color:var(--text2);font-weight:400;">— Ctrl/Cmd+click for multiple</span></label><select id="co-model" multiple style="height:36px;min-height:36px;overflow-y:auto;" onfocus="this.style.height=Math.min(STATE.models.length*36,180)+'px'" onblur="this.style.height='36px'"></select></div>
+            <div class="form-group" style="position:relative;">
+              <label>Model(s)</label>
+              <div id="co-model-trigger" onclick="toggleModelDropdown()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;">
+                <span id="co-model-label" style="color:var(--text2);">Select model(s)…</span>
+                <span style="font-size:10px;color:var(--text2);">▼</span>
+              </div>
+              <div id="co-model-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;z-index:200;padding:6px 0;margin-top:2px;max-height:220px;overflow-y:auto;">
+                <div id="co-model-options"></div>
+              </div>
+              <select id="co-model" multiple style="display:none;"></select>
+            </div>
             <div class="form-group"><label>Platform</label>
               <select id="co-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="other">Other</option></select>
             </div>
@@ -852,12 +862,42 @@ function statCard(l,v,borderCls,valCls){
 
 // ── Content Orders ───────────────────────────────────────────
 function populateModelDropdowns() {
+  // Hidden select (used by submitContentOrder)
   const sel=document.getElementById('co-model');
   if(sel) sel.innerHTML=STATE.models.map(m=>`<option value="${m.id}" data-email="${m.email||''}" data-name="${m.name}">${m.name}</option>`).join('');
+  // Custom visual dropdown
+  const opts=document.getElementById('co-model-options');
+  if(opts) opts.innerHTML=STATE.models.map(m=>`
+    <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;font-size:13px;color:var(--text);" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''">
+      <input type="checkbox" value="${m.id}" onchange="syncModelSelect()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+      ${m.name}
+    </label>`).join('');
   const fsel=document.getElementById('co-filter-model');
   if(fsel) fsel.innerHTML='<option value="">All Models</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
 }
+
+function toggleModelDropdown(){
+  const dd=document.getElementById('co-model-dropdown');
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+
+function syncModelSelect(){
+  const checked=[...document.querySelectorAll('#co-model-options input:checked')];
+  // Sync hidden select
+  const sel=document.getElementById('co-model');
+  [...sel.options].forEach(o=>{ o.selected=checked.some(c=>c.value===o.value); });
+  // Update trigger label
+  const label=document.getElementById('co-model-label');
+  if(checked.length===0) label.style.color='var(--text2)',label.textContent='Select model(s)…';
+  else{ label.style.color='var(--text)'; label.textContent=checked.map(c=>c.closest('label').textContent.trim()).join(', '); }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click',e=>{
+  const dd=document.getElementById('co-model-dropdown');
+  if(dd&&!dd.contains(e.target)&&e.target.id!=='co-model-trigger'&&!e.target.closest('#co-model-trigger')) dd.style.display='none';
+});
 
 function renderContentOrders(filtered) {
   const orders = filtered!==undefined ? filtered : STATE.contentOrders;
