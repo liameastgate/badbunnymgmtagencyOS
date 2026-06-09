@@ -819,7 +819,12 @@ async function loadAllData() {
       ? sb.from('content_orders').select('*').eq('model_email', STATE.profile.email).order('created_at',{ascending:false})
       : sb.from('content_orders').select('*').order('created_at',{ascending:false})
   ]);
-  STATE.models = m.data||[]; STATE.chatters = c.data||[]; STATE.contentOrders = o.data||[];
+  const rawModels = m.data||[];
+  rawModels.sort((a,b)=>{
+    const order={full_scale:0,chatting:1};
+    return (order[a.mgmt_type]??0)-(order[b.mgmt_type]??0);
+  });
+  STATE.models = rawModels; STATE.chatters = c.data||[]; STATE.contentOrders = o.data||[];
   renderModels(); renderChatters(); renderContentOrders(); populateModelDropdowns(); populateChatterDropdown();
 }
 
@@ -1207,7 +1212,8 @@ function previewReport(rows, team='a') {
       model_payout:modelPayout, agency_net:agencyNet,
       chatter_wages:0, agency_profit:agencyNet,
       renew_pct:renewPct, active_fans:activeFans, new_fans:newFans,
-      msg_net:msgNet, tips_net:tipsNet, sub_net:subNet
+      msg_net:msgNet, tips_net:tipsNet, sub_net:subNet,
+      mgmt_type:mgmtType
     };
   }).filter(r=>r.total_earnings>0||r.model_name);
 
@@ -1225,8 +1231,10 @@ function previewReport(rows, team='a') {
 }
 
 async function saveBothReports(){
-  const all=[...(_parsedA||[]),...(_parsedB||[])];
-  if(!all.length) return showAlert('report-alert','No data to save.','error');
+  const raw=[...(_parsedA||[]),...(_parsedB||[])];
+  if(!raw.length) return showAlert('report-alert','No data to save.','error');
+  // Strip fields that don't exist in the weekly_reports DB schema
+  const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,...r})=>r);
   const{error}=await sb.from('weekly_reports').insert(all);
   if(error) return showAlert('report-alert',error.message,'error');
   showAlert('report-alert',`Saved! ${all.length} rows recorded.`,'success');
