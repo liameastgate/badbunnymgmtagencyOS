@@ -90,6 +90,7 @@
   label { font-size: 12px; font-weight: 600; color: var(--text2); }
   input, select, textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 13px; outline: none; transition: border-color 0.15s; font-family: inherit; width: 100%; }
   input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(40%) sepia(80%) saturate(500%) hue-rotate(200deg) brightness(120%); cursor: pointer; opacity: 1; }
   textarea { resize: vertical; min-height: 80px; }
   select option { background: var(--surface2); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; letter-spacing: 0.3px; }
@@ -206,6 +207,8 @@
     <div class="page" id="page-content">
       <div class="page-title">Content Orders</div>
       <div class="page-sub">Assign Instagram/TikTok content for models to copy and re-upload</div>
+      <!-- Drive link banners — populated by populateModelDropdowns() -->
+      <div id="co-drive-banners" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;"></div>
       <div id="content-admin-panel" style="display:none;">
         <div class="card">
           <div class="card-title">New Content Order</div>
@@ -655,10 +658,30 @@
       <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
+      <div class="form-group full"><label>Google Drive Link</label><input type="url" id="model-drive" placeholder="https://drive.google.com/..."></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
       <button class="btn btn-ghost" onclick="closeModal('model-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Content Order Edit Modal -->
+<div class="modal-overlay" id="co-edit-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Edit Content Order</span><button class="modal-close" onclick="closeModal('co-edit-modal')">✕</button></div>
+    <input type="hidden" id="co-edit-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Platform</label><select id="co-edit-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="other">Other</option></select></div>
+      <div class="form-group"><label>Status</label><select id="co-edit-status"><option value="pending">Pending</option><option value="done">Done</option></select></div>
+      <div class="form-group full"><label>Content URL</label><input type="url" id="co-edit-url" placeholder="https://..."></div>
+      <div class="form-group full"><label>Drive Link</label><input type="url" id="co-edit-drive" placeholder="https://drive.google.com/..."></div>
+      <div class="form-group full"><label>Notes</label><textarea id="co-edit-notes" rows="3" placeholder="Any notes..."></textarea></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEditOrder()">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal('co-edit-modal')">Cancel</button>
     </div>
   </div>
 </div>
@@ -933,6 +956,16 @@ function populateModelDropdowns() {
   const fsel=document.getElementById('co-filter-model');
   if(fsel) fsel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
+  // Drive link banners
+  const bannerEl=document.getElementById('co-drive-banners');
+  if(bannerEl){
+    const withDrive=visibleModels.filter(m=>m.drive_link);
+    bannerEl.innerHTML=withDrive.map(m=>`
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(30,79,255,0.08);border:1px solid rgba(30,79,255,0.2);border-radius:8px;padding:10px 14px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text2);min-width:80px;">${m.name}</span>
+        <a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>
+      </div>`).join('');
+  }
 }
 
 function toggleModelDropdown(){
@@ -976,9 +1009,10 @@ function renderContentOrders(filtered) {
       <td style="max-width:180px;">${o.notes||'—'}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
-      <td style="display:flex;gap:4px;">
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
         ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓ Done</button>`:''}
         ${canEdit&&o.status==='done'?`<button class="btn btn-sm btn-ghost" onclick="markPending('${o.id}')" style="font-size:11px;">↩ Undo</button>`:''}
+        ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="editOrder('${o.id}')">✏ Edit</button>`:''}
         ${STATE.profile.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>`:''}
       </td></tr>`;
   });
@@ -1065,6 +1099,34 @@ async function deleteOrder(id) {
   if(!confirm('Delete?'))return;
   await sb.from('content_orders').delete().eq('id',id);
   STATE.contentOrders=STATE.contentOrders.filter(o=>o.id!==id); renderContentOrders();
+}
+
+function editOrder(id) {
+  const o=STATE.contentOrders.find(x=>x.id===id); if(!o)return;
+  document.getElementById('co-edit-id').value=id;
+  document.getElementById('co-edit-platform').value=o.platform||'instagram';
+  document.getElementById('co-edit-status').value=o.status||'pending';
+  document.getElementById('co-edit-url').value=o.url||'';
+  document.getElementById('co-edit-drive').value=o.drive_link||'';
+  document.getElementById('co-edit-notes').value=o.notes||'';
+  openModal('co-edit-modal');
+}
+
+async function saveEditOrder() {
+  const id=document.getElementById('co-edit-id').value;
+  const updates={
+    platform:document.getElementById('co-edit-platform').value,
+    status:document.getElementById('co-edit-status').value,
+    url:document.getElementById('co-edit-url').value.trim()||null,
+    drive_link:document.getElementById('co-edit-drive').value.trim()||null,
+    notes:document.getElementById('co-edit-notes').value.trim()||null,
+  };
+  const{error}=await sb.from('content_orders').update(updates).eq('id',id);
+  if(error)return showAlert('co-alert',error.message,'error');
+  const o=STATE.contentOrders.find(x=>x.id===id);
+  if(o)Object.assign(o,updates);
+  renderContentOrders();
+  closeModal('co-edit-modal');
 }
 
 // ── Reports ──────────────────────────────────────────────────
@@ -1303,12 +1365,13 @@ function editModel(id){
   document.getElementById('model-of').value=m.of_account||''; document.getElementById('model-platform').value=m.platform||'Active';
   document.getElementById('model-mgmt-type').value=m.mgmt_type||'full_scale';
   document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
-  document.getElementById('model-email').value=m.email||''; openModal('model-modal');
+  document.getElementById('model-email').value=m.email||'';
+  document.getElementById('model-drive').value=m.drive_link||''; openModal('model-modal');
 }
 
 async function saveModel(){
   const id=document.getElementById('model-id').value;
-  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim()};
+  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null};
   if(!p.name)return alert('Name required');
   if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
   else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
