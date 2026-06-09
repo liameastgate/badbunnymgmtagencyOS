@@ -1049,7 +1049,13 @@ function previewChatterReport(rows) {
 
   rows.forEach(row=>{
     const name=row['Employees']||row['Employee']||'—';
-    const creators=row['Creators']||'—';
+    const creators=row['Creators']||'';
+    const creatorList=creators?creators.split(',').map(s=>s.trim()).filter(Boolean):[];
+    const creatorBadge=creatorList.length
+      ?`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:default;white-space:nowrap;" title="${creatorList.join(', ')}">
+          ${creatorList.length} model${creatorList.length>1?'s':''}
+        </span>`
+      :'—';
     const sales=cleanAmount(row['Sales']||0);
     const ppv=cleanAmount(row['PPV sales']||row['PPV Sales']||0);
     const tips=cleanAmount(row['Tips']||0);
@@ -1058,10 +1064,10 @@ function previewChatterReport(rows) {
     const cvr=row['Fan CVR']||'—';
     const golden=row['Golden ratio']||row['Golden Ratio']||'—';
     const hours=row['Scheduled hours']||row['Scheduled Hours']||'—';
-    const sph=row['Sales per hour']||row['Sales Per Hour']||'—';
+    const sph=cleanAmount(row['Sales per hour']||row['Sales Per Hour']||0);
     html+=`<tr>
       <td><strong>${name}</strong></td>
-      <td style="font-size:11px;color:var(--text2);max-width:150px;">${creators}</td>
+      <td>${creatorBadge}</td>
       <td class="profit">$${fmt(sales)}</td>
       <td>$${fmt(ppv)}</td>
       <td>$${fmt(tips)}</td>
@@ -1070,7 +1076,7 @@ function previewChatterReport(rows) {
       <td>${cvr}</td>
       <td>${golden}</td>
       <td>${hours}</td>
-      <td>${sph}</td>
+      <td>$${fmt(sph)}</td>
     </tr>`;
   });
   html+=`</tbody></table></div></div>`;
@@ -1144,7 +1150,7 @@ function previewReport(rows) {
 
     return{
       week_of:weekStart, week_end:weekEnd,
-      model_id:model?.id||null, model_name:name, mgmt_type:mgmtType,
+      model_id:model?.id||null, model_name:name,
       total_earnings:earnings, model_split:split,
       model_payout:modelPayout, agency_net:agencyNet,
       chatter_wages:0, agency_profit:agencyNet,
