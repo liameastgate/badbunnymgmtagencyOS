@@ -263,35 +263,69 @@
 
       <!-- Creator Stats Upload -->
       <div id="report-tab-upload">
-        <div class="card">
-          <div class="card-title">Upload Creator Statistics</div>
-          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
-            <div class="form-group" style="max-width:160px;"><label>From</label><input type="date" id="report-week-start"></div>
-            <div class="form-group" style="max-width:160px;"><label>To</label><input type="date" id="report-week-end"></div>
-            <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills from file</div>
+        <div class="two-col" style="margin-bottom:14px;">
+          <!-- Team A -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title" style="color:var(--accent2);">Team A</div>
+            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start"></div>
+              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end"></div>
+              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills</div>
+            </div>
+            <div class="file-drop" onclick="document.getElementById('csv-input-a').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropA(event)">
+              <div style="font-size:24px;">📄</div>
+              <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
+            </div>
+            <input type="file" id="csv-input-a" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFileA(this.files[0])">
           </div>
-          <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
-            <div style="font-size:28px;">📄</div>
-            <p>Creator Statistics CSV/XLSX</p>
+          <!-- Team B -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title" style="color:var(--accent2);">Team B</div>
+            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start-b"></div>
+              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end-b"></div>
+              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills</div>
+            </div>
+            <div class="file-drop" onclick="document.getElementById('csv-input-b').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropB(event)">
+              <div style="font-size:24px;">📄</div>
+              <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
+            </div>
+            <input type="file" id="csv-input-b" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFileB(this.files[0])">
           </div>
-          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
-          <div id="report-alert" class="alert"></div>
         </div>
-        <div id="csv-preview" style="margin-top:14px;"></div>
+        <div id="report-alert" class="alert"></div>
+        <div id="csv-preview-a" style="margin-top:14px;"></div>
+        <div id="csv-preview-b" style="margin-top:14px;"></div>
+        <div id="csv-save-both" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="saveBothReports()">💾 Save Both Reports</button>
+        </div>
       </div>
 
       <!-- Chatter Performance Upload (tab) -->
       <div id="report-tab-chatters" style="display:none;">
-        <div class="card">
-          <div class="card-title">Upload Infloww Employee Report</div>
-          <div class="file-drop" onclick="document.getElementById('chatter-csv-input2').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)">
-            <div style="font-size:28px;">📄</div>
-            <p>Employee Performance CSV/XLSX</p>
+        <div class="two-col" style="margin-bottom:14px;">
+          <!-- Team A -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title" style="color:var(--accent2);">Team A</div>
+            <div class="file-drop" onclick="document.getElementById('chatter-csv-input-a').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDropA(event)">
+              <div style="font-size:24px;">📄</div>
+              <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
+            </div>
+            <input type="file" id="chatter-csv-input-a" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFileA(this.files[0])">
           </div>
-          <input type="file" id="chatter-csv-input2" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
-          <div id="chatter-report-alert" class="alert"></div>
+          <!-- Team B -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title" style="color:var(--accent2);">Team B</div>
+            <div class="file-drop" onclick="document.getElementById('chatter-csv-input-b').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDropB(event)">
+              <div style="font-size:24px;">📄</div>
+              <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
+            </div>
+            <input type="file" id="chatter-csv-input-b" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFileB(this.files[0])">
+          </div>
         </div>
-        <div id="chatter-csv-preview" style="margin-top:14px;"></div>
+        <div id="chatter-report-alert" class="alert"></div>
+        <div id="chatter-csv-preview-a" style="margin-top:14px;"></div>
+        <div id="chatter-csv-preview-b" style="margin-top:14px;"></div>
       </div>
 
       <!-- History -->
@@ -1019,8 +1053,37 @@ function switchReportTab(tab) {
   if(tab==='history') loadReportHistory();
 }
 
-function handleChatterCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFile(e.dataTransfer.files[0]);}
+// ── Team A/B Creator handlers ────────────────────────────────
+var _parsedA=null, _parsedB=null;
+function handleCsvDropA(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileA(e.dataTransfer.files[0]);}
+function handleCsvDropB(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileB(e.dataTransfer.files[0]);}
+function handleCsvFileA(file){parseCsvXlsx(file,rows=>previewReport(rows,'a'));}
+function handleCsvFileB(file){parseCsvXlsx(file,rows=>previewReport(rows,'b'));}
+function parseCsvXlsx(file,cb){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});if(!rows.length)return showAlert('report-alert','Could not parse file.','error');cb(rows);}
+    catch(err){showAlert('report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
 
+// ── Team A/B Chatter handlers ────────────────────────────────
+function handleChatterCsvDropA(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFileA(e.dataTransfer.files[0]);}
+function handleChatterCsvDropB(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFileB(e.dataTransfer.files[0]);}
+function handleChatterCsvFileA(file){parseChatterXlsx(file,'a');}
+function handleChatterCsvFileB(file){parseChatterXlsx(file,'b');}
+function parseChatterXlsx(file,team){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');previewChatterReport(rows,team);}
+    catch(err){showAlert('chatter-report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+
+// Legacy aliases (keep for safety)
+function handleChatterCsvDrop(e){handleChatterCsvDropA(e);}
 function handleChatterCsvFile(file){
   const r=new FileReader();
   r.onload=e=>{
@@ -1035,12 +1098,13 @@ function handleChatterCsvFile(file){
   r.readAsBinaryString(file);
 }
 
-function previewChatterReport(rows) {
+function previewChatterReport(rows, team='a') {
   const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
   const dates=parseInflowwDate(dateRaw);
   const period=dates.start&&dates.end?`${dates.start} to ${dates.end}`:'Unknown period';
 
-  let html=`<div class="card"><div class="card-title">Chatter Performance — ${rows.length} chatters · ${period}</div>
+  const teamLabel=team==='b'?'Team B':'Team A';
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${teamLabel} — ${rows.length} chatters · ${period}</div>
   <div class="table-wrap"><table><thead><tr>
     <th>Chatter</th><th>Models</th><th>Sales</th><th>PPV Sales</th><th>Tips</th>
     <th>DMs Sent</th><th>Fans Chatted</th><th>Fan CVR</th><th>Golden Ratio</th>
@@ -1080,25 +1144,12 @@ function previewChatterReport(rows) {
     </tr>`;
   });
   html+=`</tbody></table></div></div>`;
-  document.getElementById('chatter-csv-preview').innerHTML=html;
-  showAlert('chatter-report-alert','Chatter report loaded — review above. This is view-only for now.','success');
+  document.getElementById('chatter-csv-preview-'+(team==='b'?'b':'a')).innerHTML=html;
+  showAlert('chatter-report-alert',`${teamLabel} chatter report loaded.`,'success');
 }
 
-function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
-
-function handleCsvFile(file){
-  const r=new FileReader();
-  r.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'binary'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      if(!rows.length)return showAlert('report-alert','Could not parse file.','error');
-      previewReport(rows);
-    }catch(err){showAlert('report-alert','Could not parse file: '+err.message,'error');}
-  };
-  r.readAsBinaryString(file);
-}
+function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileA(e.dataTransfer.files[0]);}
+function handleCsvFile(file){handleCsvFileA(file);}
 
 function parseCSV(text){const lines=text.trim().split('\n');if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));return lines.slice(1).map(line=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});return obj;});}
 
@@ -1116,15 +1167,16 @@ function cleanAmount(val) {
   return parseFloat(String(val).replace(/[$,%]/g,'').trim())||0;
 }
 
-function previewReport(rows) {
+function previewReport(rows, team='a') {
   // Auto-extract dates from first row if present
   const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
   const autoDate = parseInflowwDate(firstDate);
-  let weekStart = document.getElementById('report-week-start').value || autoDate.start;
-  let weekEnd   = document.getElementById('report-week-end').value   || autoDate.end;
-  // Fill in the pickers if auto-detected
-  if(autoDate.start && !document.getElementById('report-week-start').value) document.getElementById('report-week-start').value=autoDate.start;
-  if(autoDate.end   && !document.getElementById('report-week-end').value)   document.getElementById('report-week-end').value=autoDate.end;
+  const startId = team==='b' ? 'report-week-start-b' : 'report-week-start';
+  const endId   = team==='b' ? 'report-week-end-b'   : 'report-week-end';
+  let weekStart = document.getElementById(startId).value || autoDate.start;
+  let weekEnd   = document.getElementById(endId).value   || autoDate.end;
+  if(autoDate.start && !document.getElementById(startId).value) document.getElementById(startId).value=autoDate.start;
+  if(autoDate.end   && !document.getElementById(endId).value)   document.getElementById(endId).value=autoDate.end;
   if(!weekStart||!weekEnd) return showAlert('report-alert','Could not detect date range — please select manually.','error');
 
   const parsed=rows.map(row=>{
@@ -1161,14 +1213,34 @@ function previewReport(rows) {
 
   const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
   const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
-  let html=`<div class="card"><div class="card-title">Creator Report Preview — ${parsed.length} accounts · ${weekStart} to ${weekEnd}</div><div class="table-wrap"><table><thead><tr><th>Creator</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  const teamLabel=team==='b'?'Team B':'Team A';
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${teamLabel} — ${parsed.length} accounts · ${weekStart} to ${weekEnd}</div><div class="table-wrap"><table><thead><tr><th>Creator</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
   parsed.forEach(r=>{html+=`<tr><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt((r.msg_net||0)+(r.tips_net||0))}</td><td style="font-size:11px;">${r.mgmt_type==='chatting'?'Chatting':'Full Scale'}</td><td>${r.model_split}%</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(r.renew_pct*100).toFixed(1)}%</td><td>${r.active_fans}</td></tr>`;});
-  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div>`;
-  html+=`<div class="btn-row"><button class="btn btn-primary" onclick='saveReport(${JSON.stringify(parsed)})'>💾 Save Report</button></div></div>`;
-  document.getElementById('csv-preview').innerHTML=html;
+  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div></div>`;
+  document.getElementById('csv-preview-'+(team==='b'?'b':'a')).innerHTML=html;
+  if(team==='b') _parsedB=parsed; else _parsedA=parsed;
+  // Show Save Both if either team has data
+  const saveBtn=document.getElementById('csv-save-both');
+  if(saveBtn) saveBtn.style.display=(_parsedA||_parsedB)?'block':'none';
 }
 
-async function saveReport(rows){const{error}=await sb.from('weekly_reports').insert(rows);if(error)return showAlert('report-alert',error.message,'error');showAlert('report-alert',`Saved! ${rows.length} rows recorded.`,'success');}
+async function saveBothReports(){
+  const all=[...(_parsedA||[]),...(_parsedB||[])];
+  if(!all.length) return showAlert('report-alert','No data to save.','error');
+  const{error}=await sb.from('weekly_reports').insert(all);
+  if(error) return showAlert('report-alert',error.message,'error');
+  showAlert('report-alert',`Saved! ${all.length} rows recorded.`,'success');
+  _parsedA=null; _parsedB=null;
+  document.getElementById('csv-preview-a').innerHTML='';
+  document.getElementById('csv-preview-b').innerHTML='';
+  document.getElementById('csv-save-both').style.display='none';
+}
+
+async function saveReport(rows){
+  const{error}=await sb.from('weekly_reports').insert(rows);
+  if(error)return showAlert('report-alert',error.message,'error');
+  showAlert('report-alert',`Saved! ${rows.length} rows recorded.`,'success');
+}
 
 async function loadReportHistory(){
   const{data}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
