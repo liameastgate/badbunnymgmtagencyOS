@@ -28,22 +28,27 @@
   .pending-msg { text-align: center; padding: 20px; color: var(--text2); font-size: 14px; line-height: 1.6; display: none; }
   .pending-msg strong { color: var(--text); display: block; margin-bottom: 8px; font-size: 16px; }
   #app { display: none; min-height: 100vh; }
-  #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
-  .logo { padding: 20px 18px 16px; font-weight: 800; font-size: 18px; color: #ffffff; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: width 0.2s, transform 0.2s; overflow: hidden; }
+  #sidebar.collapsed { width: 0; transform: translateX(-220px); }
+  #sidebar-toggle { position: fixed; top: 14px; left: 228px; z-index: 200; background: var(--surface); border: 1px solid var(--border); color: var(--text2); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: left 0.2s; }
+  #sidebar-toggle.collapsed { left: 10px; }
+  #sidebar-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .logo { padding: 20px 18px 16px; font-weight: 800; font-size: 18px; color: #ffffff; letter-spacing: 1px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .logo::after { content: ''; display: block; width: 28px; height: 2px; background: var(--accent); margin-top: 8px; border-radius: 1px; }
   .logo span { display: block; font-size: 9px; color: var(--text2); letter-spacing: 3px; font-weight: 500; margin-top: 3px; text-transform: uppercase; }
-  .nav-section { font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #2a3060; padding: 10px 12px 4px; }
+  .nav-section { font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #2a3060; padding: 10px 12px 4px; white-space: nowrap; }
   nav { flex: 1; padding: 8px 8px; overflow-y: auto; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 1px; transition: all 0.15s; letter-spacing: 0.2px; border-left: 2px solid transparent; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 1px; transition: all 0.15s; letter-spacing: 0.2px; border-left: 2px solid transparent; white-space: nowrap; }
   .nav-item:hover { background: var(--surface2); color: var(--text); }
   .nav-item.active { background: rgba(30,79,255,0.1); color: #ffffff; border-left-color: var(--accent); border-radius: 0 6px 6px 0; }
   .nav-icon { font-size: 15px; width: 18px; text-align: center; }
-  .user-info { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; }
+  .user-info { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
   .user-email { color: var(--text2); word-break: break-all; margin-bottom: 4px; }
   .user-role { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; background: var(--accent); color: #fff; }
   .btn-signout { margin-top: 8px; background: none; border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; width: 100%; font-family: inherit; }
   .btn-signout:hover { color: var(--red); border-color: var(--red); }
-  #main { margin-left: 220px; padding: 24px 28px; min-height: 100vh; flex: 1; min-width: 0; width: calc(100vw - 220px); }
+  #main { margin-left: 220px; padding: 24px 28px; min-height: 100vh; flex: 1; min-width: 0; width: calc(100vw - 220px); transition: margin-left 0.2s, width 0.2s; }
+  #main.expanded { margin-left: 0; width: 100vw; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .two-col-wide { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
   .two-col > .card, .two-col-wide > .card { margin-bottom: 0; }
@@ -152,6 +157,7 @@
 </div>
 
 <div id="app">
+  <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
   <div id="sidebar">
     <div class="logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <nav id="nav"></nav>
@@ -268,9 +274,8 @@
           <div class="card" style="margin-bottom:0;">
             <div class="card-title" style="color:var(--accent2);">Team A</div>
             <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
-              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start"></div>
-              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end"></div>
-              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills</div>
+              <div class="form-group" style="max-width:140px;"><label>Invoice From</label><input type="date" id="report-week-start"></div>
+              <div class="form-group" style="max-width:140px;"><label>Invoice To</label><input type="date" id="report-week-end"></div>
             </div>
             <div class="file-drop" onclick="document.getElementById('csv-input-a').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropA(event)">
               <div style="font-size:24px;">📄</div>
@@ -282,9 +287,8 @@
           <div class="card" style="margin-bottom:0;">
             <div class="card-title" style="color:var(--accent2);">Team B</div>
             <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
-              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start-b"></div>
-              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end-b"></div>
-              <div style="font-size:11px;color:var(--text2);padding-bottom:10px;">Auto-fills</div>
+              <div class="form-group" style="max-width:140px;"><label>Invoice From</label><input type="date" id="report-week-start-b"></div>
+              <div class="form-group" style="max-width:140px;"><label>Invoice To</label><input type="date" id="report-week-end-b"></div>
             </div>
             <div class="file-drop" onclick="document.getElementById('csv-input-b').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropB(event)">
               <div style="font-size:24px;">📄</div>
@@ -689,7 +693,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
 
 var NAV = [
-  { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic','model'], section: 'Workspace' },
+  { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic'], section: 'Workspace' },
   { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'],                             section: null },
@@ -730,7 +734,7 @@ async function initApp(user) {
   document.getElementById('user-role-display').textContent = profile.role;
   buildNav(profile.role);
   await loadAllData();
-  navigate('overview');
+  navigate(profile.role === 'model' ? 'content' : 'overview');
 }
 
 function buildNav(role) {
@@ -798,6 +802,16 @@ async function signUp() {
     hide('login-form'); hide('signup-form'); show('pending-screen');
     showAuthMsg('Account created! Waiting for admin to assign your role.', 'success');
   }
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('main');
+  const btn = document.getElementById('sidebar-toggle');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  main.classList.toggle('expanded', collapsed);
+  btn.classList.toggle('collapsed', collapsed);
+  btn.textContent = collapsed ? '☰' : '✕';
 }
 
 async function signOut() {
@@ -901,18 +915,23 @@ function statCard(l,v,borderCls,valCls){
 
 // ── Content Orders ───────────────────────────────────────────
 function populateModelDropdowns() {
+  const isModel = STATE.profile?.role === 'model';
+  // For model role: only show their own profile in dropdowns
+  const visibleModels = isModel
+    ? STATE.models.filter(m => (m.email||'').toLowerCase() === (STATE.profile.email||'').toLowerCase())
+    : STATE.models;
   // Hidden select (used by submitContentOrder)
   const sel=document.getElementById('co-model');
-  if(sel) sel.innerHTML=STATE.models.map(m=>`<option value="${m.id}" data-email="${m.email||''}" data-name="${m.name}">${m.name}</option>`).join('');
+  if(sel) sel.innerHTML=visibleModels.map(m=>`<option value="${m.id}" data-email="${m.email||''}" data-name="${m.name}">${m.name}</option>`).join('');
   // Custom visual dropdown
   const opts=document.getElementById('co-model-options');
-  if(opts) opts.innerHTML=STATE.models.map(m=>`
+  if(opts) opts.innerHTML=visibleModels.map(m=>`
     <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;font-size:13px;color:var(--text);" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''">
       <input type="checkbox" value="${m.id}" onchange="syncModelSelect()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
       ${m.name}
     </label>`).join('');
   const fsel=document.getElementById('co-filter-model');
-  if(fsel) fsel.innerHTML='<option value="">All Models</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  if(fsel) fsel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
 }
 
@@ -1173,16 +1192,11 @@ function cleanAmount(val) {
 }
 
 function previewReport(rows, team='a') {
-  // Auto-extract dates from first row if present
-  const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
-  const autoDate = parseInflowwDate(firstDate);
   const startId = team==='b' ? 'report-week-start-b' : 'report-week-start';
   const endId   = team==='b' ? 'report-week-end-b'   : 'report-week-end';
-  let weekStart = document.getElementById(startId).value || autoDate.start;
-  let weekEnd   = document.getElementById(endId).value   || autoDate.end;
-  if(autoDate.start && !document.getElementById(startId).value) document.getElementById(startId).value=autoDate.start;
-  if(autoDate.end   && !document.getElementById(endId).value)   document.getElementById(endId).value=autoDate.end;
-  if(!weekStart||!weekEnd) return showAlert('report-alert','Could not detect date range — please select manually.','error');
+  const weekStart = document.getElementById(startId).value;
+  const weekEnd   = document.getElementById(endId).value;
+  if(!weekStart||!weekEnd) return showAlert('report-alert',`Please set the invoice period dates for Team ${team.toUpperCase()} before uploading.`,'error');
 
   const parsed=rows.map(row=>{
     // Exact Infloww Creator Statistics column names
