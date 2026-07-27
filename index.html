@@ -1646,7 +1646,9 @@ async function submitInvoice(){
   const total=salary+commission;
   const weekStart=document.getElementById('inv-week-start').value;
   const weekEnd=document.getElementById('inv-week-end').value;
-  const weekOf=weekStart&&weekEnd?`${weekStart} – ${weekEnd}`:(weekStart||weekEnd||'');
+  // week_of is a DATE column — store the week-start date itself, not a "start – end" range string
+  // (which Postgres rejects). The Week To field stays in the form purely to help you calculate totals.
+  const weekOf=weekStart||weekEnd||'';
   if(!weekOf||total===0)return showAlert('inv-alert','Fill in week dates and at least one earnings amount.','error');
   const fileUrl=await uploadInvFile();
   const inv={
