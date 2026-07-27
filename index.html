@@ -251,6 +251,12 @@
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
           <select id="co-filter-model" onchange="filterContentOrders()" style="width:180px;"><option value="">All Models</option></select>
           <select id="co-filter-status" onchange="filterContentOrders()" style="width:140px;"><option value="">All Statuses</option><option value="pending">Pending</option><option value="done">Done</option></select>
+          <select id="co-sort" onchange="filterContentOrders()" style="width:170px;">
+            <option value="date_desc">Date: Newest first</option>
+            <option value="date_asc">Date: Oldest first</option>
+            <option value="status">Status</option>
+            <option value="model">Model (A–Z)</option>
+          </select>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Thumb</th><th>Model</th><th>Platform</th><th>Content Link</th><th>Drive</th><th>Notes</th><th>Status</th><th>Date</th><th></th></tr></thead>
@@ -949,7 +955,12 @@ function populateModelDropdowns() {
       ${m.name}
     </label>`).join('');
   const fsel=document.getElementById('co-filter-model');
-  if(fsel) fsel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  if(fsel){
+    const prevFilterVal=fsel.value;
+    fsel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+    // Preserve the previously selected filter (e.g. after a model add/edit/delete elsewhere) unless that model no longer exists
+    if(prevFilterVal && [...fsel.options].some(o=>o.value===prevFilterVal)) fsel.value=prevFilterVal;
+  }
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
   // Drive link banners
   const bannerEl=document.getElementById('co-drive-banners');
@@ -1016,7 +1027,17 @@ function renderContentOrders(filtered) {
 function filterContentOrders() {
   const m=document.getElementById('co-filter-model').value;
   const s=document.getElementById('co-filter-status').value;
-  renderContentOrders(STATE.contentOrders.filter(o=>(!m||o.model_id===m)&&(!s||o.status===s)));
+  const sortBy=document.getElementById('co-sort')?.value||'date_desc';
+  let result=STATE.contentOrders.filter(o=>(!m||o.model_id===m)&&(!s||o.status===s));
+  result=result.slice().sort((a,b)=>{
+    switch(sortBy){
+      case 'date_asc': return new Date(a.created_at)-new Date(b.created_at);
+      case 'status': return (a.status||'pending').localeCompare(b.status||'pending') || new Date(b.created_at)-new Date(a.created_at);
+      case 'model': return (a.model_name||'').localeCompare(b.model_name||'');
+      case 'date_desc': default: return new Date(b.created_at)-new Date(a.created_at);
+    }
+  });
+  renderContentOrders(result);
 }
 
 // Thumbnail helpers
@@ -1072,7 +1093,7 @@ async function submitContentOrder() {
   }));
   const{data,error}=await sb.from('content_orders').insert(inserts).select();
   if(error) return showAlert('co-alert',error.message,'error');
-  (data||[]).forEach(d=>STATE.contentOrders.unshift(d)); renderContentOrders();
+  (data||[]).forEach(d=>STATE.contentOrders.unshift(d)); filterContentOrders();
   showAlert('co-alert',`${inserts.length} order${inserts.length>1?'s':''} added!`,'success');
   document.getElementById('co-url').value=''; document.getElementById('co-drive').value=''; document.getElementById('co-notes').value='';
   // Deselect all
@@ -1082,18 +1103,18 @@ async function submitContentOrder() {
 
 async function markDone(id) {
   await sb.from('content_orders').update({status:'done'}).eq('id',id);
-  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='done'; renderContentOrders();
+  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='done'; filterContentOrders();
 }
 
 async function markPending(id) {
   await sb.from('content_orders').update({status:'pending'}).eq('id',id);
-  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='pending'; renderContentOrders();
+  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='pending'; filterContentOrders();
 }
 
 async function deleteOrder(id) {
   if(!confirm('Delete?'))return;
   await sb.from('content_orders').delete().eq('id',id);
-  STATE.contentOrders=STATE.contentOrders.filter(o=>o.id!==id); renderContentOrders();
+  STATE.contentOrders=STATE.contentOrders.filter(o=>o.id!==id); filterContentOrders();
 }
 
 function editOrder(id) {
@@ -1120,7 +1141,7 @@ async function saveEditOrder() {
   if(error)return showAlert('co-alert',error.message,'error');
   const o=STATE.contentOrders.find(x=>x.id===id);
   if(o)Object.assign(o,updates);
-  renderContentOrders();
+  filterContentOrders();
   closeModal('co-edit-modal');
 }
 
@@ -1430,7 +1451,12 @@ function renderChatters(){
   STATE.chatters.forEach(c=>{tbody.innerHTML+=`<tr><td><strong>${c.name}</strong></td><td style="color:var(--text2);">${c.email||'—'}</td><td>$${c.hourly_rate||3}/hr</td><td>${c.commission_pct||5}%</td><td><button class="btn btn-sm btn-ghost" onclick="editChatter('${c.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delChatter('${c.id}')">✕</button></td></tr>`;});
 }
 
-function populateChatterDropdown(){const sel=document.getElementById('hours-chatter');if(sel)sel.innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}
+function populateChatterDropdown(){
+  const sel=document.getElementById('hours-chatter'); if(!sel) return;
+  const prevVal=sel.value;
+  sel.innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if(prevVal && [...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+}
 
 function editChatter(id){
   const c=STATE.chatters.find(x=>x.id===id);
@@ -1469,7 +1495,10 @@ async function loadChatterWeeks(){
   const{data}=await sb.from('chatter_hours').select('week_of').order('week_of',{ascending:false});
   const weeks=[...new Set((data||[]).map(h=>h.week_of))];
   const sel=document.getElementById('summary-week');
+  const prevVal=sel.value;
   sel.innerHTML='<option value="">Select week…</option>'+weeks.map(w=>`<option value="${w}">${w}</option>`).join('');
+  // Preserve the previously selected week (e.g. after logging new hours) instead of resetting the picker
+  if(prevVal&&weeks.includes(prevVal)){ sel.value=prevVal; loadHoursSummary(); }
 }
 
 async function loadHoursSummary(){
@@ -1595,7 +1624,7 @@ async function submitInvoice(){
 
 async function updateInvoice(id,status){
   await sb.from('invoices').update({status}).eq('id',id);
-  const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status; renderInvoicesTable(STATE.invoices);
+  const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status; filterInvoices();
 }
 
 // ── Team ─────────────────────────────────────────────────────
@@ -1717,7 +1746,7 @@ async function addExpense(){
   const{data,error}=await sb.from('expenses').insert(exp).select().single();
   if(error)return showAlert('exp-alert',error.message,'error');
   EXPENSES_DATA.unshift(data);
-  renderExpenses(EXPENSES_DATA);
+  filterExpenses();
   renderExpenseSummary();
   showAlert('exp-alert','Expense logged!','success');
   document.getElementById('exp-amount').value='';
@@ -1728,7 +1757,7 @@ async function deleteExpense(id){
   if(!confirm('Delete this expense?'))return;
   await sb.from('expenses').delete().eq('id',id);
   EXPENSES_DATA=EXPENSES_DATA.filter(e=>e.id!==id);
-  renderExpenses(EXPENSES_DATA);
+  filterExpenses();
   renderExpenseSummary();
 }
 
@@ -1736,14 +1765,20 @@ async function deleteExpense(id){
 async function loadModelSheets(){
   const list=document.getElementById('sheets-model-list'); list.innerHTML='';
   if(!STATE.models.length){document.getElementById('sheets-content').innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No models added yet</p></div>';return;}
-  STATE.models.forEach((m,i)=>{
+  // Preserve whichever model's sheet was open (e.g. re-navigating to this page)
+  // instead of always jumping back to the first model.
+  const prevModelId=window._currentSheetModelId;
+  const stillExists=prevModelId&&STATE.models.some(m=>m.id===prevModelId);
+  let toSelect=STATE.models[0];
+  STATE.models.forEach(m=>{
     const btn=document.createElement('button');
     btn.className='btn btn-ghost'; btn.style.cssText='width:100%;text-align:left;margin-bottom:4px;';
     btn.textContent=m.name;
     btn.onclick=()=>showModelSheet(m);
     list.appendChild(btn);
-    if(i===0)showModelSheet(m);
+    if(stillExists&&m.id===prevModelId) toSelect=m;
   });
+  showModelSheet(toSelect);
 }
 
 async function showModelSheet(model){
@@ -1807,8 +1842,15 @@ async function loadSOPs(){
   const{data}=await sb.from('sops').select('*').order('created_at');
   SOPS_DATA=data||[];
   renderSOPNav(isAdmin);
-  if(SOPS_DATA.length) openSOP(SOPS_DATA[0].id);
-  else document.getElementById('sops-content-area').innerHTML='<div class="empty" style="margin-top:80px;"><div class="empty-icon">📖</div><p>No SOPs yet — click + Add to create one</p></div>';
+  if(SOPS_DATA.length){
+    // Preserve whichever SOP was open (e.g. re-navigating to this page, or deleting a different SOP)
+    // instead of always jumping back to the first one.
+    const stillExists=CURRENT_SOP_ID&&SOPS_DATA.some(s=>s.id===CURRENT_SOP_ID);
+    openSOP(stillExists?CURRENT_SOP_ID:SOPS_DATA[0].id);
+  } else {
+    CURRENT_SOP_ID=null;
+    document.getElementById('sops-content-area').innerHTML='<div class="empty" style="margin-top:80px;"><div class="empty-icon">📖</div><p>No SOPs yet — click + Add to create one</p></div>';
+  }
 }
 
 function renderSOPNav(isAdmin){
