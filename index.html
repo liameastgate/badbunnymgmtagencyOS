@@ -246,6 +246,37 @@
           <div class="btn-row"><button class="btn btn-primary" onclick="submitContentOrder()">➕ Add Order</button></div>
           <div id="co-alert" class="alert"></div>
         </div>
+        <div class="card">
+          <div class="card-title">⚡ Quick Add by URL</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:14px;margin-top:-8px;">Paste one or more video links (one per line) — platform is detected automatically per link. Add thumbnails in the same order as your links if you want them.</div>
+          <div class="form-grid">
+            <div class="form-group full" style="position:relative;">
+              <label>Model(s)</label>
+              <div id="bulk-model-trigger" onclick="toggleBulkModelDropdown()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;">
+                <span id="bulk-model-label" style="color:var(--text2);">Select model(s)…</span>
+                <span style="font-size:10px;color:var(--text2);">▼</span>
+              </div>
+              <div id="bulk-model-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;z-index:200;padding:6px 0;margin-top:2px;max-height:220px;overflow-y:auto;">
+                <div id="bulk-model-options"></div>
+              </div>
+              <select id="bulk-model" multiple style="display:none;"></select>
+            </div>
+            <div class="form-group full"><label>Video Links (one per line)</label><textarea id="bulk-urls" rows="4" placeholder="https://www.instagram.com/reel/...&#10;https://www.tiktok.com/@user/video/...&#10;https://www.instagram.com/reel/..."></textarea></div>
+            <div class="form-group full">
+              <label>Thumbnails (optional — select/drop in the same order as the links above, 1st image = 1st link)</label>
+              <div id="bulk-thumb-preview" style="display:none;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+              <div class="file-drop" id="bulk-thumb-drop" onclick="document.getElementById('bulk-thumb-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBulkThumbDrop(event)" style="padding:16px;">
+                <div style="font-size:24px;">🖼️</div>
+                <p style="margin-top:4px;font-size:12px;">Click or drag multiple thumbnails — matched to links by order</p>
+              </div>
+              <input type="file" id="bulk-thumb-input" accept="image/*" multiple style="display:none" onchange="handleBulkThumbFiles(this.files)">
+            </div>
+            <div class="form-group full"><label>Google Drive Link (optional, applied to all)</label><input type="url" id="bulk-drive" placeholder="https://drive.google.com/..."></div>
+            <div class="form-group full"><label>Notes / Instructions (optional, applied to all)</label><textarea id="bulk-notes" rows="2" placeholder="e.g. Copy and repost with caption: …"></textarea></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="bulkAddContentOrders()">⚡ Bulk Add</button></div>
+          <div id="co-bulk-alert" class="alert"></div>
+        </div>
       </div>
       <div class="card">
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -434,6 +465,8 @@
       <div>
         <div id="invoice-admin-panel" style="display:none;" class="card" style="margin-bottom:14px;">
           <div class="card-title">All Invoices</div>
+          <div id="invoices-sync-alert" class="alert" style="margin-bottom:12px;"></div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week; moving it off Approved removes that synced expense.</div>
           <div style="margin-bottom:12px;"><select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select></div>
           <div class="table-wrap"><table>
             <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
@@ -483,8 +516,12 @@
             <input type="number" id="exp-amount" placeholder="0.00" step="0.01" min="0">
           </div>
           <div class="form-group">
-            <label>Date</label>
-            <input type="date" id="exp-date">
+            <label>Week From</label>
+            <input type="date" id="exp-date" onchange="syncExpWeek()">
+          </div>
+          <div class="form-group">
+            <label>Week To</label>
+            <input type="date" id="exp-date-end">
           </div>
           <div class="form-group full">
             <label>Description</label>
@@ -938,6 +975,15 @@ function populateModelDropdowns() {
       <input type="checkbox" value="${m.id}" onchange="syncModelSelect()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
       ${m.name}
     </label>`).join('');
+  // Quick Add by URL — mirrors the New Content Order model picker above
+  const bulkSel=document.getElementById('bulk-model');
+  if(bulkSel) bulkSel.innerHTML=visibleModels.map(m=>`<option value="${m.id}" data-email="${m.email||''}" data-name="${m.name}">${m.name}</option>`).join('');
+  const bulkOpts=document.getElementById('bulk-model-options');
+  if(bulkOpts) bulkOpts.innerHTML=visibleModels.map(m=>`
+    <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;font-size:13px;color:var(--text);" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''">
+      <input type="checkbox" value="${m.id}" onchange="syncBulkModelSelect()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+      ${m.name}
+    </label>`).join('');
   const fsel=document.getElementById('co-filter-model');
   if(fsel){
     const prevFilterVal=fsel.value;
@@ -974,11 +1020,73 @@ function syncModelSelect(){
   else{ label.style.color='var(--text)'; label.textContent=checked.map(c=>c.closest('label').textContent.trim()).join(', '); }
 }
 
-// Close dropdown when clicking outside
+function toggleBulkModelDropdown(){
+  const dd=document.getElementById('bulk-model-dropdown');
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+
+function syncBulkModelSelect(){
+  const checked=[...document.querySelectorAll('#bulk-model-options input:checked')];
+  const sel=document.getElementById('bulk-model');
+  [...sel.options].forEach(o=>{ o.selected=checked.some(c=>c.value===o.value); });
+  const label=document.getElementById('bulk-model-label');
+  if(checked.length===0) label.style.color='var(--text2)',label.textContent='Select model(s)…';
+  else{ label.style.color='var(--text)'; label.textContent=checked.map(c=>c.closest('label').textContent.trim()).join(', '); }
+}
+
+// Close dropdowns when clicking outside
 document.addEventListener('click',e=>{
   const dd=document.getElementById('co-model-dropdown');
   if(dd&&!dd.contains(e.target)&&e.target.id!=='co-model-trigger'&&!e.target.closest('#co-model-trigger')) dd.style.display='none';
+  const bdd=document.getElementById('bulk-model-dropdown');
+  if(bdd&&!bdd.contains(e.target)&&e.target.id!=='bulk-model-trigger'&&!e.target.closest('#bulk-model-trigger')) bdd.style.display='none';
 });
+
+// Detects platform from a pasted URL so Quick Add doesn't need a manual platform picker per link.
+function detectPlatformFromUrl(url){
+  const u=String(url||'').toLowerCase();
+  if(/instagram\.com/.test(u)) return 'instagram';
+  if(/tiktok\.com/.test(u)) return 'tiktok';
+  return 'other';
+}
+
+async function bulkAddContentOrders(){
+  const sel=document.getElementById('bulk-model');
+  const selectedOptions=[...sel.selectedOptions];
+  if(!selectedOptions.length) return showAlert('co-bulk-alert','Select at least one model.','error');
+  const rawLines=document.getElementById('bulk-urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const urls=rawLines.filter(l=>/^https?:\/\//i.test(l));
+  const skipped=rawLines.length-urls.length;
+  if(!urls.length) return showAlert('co-bulk-alert','Paste at least one valid video link (starting with http:// or https://).','error');
+  const driveLink=document.getElementById('bulk-drive').value.trim();
+  const notes=document.getElementById('bulk-notes').value.trim();
+  const inserts=[];
+  urls.forEach((url,i)=>{
+    const platform=detectPlatformFromUrl(url);
+    const thumbnailUrl=_bulkThumbDataUrls[i]||null;
+    selectedOptions.forEach(opt=>{
+      inserts.push({
+        model_id:opt.value, model_name:opt.dataset.name||opt.textContent, model_email:opt.dataset.email||null,
+        platform, url, drive_link:driveLink||null, notes:notes||null,
+        thumbnail_url:thumbnailUrl, status:'pending'
+      });
+    });
+  });
+  const{data,error}=await sb.from('content_orders').insert(inserts).select();
+  if(error) return showAlert('co-bulk-alert',error.message,'error');
+  (data||[]).forEach(d=>STATE.contentOrders.unshift(d));
+  filterContentOrders();
+  let msg=`${inserts.length} order${inserts.length!==1?'s':''} added from ${urls.length} link${urls.length!==1?'s':''}!`;
+  if(skipped) msg+=` (${skipped} line${skipped!==1?'s':''} skipped — didn't look like a URL.)`;
+  if(_bulkThumbDataUrls.length&&_bulkThumbDataUrls.length!==urls.length) msg+=` (${_bulkThumbDataUrls.length} thumbnail${_bulkThumbDataUrls.length!==1?'s':''} matched by order — extras or missing ones were left blank.)`;
+  showAlert('co-bulk-alert',msg,'success');
+  document.getElementById('bulk-urls').value='';
+  document.getElementById('bulk-drive').value='';
+  document.getElementById('bulk-notes').value='';
+  clearBulkThumbs();
+  [...sel.options].forEach(o=>o.selected=false);
+  syncBulkModelSelect();
+}
 
 function renderContentOrders(filtered) {
   const orders = filtered!==undefined ? filtered : STATE.contentOrders;
@@ -1026,12 +1134,11 @@ function filterContentOrders() {
 
 // Thumbnail helpers
 var _thumbDataUrl=null;
-function handleThumbDrop(e){e.preventDefault();document.getElementById('co-thumb-drop').classList.remove('dragover');if(e.dataTransfer.files[0])handleThumbFile(e.dataTransfer.files[0]);}
-function handleThumbFile(file){
+// Shared resize helper: reads an image file, downsizes it via canvas, hands back a base64 JPEG.
+function resizeImageFile(file,cb){
   if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    // Resize image to thumbnail via canvas before storing
     const img=new Image();
     img.onload=()=>{
       const maxW=320,maxH=180;
@@ -1039,17 +1146,61 @@ function handleThumbFile(file){
       if(w>maxW||h>maxH){const r=Math.min(maxW/w,maxH/h);w=Math.round(w*r);h=Math.round(h*r);}
       const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      _thumbDataUrl=canvas.toDataURL('image/jpeg',0.8);
-      document.getElementById('co-thumb-img').src=_thumbDataUrl;
-      document.getElementById('co-thumb-preview').style.display='flex';
-      document.getElementById('co-thumb-preview').style.alignItems='center';
-      document.getElementById('co-thumb-drop').style.display='none';
+      cb(canvas.toDataURL('image/jpeg',0.8));
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
+function handleThumbDrop(e){e.preventDefault();document.getElementById('co-thumb-drop').classList.remove('dragover');if(e.dataTransfer.files[0])handleThumbFile(e.dataTransfer.files[0]);}
+function handleThumbFile(file){
+  if(!file)return;
+  resizeImageFile(file,dataUrl=>{
+    _thumbDataUrl=dataUrl;
+    document.getElementById('co-thumb-img').src=_thumbDataUrl;
+    document.getElementById('co-thumb-preview').style.display='flex';
+    document.getElementById('co-thumb-preview').style.alignItems='center';
+    document.getElementById('co-thumb-drop').style.display='none';
+  });
+}
 function clearThumb(){_thumbDataUrl=null;document.getElementById('co-thumb-preview').style.display='none';document.getElementById('co-thumb-drop').style.display='block';document.getElementById('co-thumb-input').value='';}
+
+// Bulk thumbnail helpers (Quick Add by URL) — multiple images matched to links by order.
+var _bulkThumbDataUrls=[];
+function handleBulkThumbDrop(e){
+  e.preventDefault();
+  document.getElementById('bulk-thumb-drop').classList.remove('dragover');
+  if(e.dataTransfer.files.length) handleBulkThumbFiles(e.dataTransfer.files);
+}
+function handleBulkThumbFiles(fileList){
+  const files=[...fileList];
+  if(!files.length)return;
+  const results=new Array(files.length);
+  let remaining=files.length;
+  files.forEach((file,i)=>{
+    resizeImageFile(file,dataUrl=>{
+      results[i]=dataUrl;
+      remaining--;
+      if(remaining===0){
+        _bulkThumbDataUrls=_bulkThumbDataUrls.concat(results);
+        renderBulkThumbPreview();
+      }
+    });
+  });
+}
+function renderBulkThumbPreview(){
+  const wrap=document.getElementById('bulk-thumb-preview');
+  if(!_bulkThumbDataUrls.length){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='flex';
+  wrap.innerHTML=_bulkThumbDataUrls.map((url,i)=>`
+    <div style="position:relative;">
+      <img src="${url}" style="width:80px;height:45px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+      <span style="position:absolute;top:2px;left:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;">#${i+1}</span>
+      <button onclick="removeBulkThumb(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:var(--red);border:none;border-radius:4px;font-size:11px;cursor:pointer;padding:0 4px;">✕</button>
+    </div>`).join('');
+}
+function removeBulkThumb(i){ _bulkThumbDataUrls.splice(i,1); renderBulkThumbPreview(); }
+function clearBulkThumbs(){ _bulkThumbDataUrls=[]; document.getElementById('bulk-thumb-input').value=''; renderBulkThumbPreview(); }
 
 async function uploadThumbToSupabase(modelId){
   // Store resized base64 thumbnail directly — no storage bucket required
@@ -1565,8 +1716,9 @@ async function renderInvoicePage(){
   document.getElementById('invoice-admin-panel').style.display=isAdmin?'block':'none';
   const wkStart=document.getElementById('inv-week-start');
   const wkEnd=document.getElementById('inv-week-end');
-  if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+1);wkStart.value=d.toISOString().split('T')[0];}
-  if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-d.getDay()+7);wkEnd.value=d.toISOString().split('T')[0];}
+  // Monday-of-this-week, computed so Sunday (getDay()===0) doesn't roll forward into next week.
+  if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
+  if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
   if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderInvoicesTable(STATE.invoices);}
   renderMyInvoices();
 }
@@ -1646,8 +1798,9 @@ async function submitInvoice(){
   const total=salary+commission;
   const weekStart=document.getElementById('inv-week-start').value;
   const weekEnd=document.getElementById('inv-week-end').value;
-  // week_of is a DATE column — store the week-start date itself, not a "start – end" range string
-  // (which Postgres rejects). The Week To field stays in the form purely to help you calculate totals.
+  // week_of/week_end are DATE columns — store each boundary separately (not a "start – end"
+  // range string, which Postgres rejects). week_end also lets an approved invoice sync into
+  // Expenses with a matching period instead of just a single day.
   const weekOf=weekStart||weekEnd||'';
   if(!weekOf||total===0)return showAlert('inv-alert','Fill in week dates and at least one earnings amount.','error');
   const fileUrl=await uploadInvFile();
@@ -1656,6 +1809,7 @@ async function submitInvoice(){
     submitted_by_name:STATE.profile.name,
     role:document.getElementById('inv-role').value,
     week_of:weekOf,
+    week_end:weekEnd||null,
     amount:total,
     salary_amount:salary,
     commission_amount:commission,
@@ -1675,8 +1829,38 @@ async function submitInvoice(){
 }
 
 async function updateInvoice(id,status){
-  await sb.from('invoices').update({status}).eq('id',id);
+  const{error}=await sb.from('invoices').update({status}).eq('id',id);
+  if(error) return showAlert('invoices-sync-alert',error.message,'error');
   const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status; filterInvoices();
+  if(inv) await syncInvoiceToExpense(inv,status);
+}
+
+// Keeps Expenses in sync with invoice approvals: approving an invoice logs its total as a
+// Staff expense for that week; moving it off Approved removes the synced expense again, so
+// Overview's Net Profit always reflects only currently-approved payouts, never stale ones.
+const ROLE_LABELS={chatter:'Chatter',traffic:'Traffic Team',va:'VA / Manager'};
+async function syncInvoiceToExpense(inv,status){
+  try{
+    if(status==='approved'){
+      const{data:existing,error:findErr}=await sb.from('expenses').select('id').eq('source_invoice_id',inv.id).maybeSingle();
+      if(findErr) throw findErr;
+      if(existing) return; // already synced — avoid duplicating on repeated approvals
+      const roleLabel=ROLE_LABELS[inv.role]||inv.role;
+      const desc=`Invoice — ${inv.submitted_by_name||inv.submitted_by_email} (${roleLabel})${inv.description?': '+inv.description:''}`;
+      const{error}=await sb.from('expenses').insert({
+        category:'staff', is_recurring:false, amount:inv.amount,
+        description:desc, expense_date:inv.week_of, week_end:inv.week_end||null,
+        source_invoice_id:inv.id
+      });
+      if(error) throw error;
+    } else {
+      const{error}=await sb.from('expenses').delete().eq('source_invoice_id',inv.id);
+      if(error) throw error;
+    }
+    if(document.getElementById('page-expenses')?.classList.contains('active')) loadExpenses();
+  }catch(e){
+    showAlert('invoices-sync-alert','Invoice status saved, but expense sync failed: '+e.message+' — your Supabase project likely needs the week_end/source_invoice_id columns added (ask Claude for the SQL).','error');
+  }
 }
 
 // ── Team ─────────────────────────────────────────────────────
@@ -1760,9 +1944,19 @@ async function loadExpenses(){
   EXPENSES_DATA=data||[];
   renderExpenses(EXPENSES_DATA);
   renderExpenseSummary();
-  // Set default date to today
-  const d=document.getElementById('exp-date');
-  if(d&&!d.value)d.value=new Date().toISOString().split('T')[0];
+  // Default Week From/To to the current week (Monday–Sunday), matching Invoices' default —
+  // both stay editable so you can log an expense for any period.
+  const wkStart=document.getElementById('exp-date');
+  const wkEnd=document.getElementById('exp-date-end');
+  if(wkStart&&!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
+  if(wkEnd&&!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
+}
+
+function syncExpWeek(){
+  const start=document.getElementById('exp-date').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('exp-date-end').value=d.toISOString().split('T')[0];
 }
 
 function renderExpenseSummary(){
@@ -1781,10 +1975,12 @@ function renderExpenses(data){
   tbody.innerHTML='';
   if(!data.length){empty.style.display='block';return;} empty.style.display='none';
   data.forEach(e=>{
+    const dateRange=e.week_end&&e.week_end!==e.expense_date?`${fmtDate(e.expense_date)} – ${fmtDate(e.week_end)}`:fmtDate(e.expense_date);
+    const syncedBadge=e.source_invoice_id?`<span title="Auto-created from an approved invoice" style="margin-left:6px;font-size:10px;color:var(--accent2);">🔗 Invoice</span>`:'';
     tbody.innerHTML+=`<tr>
-      <td style="white-space:nowrap;">${fmtDate(e.expense_date)}</td>
+      <td style="white-space:nowrap;">${dateRange}</td>
       <td>${EXP_LABELS[e.category]||e.category}</td>
-      <td>${e.description||'—'}</td>
+      <td>${e.description||'—'}${syncedBadge}</td>
       <td class="loss">$${fmt(e.amount)}</td>
       <td><span class="badge ${e.is_recurring?'processing':'pending'}">${e.is_recurring?'Recurring':'One-off'}</span></td>
       <td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">✕</button></td>
@@ -1805,7 +2001,8 @@ async function addExpense(){
     category:document.getElementById('exp-category').value,
     is_recurring:document.getElementById('exp-recurring').value==='true',
     amount,description:desc,
-    expense_date:document.getElementById('exp-date').value||new Date().toISOString().split('T')[0]
+    expense_date:document.getElementById('exp-date').value||new Date().toISOString().split('T')[0],
+    week_end:document.getElementById('exp-date-end').value||null
   };
   const{data,error}=await sb.from('expenses').insert(exp).select().single();
   if(error)return showAlert('exp-alert',error.message,'error');
