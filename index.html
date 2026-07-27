@@ -313,6 +313,7 @@
 
       <!-- History -->
       <div id="report-tab-history" style="display:none;">
+        <div id="report-history-alert" class="alert" style="margin-bottom:12px;"></div>
         <div id="report-history-groups"></div>
         <div id="report-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No reports yet</p></div>
       </div>
@@ -511,10 +512,11 @@
     <div class="page" id="page-team">
       <div class="page-title">Team Access</div>
       <div class="page-sub">Assign roles and customise exactly which pages each person can access</div>
+      <div id="team-alert" class="alert" style="margin-bottom:12px;"></div>
       <div class="two-col-wide">
         <div class="card">
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th><th>Custom Pages</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Change Role</th><th>Custom Pages</th><th></th></tr></thead>
             <tbody id="team-body"></tbody>
           </table></div>
         </div>
@@ -728,7 +730,18 @@ async function initApp(user) {
   document.getElementById('user-role-display').textContent = profile.role;
   buildNav(profile.role);
   await loadAllData();
-  navigate(profile.role === 'model' ? 'content' : 'overview');
+  // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
+  const defaultPage = profile.role === 'model' ? 'content' : 'overview';
+  let savedPage=null;
+  try{ savedPage=localStorage.getItem('agencyos_page'); }catch(e){}
+  navigate(savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage);
+}
+
+function pageAllowed(pageId, profile){
+  const item=NAV.find(n=>n.id===pageId);
+  if(!item) return false;
+  const customPerms=profile?.permissions;
+  return customPerms ? customPerms.includes(pageId) : item.roles.includes(profile?.role);
 }
 
 function buildNav(role) {
@@ -759,6 +772,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const el = document.getElementById('page-' + page); if (el) el.classList.add('active');
   const nav = document.getElementById('nav-' + page); if (nav) nav.classList.add('active');
+  try{ localStorage.setItem('agencyos_page', page); }catch(e){}
   if (page === 'overview') renderOverview();
   if (page === 'invoices') renderInvoicePage();
   if (page === 'team') loadTeam();
@@ -1408,14 +1422,20 @@ async function loadReportHistory(){
 
 async function deleteReportRow(id){
   if(!confirm('Delete this model\'s row from this report?'))return;
-  await sb.from('weekly_reports').delete().eq('id',id);
+  const{data,error}=await sb.from('weekly_reports').delete().eq('id',id).select();
+  if(error) return showAlert('report-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('report-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the weekly_reports table — ask Claude for the SQL to add one.','error');
+  showAlert('report-history-alert','Deleted.','success');
   loadReportHistory();
 }
 
 async function deleteReportGroup(ids,label){
   if(!ids||!ids.length)return;
   if(!confirm(`Delete all ${ids.length} row${ids.length!==1?'s':''} for ${label||'this week'}? This cannot be undone.`))return;
-  await sb.from('weekly_reports').delete().in('id',ids);
+  const{data,error}=await sb.from('weekly_reports').delete().in('id',ids).select();
+  if(error) return showAlert('report-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('report-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the weekly_reports table — ask Claude for the SQL to add one.','error');
+  showAlert('report-history-alert',`Deleted ${data.length} row${data.length!==1?'s':''}.`,'success');
   loadReportHistory();
 }
 
@@ -1672,8 +1692,20 @@ async function loadTeam(){
       <td><button class="btn btn-sm ${hasCustom?'btn-primary':'btn-ghost'}" onclick="openPermEditor('${u.id}','${u.name||u.email}','${u.role}',${JSON.stringify(u.permissions||[]).replace(/"/g,"'")})">
         ${hasCustom?'✏ Custom':'+ Set'}
       </button></td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteMember('${u.id}','${(u.email||'').replace(/'/g,"\\'")}')">✕</button></td>
     </tr>`;
   });
+}
+
+async function deleteMember(id,email){
+  if(id===STATE.profile?.id) return showAlert('team-alert',"You can't remove your own account while signed in as them.",'error');
+  if(!confirm(`Remove ${email}? They'll lose access immediately. This only revokes their access — it doesn't delete their login, so if they try to sign in again they'll land on the "pending approval" screen and need to be re-approved.`))return;
+  const{data,error}=await sb.from('profiles').delete().eq('id',id).select();
+  if(error) return showAlert('team-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('team-alert','Nothing was removed. Your Supabase project likely needs a DELETE policy on the profiles table — ask Claude for the SQL to add one.','error');
+  showAlert('team-alert',`${email} removed.`,'success');
+  if(PERM_USER_ID===id){ PERM_USER_ID=null; document.getElementById('perm-toggles').innerHTML=''; }
+  loadTeam();
 }
 
 async function updateRole(id,role){if(!role)return;await sb.from('profiles').update({role}).eq('id',id);loadTeam();}
