@@ -467,7 +467,10 @@
           <div class="card-title">All Invoices</div>
           <div id="invoices-sync-alert" class="alert" style="margin-bottom:12px;"></div>
           <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week; moving it off Approved removes that synced expense.</div>
-          <div style="margin-bottom:12px;"><select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select></div>
+          <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select>
+            <button class="btn btn-sm btn-ghost" onclick="backfillInvoiceExpenseSync()" title="Catches any already-approved invoices from before this sync existed">🔄 Sync Approved → Expenses</button>
+          </div>
           <div class="table-wrap"><table>
             <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-body"></tbody>
@@ -1853,6 +1856,7 @@ async function syncInvoiceToExpense(inv,status){
         source_invoice_id:inv.id
       });
       if(error) throw error;
+      showAlert('invoices-sync-alert',`Synced to Expenses ✓ ($${fmt(inv.amount)} logged as Staff expense)`,'success');
     } else {
       const{error}=await sb.from('expenses').delete().eq('source_invoice_id',inv.id);
       if(error) throw error;
@@ -1861,6 +1865,36 @@ async function syncInvoiceToExpense(inv,status){
   }catch(e){
     showAlert('invoices-sync-alert','Invoice status saved, but expense sync failed: '+e.message+' — your Supabase project likely needs the week_end/source_invoice_id columns added (ask Claude for the SQL).','error');
   }
+}
+
+// One-time backfill: catches invoices that were already marked "approved" before this sync
+// feature existed (or from any point where the live sync silently failed), so their cost
+// still ends up reflected in Expenses/Net Profit without needing to un-approve and re-approve.
+async function backfillInvoiceExpenseSync(){
+  const{data:approved,error}=await sb.from('invoices').select('*').eq('status','approved');
+  if(error) return showAlert('invoices-sync-alert',error.message,'error');
+  if(!approved||!approved.length) return showAlert('invoices-sync-alert','No approved invoices to check.','success');
+  let created=0, failed=0;
+  for(const inv of approved){
+    try{
+      const{data:existing,error:findErr}=await sb.from('expenses').select('id').eq('source_invoice_id',inv.id).maybeSingle();
+      if(findErr) throw findErr;
+      if(existing) continue;
+      const roleLabel=ROLE_LABELS[inv.role]||inv.role;
+      const desc=`Invoice — ${inv.submitted_by_name||inv.submitted_by_email} (${roleLabel})${inv.description?': '+inv.description:''}`;
+      const{error:insErr}=await sb.from('expenses').insert({
+        category:'staff', is_recurring:false, amount:inv.amount,
+        description:desc, expense_date:inv.week_of, week_end:inv.week_end||null,
+        source_invoice_id:inv.id
+      });
+      if(insErr) throw insErr;
+      created++;
+    }catch(e){ failed++; }
+  }
+  let msg=created?`Synced ${created} previously-approved invoice${created!==1?'s':''} to Expenses.`:'Everything was already in sync — nothing to backfill.';
+  if(failed) msg+=` (${failed} failed — check the week_end/source_invoice_id columns exist.)`;
+  showAlert('invoices-sync-alert',msg,failed?'error':'success');
+  if(created&&document.getElementById('page-expenses')?.classList.contains('active')) loadExpenses();
 }
 
 // ── Team ─────────────────────────────────────────────────────
