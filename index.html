@@ -278,67 +278,37 @@
 
       <!-- Creator Stats Upload -->
       <div id="report-tab-upload">
-        <div class="two-col" style="margin-bottom:14px;">
-          <!-- Team A -->
-          <div class="card" style="margin-bottom:0;">
-            <div class="card-title" style="color:var(--accent2);">Team A</div>
-            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
-              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start"></div>
-              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end"></div>
-            </div>
-            <div class="file-drop" onclick="document.getElementById('csv-input-a').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropA(event)">
-              <div style="font-size:24px;">📄</div>
-              <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
-            </div>
-            <input type="file" id="csv-input-a" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFileA(this.files[0])">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Creator Statistics</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end"></div>
           </div>
-          <!-- Team B -->
-          <div class="card" style="margin-bottom:0;">
-            <div class="card-title" style="color:var(--accent2);">Team B</div>
-            <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
-              <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="report-week-start-b"></div>
-              <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="report-week-end-b"></div>
-            </div>
-            <div class="file-drop" onclick="document.getElementById('csv-input-b').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDropB(event)">
-              <div style="font-size:24px;">📄</div>
-              <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
-            </div>
-            <input type="file" id="csv-input-b" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFileB(this.files[0])">
+          <div class="file-drop" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
           </div>
+          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleCsvFile(this.files[0])">
         </div>
         <div id="report-alert" class="alert"></div>
-        <div id="csv-preview-a" style="margin-top:14px;"></div>
-        <div id="csv-preview-b" style="margin-top:14px;"></div>
-        <div id="csv-save-both" style="display:none;margin-top:8px;">
-          <button class="btn btn-primary" onclick="saveBothReports()">💾 Save Both Reports</button>
+        <div id="csv-preview" style="margin-top:14px;"></div>
+        <div id="csv-save" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="saveReportRows()">💾 Save Report</button>
         </div>
       </div>
 
       <!-- Chatter Performance Upload (tab) -->
       <div id="report-tab-chatters" style="display:none;">
-        <div class="two-col" style="margin-bottom:14px;">
-          <!-- Team A -->
-          <div class="card" style="margin-bottom:0;">
-            <div class="card-title" style="color:var(--accent2);">Team A</div>
-            <div class="file-drop" onclick="document.getElementById('chatter-csv-input-a').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDropA(event)">
-              <div style="font-size:24px;">📄</div>
-              <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
-            </div>
-            <input type="file" id="chatter-csv-input-a" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFileA(this.files[0])">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Employee Performance</div>
+          <div class="file-drop" onclick="document.getElementById('chatter-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
           </div>
-          <!-- Team B -->
-          <div class="card" style="margin-bottom:0;">
-            <div class="card-title" style="color:var(--accent2);">Team B</div>
-            <div class="file-drop" onclick="document.getElementById('chatter-csv-input-b').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleChatterCsvDropB(event)">
-              <div style="font-size:24px;">📄</div>
-              <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
-            </div>
-            <input type="file" id="chatter-csv-input-b" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFileB(this.files[0])">
-          </div>
+          <input type="file" id="chatter-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleChatterCsvFile(this.files[0])">
         </div>
         <div id="chatter-report-alert" class="alert"></div>
-        <div id="chatter-csv-preview-a" style="margin-top:14px;"></div>
-        <div id="chatter-csv-preview-b" style="margin-top:14px;"></div>
+        <div id="chatter-csv-preview" style="margin-top:14px;"></div>
       </div>
 
       <!-- History -->
@@ -1155,12 +1125,10 @@ function switchReportTab(tab) {
   if(tab==='history') loadReportHistory();
 }
 
-// ── Team A/B Creator handlers ────────────────────────────────
-var _parsedA=null, _parsedB=null;
-function handleCsvDropA(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileA(e.dataTransfer.files[0]);}
-function handleCsvDropB(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileB(e.dataTransfer.files[0]);}
-function handleCsvFileA(file){parseCsvXlsx(file,rows=>previewReport(rows,'a'));}
-function handleCsvFileB(file){parseCsvXlsx(file,rows=>previewReport(rows,'b'));}
+// ── Creator Stats handlers ────────────────────────────────────
+var _parsedRows=null;
+function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
+function handleCsvFile(file){parseCsvXlsx(file,rows=>previewReport(rows));}
 function parseCsvXlsx(file,cb){
   const r=new FileReader();
   r.onload=e=>{
@@ -1170,43 +1138,23 @@ function parseCsvXlsx(file,cb){
   r.readAsBinaryString(file);
 }
 
-// ── Team A/B Chatter handlers ────────────────────────────────
-function handleChatterCsvDropA(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFileA(e.dataTransfer.files[0]);}
-function handleChatterCsvDropB(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFileB(e.dataTransfer.files[0]);}
-function handleChatterCsvFileA(file){parseChatterXlsx(file,'a');}
-function handleChatterCsvFileB(file){parseChatterXlsx(file,'b');}
-function parseChatterXlsx(file,team){
+// ── Chatter Performance handlers ──────────────────────────────
+function handleChatterCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleChatterCsvFile(e.dataTransfer.files[0]);}
+function handleChatterCsvFile(file){
   const r=new FileReader();
   r.onload=e=>{
-    try{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');previewChatterReport(rows,team);}
+    try{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');previewChatterReport(rows);}
     catch(err){showAlert('chatter-report-alert','Could not parse file: '+err.message,'error');}
   };
   r.readAsBinaryString(file);
 }
 
-// Legacy aliases (keep for safety)
-function handleChatterCsvDrop(e){handleChatterCsvDropA(e);}
-function handleChatterCsvFile(file){
-  const r=new FileReader();
-  r.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'binary'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      if(!rows.length)return showAlert('chatter-report-alert','Could not parse file.','error');
-      previewChatterReport(rows);
-    }catch(err){showAlert('chatter-report-alert','Could not parse file: '+err.message,'error');}
-  };
-  r.readAsBinaryString(file);
-}
-
-function previewChatterReport(rows, team='a') {
+function previewChatterReport(rows) {
   const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
   const dates=parseInflowwDate(dateRaw);
   const period=dates.start&&dates.end?`${dates.start} to ${dates.end}`:'Unknown period';
 
-  const teamLabel=team==='b'?'Team B':'Team A';
-  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${teamLabel} — ${rows.length} chatters · ${period}</div>
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${rows.length} chatters · ${period}</div>
   <div class="table-wrap"><table><thead><tr>
     <th>Chatter</th><th>Models</th><th>Sales</th><th>PPV Sales</th><th>Tips</th>
     <th>DMs Sent</th><th>Fans Chatted</th><th>Fan CVR</th><th>Golden Ratio</th>
@@ -1246,12 +1194,9 @@ function previewChatterReport(rows, team='a') {
     </tr>`;
   });
   html+=`</tbody></table></div></div>`;
-  document.getElementById('chatter-csv-preview-'+(team==='b'?'b':'a')).innerHTML=html;
-  showAlert('chatter-report-alert',`${teamLabel} chatter report loaded.`,'success');
+  document.getElementById('chatter-csv-preview').innerHTML=html;
+  showAlert('chatter-report-alert','Chatter report loaded.','success');
 }
-
-function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFileA(e.dataTransfer.files[0]);}
-function handleCsvFile(file){handleCsvFileA(file);}
 
 function parseCSV(text){const lines=text.trim().split('\n');if(lines.length<2)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));return lines.slice(1).map(line=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||'';});return obj;});}
 
@@ -1269,15 +1214,70 @@ function cleanAmount(val) {
   return parseFloat(String(val).replace(/[$,%]/g,'').trim())||0;
 }
 
-function previewReport(rows, team='a') {
+// ── Model name matching (normalize + fuzzy) ───────────────────
+// Strips accents/punctuation/case so "Chloé", "CHLOE", "chloe " etc all line up.
+function normalizeName(s){
+  return String(s||'')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]/g,'').trim();
+}
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  if(!m) return n; if(!n) return m;
+  const dp=[];
+  for(let i=0;i<=m;i++) dp.push(new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j-1],dp[i-1][j],dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+// Returns {model, matchType} where matchType is 'exact' | 'fuzzy' | 'none'.
+// Fuzzy matches only apply when exactly one model is unambiguously close, so
+// we never silently merge two genuinely different models.
+function findModelMatch(name){
+  const norm=normalizeName(name);
+  if(!norm) return {model:null, matchType:'none'};
+  const exact=STATE.models.find(m=>normalizeName(m.name)===norm||normalizeName(m.of_account)===norm);
+  if(exact) return {model:exact, matchType:'exact'};
+  const threshold=Math.min(3,Math.max(1,Math.ceil(norm.length*0.34)));
+  const candidates=STATE.models.map(m=>{
+    const d1=levenshtein(norm,normalizeName(m.name));
+    const d2=m.of_account?levenshtein(norm,normalizeName(m.of_account)):Infinity;
+    return {model:m, dist:Math.min(d1,d2)};
+  }).filter(c=>c.dist<=threshold).sort((a,b)=>a.dist-b.dist);
+  if(candidates.length===1||(candidates.length>1&&candidates[0].dist<candidates[1].dist)){
+    return {model:candidates[0].model, matchType:'fuzzy'};
+  }
+  return {model:null, matchType:'none'};
+}
+
+// Recompute the derived fields (split/mgmt type/agency net/payout) for a parsed
+// row given whichever model is currently selected for it (matched or manually reassigned).
+function deriveRowFields(row,model){
+  const split=model?parseFloat(model.split||20):20;
+  const mgmtType=model?.mgmt_type||'full_scale';
+  const revenueBase=mgmtType==='chatting'?(row.msg_net+row.tips_net):row.total_earnings;
+  const agencyNet=revenueBase*(split/100);
+  row.model_id=model?.id||null;
+  row.model_name=model?model.name:row.raw_name;
+  row.model_split=split;
+  row.mgmt_type=mgmtType;
+  row.agency_net=agencyNet;
+  row.agency_profit=agencyNet;
+  row.model_payout=row.total_earnings-agencyNet;
+}
+
+function previewReport(rows) {
   const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
   const autoDate = parseInflowwDate(firstDate);
-  const startId = team==='b' ? 'report-week-start-b' : 'report-week-start';
-  const endId   = team==='b' ? 'report-week-end-b'   : 'report-week-end';
-  let weekStart = document.getElementById(startId).value || autoDate.start;
-  let weekEnd   = document.getElementById(endId).value   || autoDate.end;
-  if(autoDate.start && !document.getElementById(startId).value) document.getElementById(startId).value=autoDate.start;
-  if(autoDate.end   && !document.getElementById(endId).value)   document.getElementById(endId).value=autoDate.end;
+  let weekStart = document.getElementById('report-week-start').value || autoDate.start;
+  let weekEnd   = document.getElementById('report-week-end').value   || autoDate.end;
+  if(autoDate.start && !document.getElementById('report-week-start').value) document.getElementById('report-week-start').value=autoDate.start;
+  if(autoDate.end   && !document.getElementById('report-week-end').value)   document.getElementById('report-week-end').value=autoDate.end;
   if(!weekStart||!weekEnd) return showAlert('report-alert','Could not detect date range — please select manually.','error');
 
   const parsed=rows.map(row=>{
@@ -1292,58 +1292,72 @@ function previewReport(rows, team='a') {
     const activeFans  = parseInt(row['Active fans']||row['Active Fans']||row['Fans']||0)||0;
     const newFans     = parseInt(row['New fans']||row['New Fans']||row['New Subscribers']||0)||0;
 
-    const model = STATE.models.find(m=>m.name.toLowerCase()===name.toLowerCase()||(m.of_account||'').toLowerCase()===name.toLowerCase());
-    const split = model ? parseFloat(model.split||20) : 20;
-    const mgmtType = model?.mgmt_type||'full_scale';
+    const {model, matchType} = findModelMatch(name);
 
-    // Chatting models: agency % of messages+tips only. Full scale: % of total earnings
-    const revenueBase = mgmtType==='chatting' ? (msgNet+tipsNet) : earnings;
-    const agencyNet   = revenueBase*(split/100);
-    const modelPayout = earnings-agencyNet;
-
-    return{
+    const r={
       week_of:weekStart, week_end:weekEnd,
-      model_id:model?.id||null, model_name:name,
-      total_earnings:earnings, model_split:split,
-      model_payout:modelPayout, agency_net:agencyNet,
-      chatter_wages:0, agency_profit:agencyNet,
+      raw_name:name, match_type:matchType,
+      total_earnings:earnings,
       renew_pct:renewPct, active_fans:activeFans, new_fans:newFans,
       msg_net:msgNet, tips_net:tipsNet, sub_net:subNet,
-      mgmt_type:mgmtType
+      chatter_wages:0
     };
-  }).filter(r=>r.total_earnings>0||r.model_name);
+    deriveRowFields(r,model);
+    return r;
+  }).filter(r=>r.total_earnings>0||r.raw_name);
 
-  const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
-  const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
-  const teamLabel=team==='b'?'Team B':'Team A';
-  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${teamLabel} — ${parsed.length} accounts · ${weekStart} to ${weekEnd}</div><div class="table-wrap"><table><thead><tr><th>Creator</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
-  parsed.forEach(r=>{html+=`<tr><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt((r.msg_net||0)+(r.tips_net||0))}</td><td style="font-size:11px;">${r.mgmt_type==='chatting'?'Chatting':'Full Scale'}</td><td>${r.model_split}%</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(r.renew_pct*100).toFixed(1)}%</td><td>${r.active_fans}</td></tr>`;});
-  html+=`<tr style="font-weight:700;"><td>TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div></div>`;
-  document.getElementById('csv-preview-'+(team==='b'?'b':'a')).innerHTML=html;
-  if(team==='b') _parsedB=parsed; else _parsedA=parsed;
-  // Show Save Both if either team has data
-  const saveBtn=document.getElementById('csv-save-both');
-  if(saveBtn) saveBtn.style.display=(_parsedA||_parsedB)?'block':'none';
+  _parsedRows=parsed;
+  renderReportPreview();
 }
 
-async function saveBothReports(){
-  const raw=[...(_parsedA||[]),...(_parsedB||[])];
+function renderReportPreview(){
+  const parsed=_parsedRows||[];
+  const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
+  const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
+  const modelOptions=(m,selectedId)=>`<option value=""${!selectedId?' selected':''}>— Unmatched (20% default) —</option>`+
+    STATE.models.map(mo=>`<option value="${mo.id}"${mo.id===selectedId?' selected':''}>${mo.name}</option>`).join('');
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} accounts · ${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}</div><div class="table-wrap"><table><thead><tr><th>Creator (from CSV)</th><th>Matched Model</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  parsed.forEach((r,i)=>{
+    const matchBadge = r.match_type==='exact'?'':
+      r.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
+      `<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr>
+      <td><strong>${r.raw_name}</strong>${matchBadge}</td>
+      <td><select onchange="reassignReportRow(${i},this.value)" style="width:150px;font-size:12px;">${modelOptions(r,r.model_id)}</select></td>
+      <td>$${fmt(r.total_earnings)}</td>
+      <td>$${fmt((r.msg_net||0)+(r.tips_net||0))}</td>
+      <td style="font-size:11px;">${r.mgmt_type==='chatting'?'Chatting':'Full Scale'}</td>
+      <td>${r.model_split}%</td>
+      <td class="profit">$${fmt(r.agency_net)}</td>
+      <td>${(r.renew_pct*100).toFixed(1)}%</td>
+      <td>${r.active_fans}</td>
+    </tr>`;
+  });
+  html+=`<tr style="font-weight:700;"><td colspan="2">TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div></div>`;
+  document.getElementById('csv-preview').innerHTML=html;
+  const saveBtn=document.getElementById('csv-save');
+  if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
+}
+
+function reassignReportRow(i,modelId){
+  const row=_parsedRows[i]; if(!row)return;
+  const model=modelId?STATE.models.find(m=>m.id===modelId):null;
+  row.match_type = model ? 'manual' : 'none';
+  deriveRowFields(row,model);
+  renderReportPreview();
+}
+
+async function saveReportRows(){
+  const raw=_parsedRows||[];
   if(!raw.length) return showAlert('report-alert','No data to save.','error');
   // Strip fields that don't exist in the weekly_reports DB schema
-  const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,...r})=>r);
+  const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,raw_name,match_type,...r})=>r);
   const{error}=await sb.from('weekly_reports').insert(all);
   if(error) return showAlert('report-alert',error.message,'error');
   showAlert('report-alert',`Saved! ${all.length} rows recorded.`,'success');
-  _parsedA=null; _parsedB=null;
-  document.getElementById('csv-preview-a').innerHTML='';
-  document.getElementById('csv-preview-b').innerHTML='';
-  document.getElementById('csv-save-both').style.display='none';
-}
-
-async function saveReport(rows){
-  const{error}=await sb.from('weekly_reports').insert(rows);
-  if(error)return showAlert('report-alert',error.message,'error');
-  showAlert('report-alert',`Saved! ${rows.length} rows recorded.`,'success');
+  _parsedRows=null;
+  document.getElementById('csv-preview').innerHTML='';
+  document.getElementById('csv-save').style.display='none';
 }
 
 async function loadReportHistory(){
@@ -1367,26 +1381,42 @@ async function loadReportHistory(){
     const totalN=rows.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
     const gid='grp-'+key.replace(/[^a-z0-9]/gi,'_');
 
+    const idsAttr=JSON.stringify(rows.map(r=>r.id)).replace(/"/g,"'");
+
     const wrap=document.createElement('div');
     wrap.className='card'; wrap.style.marginBottom='10px';
     wrap.innerHTML=`
-      <div onclick="toggleHistoryGroup('${gid}')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;">
-        <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div onclick="toggleHistoryGroup('${gid}')" style="cursor:pointer;user-select:none;flex:1;">
           <span style="font-weight:700;font-size:14px;color:#fff;">${label}</span>
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">${rows.length} model${rows.length!==1?'s':''}</span>
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">Earnings: <strong style="color:#fff;">$${fmt(totalE)}</strong></span>
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">Agency Net: <strong style="color:var(--accent2);">$${fmt(totalN)}</strong></span>
         </div>
-        <span id="${gid}-chevron" style="color:var(--text2);font-size:12px;">▼</span>
+        <button class="btn btn-sm btn-danger" style="margin-left:12px;" onclick="event.stopPropagation();deleteReportGroup(${idsAttr},'${label.replace(/'/g,"\\'")}')">✕ Delete Week</button>
+        <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;margin-left:12px;">▼</span>
       </div>
       <div id="${gid}" style="display:none;margin-top:14px;">
         <div class="table-wrap"><table>
-          <thead><tr><th>Model</th><th>Earnings</th><th>Model Payout</th><th>Agency Net</th><th>Agency Profit</th><th>Renew %</th></tr></thead>
-          <tbody>${rows.map(r=>{const p=parseFloat(r.agency_profit||0);return`<tr><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td>$${fmt(r.agency_net)}</td><td class="${p>=0?'profit':'loss'}">$${fmt(p)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`;}).join('')}</tbody>
+          <thead><tr><th>Model</th><th>Earnings</th><th>Model Payout</th><th>Agency Net</th><th>Agency Profit</th><th>Renew %</th><th></th></tr></thead>
+          <tbody>${rows.map(r=>{const p=parseFloat(r.agency_profit||0);return`<tr><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td>$${fmt(r.agency_net)}</td><td class="${p>=0?'profit':'loss'}">$${fmt(p)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td><td><button class="btn btn-sm btn-danger" onclick="deleteReportRow('${r.id}')">✕</button></td></tr>`;}).join('')}</tbody>
         </table></div>
       </div>`;
     container.appendChild(wrap);
   });
+}
+
+async function deleteReportRow(id){
+  if(!confirm('Delete this model\'s row from this report?'))return;
+  await sb.from('weekly_reports').delete().eq('id',id);
+  loadReportHistory();
+}
+
+async function deleteReportGroup(ids,label){
+  if(!ids||!ids.length)return;
+  if(!confirm(`Delete all ${ids.length} row${ids.length!==1?'s':''} for ${label||'this week'}? This cannot be undone.`))return;
+  await sb.from('weekly_reports').delete().in('id',ids);
+  loadReportHistory();
 }
 
 function toggleHistoryGroup(gid){
