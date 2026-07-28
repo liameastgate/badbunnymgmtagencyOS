@@ -1838,6 +1838,7 @@ function invoiceRowHtml(inv){
       <button class="btn btn-sm btn-ghost" onclick="updateInvoice('${inv.id}','processing')">⏳</button>
       <button class="btn btn-sm btn-danger" onclick="updateInvoice('${inv.id}','rejected')">✕</button>
       <button class="btn btn-sm btn-ghost" onclick="editInvoice('${inv.id}')">✏</button>
+      <button class="btn btn-sm btn-danger" onclick="delInvoice('${inv.id}')" title="Delete permanently">🗑</button>
     </td></tr>`;
 }
 
@@ -1938,6 +1939,21 @@ async function updateInvoice(id,status){
   // Refresh both tables — a status change moves the row from Needs Review into (or out of) Processed.
   renderPendingInvoices(); filterInvoices();
   if(inv) await syncInvoiceToExpense(inv,status);
+}
+
+// Permanently deletes an invoice (any status, including approved). If it was approved and has a
+// linked Staff expense, that expense is removed too so Net Profit doesn't keep a stale entry.
+async function delInvoice(id){
+  const inv=STATE.invoices.find(x=>x.id===id)||MY_INVOICES_DATA.find(x=>x.id===id);
+  if(!inv)return;
+  const warn=inv.status==='approved'?' This will also remove its linked Staff expense.':'';
+  if(!confirm(`Delete this invoice permanently?${warn}`))return;
+  const{error,data}=await sb.from('invoices').delete().eq('id',id).select();
+  if(error||!data||!data.length){alert('Could not delete this invoice — you may be missing delete permission. Ask an admin to check the Supabase RLS policy.');return;}
+  STATE.invoices=STATE.invoices.filter(i=>i.id!==id);
+  MY_INVOICES_DATA=MY_INVOICES_DATA.filter(i=>i.id!==id);
+  await syncInvoiceToExpense(inv,'deleted'); // reuses the "not approved" branch to clean up any linked expense
+  renderPendingInvoices(); filterInvoices(); renderMyInvoices();
 }
 
 function syncInvEditWeek(){
