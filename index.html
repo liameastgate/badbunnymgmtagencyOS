@@ -3485,7 +3485,7 @@ async function loadChatterShifts(){
 // A fixed, repeating schedule -- three time slots x Mon-Fri, not tied to any specific date.
 // Assigning a chatter to a slot means "every week, this chatter works this slot" until removed.
 const ROSTER_SLOTS=[{n:0,label:'12am–10am'},{n:1,label:'10am–6pm'},{n:2,label:'6pm–12am'}];
-const ROSTER_WEEKDAYS=[{n:1,label:'Mon'},{n:2,label:'Tue'},{n:3,label:'Wed'},{n:4,label:'Thu'},{n:5,label:'Fri'}];
+const ROSTER_WEEKDAYS=[{n:1,label:'Mon'},{n:2,label:'Tue'},{n:3,label:'Wed'},{n:4,label:'Thu'},{n:5,label:'Fri'},{n:6,label:'Sat'},{n:0,label:'Sun'}];
 const ROSTER_CAL_PALETTE=['#4a9eff','#ff6b6b','#4ade80','#facc15','#c084fc','#fb923c','#22d3ee','#f472b6'];
 var _rosterSlots=[];
 function chatterColorById(id){const i=STATE.chatters.findIndex(x=>x.id===id);return ROSTER_CAL_PALETTE[i>=0?i%ROSTER_CAL_PALETTE.length:0];}
@@ -3499,7 +3499,7 @@ function renderRosterGrid(){
   const el=document.getElementById('roster-grid'); if(!el) return;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
   const cellsFor=(weekday,slot)=>_rosterSlots.filter(s=>s.weekday===weekday&&s.slot===slot);
-  let html=`<div style="display:grid;grid-template-columns:110px repeat(5,1fr);gap:6px;">`;
+  let html=`<div style="display:grid;grid-template-columns:110px repeat(7,1fr);gap:6px;">`;
   html+=`<div></div>`+ROSTER_WEEKDAYS.map(w=>`<div style="font-size:12px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:4px;">${w.label}</div>`).join('');
   ROSTER_SLOTS.forEach(slot=>{
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;">${slot.label}</div>`;
