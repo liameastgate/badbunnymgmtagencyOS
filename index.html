@@ -251,7 +251,7 @@
             <div class="form-group"><label>Platform</label>
               <select id="co-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="other">Other</option></select>
             </div>
-            <div class="form-group full"><label>Content URL (Instagram / TikTok post link)</label><input type="url" id="co-url" placeholder="https://www.instagram.com/reel/..."></div>
+            <div class="form-group full"><label>Content URL (Instagram / TikTok post link)</label><input type="url" id="co-url" placeholder="https://www.instagram.com/reel/..." onblur="autoFetchSingleThumb()"><span id="co-fetch-status" style="font-size:11px;color:var(--text2);"></span></div>
             <div class="form-group full"><label>Google Drive Link (optional)</label><input type="url" id="co-drive" placeholder="https://drive.google.com/..."></div>
             <div class="form-group full">
               <label>Video Thumbnail (screenshot a frame so the model can identify the video)</label>
@@ -289,6 +289,7 @@
             <div class="form-group full">
               <label>Thumbnails (optional — select/drop in the same order as the links above, 1st image = 1st link)</label>
               <div id="bulk-thumb-preview" style="display:none;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+              <div class="btn-row" style="margin-bottom:8px;"><button type="button" class="btn btn-sm btn-ghost" onclick="autoFetchBulkThumbs()">🔎 Auto-fetch Thumbnails from Links</button></div>
               <div class="file-drop" id="bulk-thumb-drop" onclick="document.getElementById('bulk-thumb-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBulkThumbDrop(event)" style="padding:16px;">
                 <div style="font-size:24px;">🖼️</div>
                 <p style="margin-top:4px;font-size:12px;">Click or drag multiple thumbnails — matched to links by order</p>
@@ -1381,6 +1382,9 @@ async function bulkAddContentOrders(){
   if(!urls.length) return showAlert('co-bulk-alert','Paste at least one valid video link (starting with http:// or https://).','error');
   const driveLink=document.getElementById('bulk-drive').value.trim();
   const notes=document.getElementById('bulk-notes').value.trim();
+  const dupModelIds=selectedOptions.map(o=>o.value);
+  const dupeCount=urls.reduce((n,u)=>n+(findDuplicateOrders(u,dupModelIds).length>0?1:0),0);
+  if(dupeCount && !confirm(`${dupeCount} of these link(s) were already ordered for the selected model(s). Add anyway?`)) return;
   const inserts=[];
   urls.forEach((url,i)=>{
     const platform=detectPlatformFromUrl(url);
@@ -1523,6 +1527,58 @@ function renderBulkThumbPreview(){
 function removeBulkThumb(i){ _bulkThumbDataUrls.splice(i,1); renderBulkThumbPreview(); }
 function clearBulkThumbs(){ _bulkThumbDataUrls=[]; document.getElementById('bulk-thumb-input').value=''; renderBulkThumbPreview(); }
 
+// -- oEmbed auto-fetch (thumbnail + caption + platform) --------
+// Calls our own /api/oembed relay (server-side call to TikTok/Instagram's
+// public oEmbed endpoints -- browsers can't call those directly due to CORS).
+// Fails silently on any error so it never blocks manual thumbnail upload.
+async function fetchOEmbed(url){
+  try{
+    const r=await fetch(`/api/oembed?url=${encodeURIComponent(url)}`);
+    const j=await r.json();
+    return (j&&j.ok)?j:null;
+  }catch(e){ return null; }
+}
+
+async function autoFetchSingleThumb(){
+  const url=document.getElementById('co-url').value.trim();
+  const statusEl=document.getElementById('co-fetch-status');
+  if(!url){ if(statusEl) statusEl.textContent=''; return; }
+  if(statusEl) statusEl.textContent='Fetching preview...';
+  const meta=await fetchOEmbed(url);
+  if(!meta){ if(statusEl) statusEl.textContent=''; return; }
+  if(meta.platform) document.getElementById('co-platform').value=meta.platform;
+  if(meta.thumbnail_url && !_thumbDataUrl){
+    _thumbDataUrl=meta.thumbnail_url;
+    document.getElementById('co-thumb-img').src=_thumbDataUrl;
+    document.getElementById('co-thumb-preview').style.display='flex';
+    document.getElementById('co-thumb-preview').style.alignItems='center';
+    document.getElementById('co-thumb-drop').style.display='none';
+  }
+  const notesEl=document.getElementById('co-notes');
+  if(meta.title && notesEl && !notesEl.value.trim()) notesEl.value=meta.title;
+  if(statusEl) statusEl.textContent=meta.thumbnail_url?'Preview fetched automatically \u2713':'';
+}
+
+async function autoFetchBulkThumbs(){
+  const rawLines=document.getElementById('bulk-urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const urls=rawLines.filter(l=>/^https?:\/\//i.test(l));
+  if(!urls.length) return showAlert('co-bulk-alert','Paste links first.','error');
+  showAlert('co-bulk-alert','Fetching thumbnails\u2026','success');
+  const metas=await Promise.all(urls.map(u=>fetchOEmbed(u)));
+  metas.forEach((m,i)=>{ if(m&&m.thumbnail_url) _bulkThumbDataUrls[i]=m.thumbnail_url; });
+  renderBulkThumbPreview();
+  const got=metas.filter(m=>m&&m.thumbnail_url).length;
+  showAlert('co-bulk-alert',`Fetched ${got}/${urls.length} thumbnail${urls.length!==1?'s':''} automatically.${urls.length-got?` (${urls.length-got} not found \u2014 upload manually or leave blank.)`:''}`,'success');
+}
+
+// -- Duplicate link detection -----------------------------------
+function findDuplicateOrders(url,modelIds){
+  const norm=u=>(u||'').trim().replace(/\/$/,'').toLowerCase();
+  const target=norm(url);
+  if(!target)return [];
+  return STATE.contentOrders.filter(o=>norm(o.url)===target && modelIds.includes(o.model_id));
+}
+
 async function uploadThumbToSupabase(modelId){
   // Store resized base64 thumbnail directly — no storage bucket required
   return _thumbDataUrl||null;
@@ -1534,6 +1590,12 @@ async function submitContentOrder() {
   if(!selectedOptions.length) return showAlert('co-alert','Select at least one model.','error');
   const url=document.getElementById('co-url').value.trim();
   if(!url) return showAlert('co-alert','Content URL required.','error');
+  const dupModelIds=selectedOptions.map(o=>o.value);
+  const dupes=findDuplicateOrders(url,dupModelIds);
+  if(dupes.length){
+    const names=[...new Set(dupes.map(d=>d.model_name))].join(', ');
+    if(!confirm(`This link was already ordered for ${names}. Add it again?`)) return;
+  }
   // Upload thumbnail once (shared across all orders)
   const thumbnailUrl=await uploadThumbToSupabase(selectedOptions[0].value);
   const platform=document.getElementById('co-platform').value;
