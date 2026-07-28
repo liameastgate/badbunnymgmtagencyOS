@@ -350,6 +350,35 @@
       </div>
     </div>
 
+    <!-- Leaderboard -->
+    <div class="page" id="page-leaderboard">
+      <div class="page-title">🏆 Leaderboard</div>
+      <div class="page-sub">Chatter rankings — sales, efficiency and performance</div>
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+        <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="lb-start" onchange="loadLeaderboard()"></div>
+        <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="lb-end" onchange="loadLeaderboard()"></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-ghost" onclick="setLeaderboardPeriod('last')">Last Week</button>
+          <button class="btn btn-sm btn-ghost" onclick="setLeaderboardPeriod('week')">This Week</button>
+          <button class="btn btn-sm btn-ghost" onclick="setLeaderboardPeriod('month')">This Month</button>
+          <button class="btn btn-sm btn-ghost" onclick="setLeaderboardPeriod('all')">All Time</button>
+        </div>
+        <div class="form-group" style="max-width:180px;"><label>Sort By</label>
+          <select id="lb-sort" onchange="renderLeaderboard()">
+            <option value="earnings">Earnings</option>
+            <option value="sales">Sales Count</option>
+            <option value="gross">Gross Revenue</option>
+            <option value="golden">Golden Ratio</option>
+            <option value="cvr">Fan CVR</option>
+            <option value="sph">Sales/Hr</option>
+          </select>
+        </div>
+        <div class="form-group" style="max-width:200px;"><label>Search</label><input type="text" id="lb-search" placeholder="Find a chatter…" oninput="renderLeaderboard()"></div>
+      </div>
+      <div id="lb-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+      <div id="lb-empty" class="empty" style="display:none;"><div class="empty-icon">🏆</div><p>No data for this period yet</p></div>
+    </div>
+
     <!-- Weekly Reports -->
     <div class="page" id="page-reports">
       <div class="page-title">Weekly Reports</div>
@@ -597,9 +626,9 @@
       <div id="chatter-tab-roster">
         <div class="two-col">
           <div>
-            <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('chatter-modal')">➕ Add Chatter</button></div>
+            <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openAddChatterModal()">➕ Add Chatter</button></div>
             <div class="card"><div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>Email</th><th>Base Rate</th><th>Commission %</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Base Rate</th><th>Commission %</th><th>Shift Days</th><th></th></tr></thead>
               <tbody id="chatters-body"></tbody>
             </table></div></div>
           </div>
@@ -632,12 +661,22 @@
       </div>
       <div id="chatter-tab-summary" style="display:none;">
         <div class="card">
-          <div style="margin-bottom:12px;"><select id="summary-week" onchange="loadHoursSummary()" style="width:180px;"><option value="">Select week…</option></select></div>
+          <div class="card-title">💰 Cost &amp; ROI</div>
+          <div style="font-size:11px;color:var(--text2);margin:-4px 0 12px;">Auto-calculated from Employee Performance + Sales Records uploads when data exists for the selected week (scheduled hours × rate, plus commission on attributed sales); falls back to manually logged hours otherwise.</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="cms-start" onchange="loadChatterCostSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="cms-end" onchange="loadChatterCostSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setChatterCostPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setChatterCostPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setChatterCostPeriod('month')">This Month</button>
+            </div>
+          </div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Chatter</th><th>Hours</th><th>Base Wage</th><th>Commission</th><th>Total</th></tr></thead>
-            <tbody id="summary-body"></tbody>
+            <thead><tr><th>Chatter</th><th>Source</th><th>Hours</th><th>Cost</th><th>Revenue</th><th>ROI</th><th>Golden Ratio</th><th>Fan CVR</th><th>DMs Sent</th></tr></thead>
+            <tbody id="cms-table"></tbody>
           </table></div>
-          <div id="summary-total" style="margin-top:12px;font-size:14px;font-weight:700;"></div>
+          <div id="cms-totals" style="margin-top:12px;font-size:13px;color:var(--text2);"></div>
         </div>
       </div>
     </div>
@@ -954,6 +993,10 @@
       <div class="form-group"><label>Email</label><input type="email" id="chatter-email" placeholder="chatter@gmail.com"></div>
       <div class="form-group"><label>Hourly Rate ($)</label><input type="number" id="chatter-rate" value="3"></div>
       <div class="form-group"><label>Commission %</label><input type="number" id="chatter-commission" value="5"></div>
+      <div class="form-group full">
+        <label>Shift Days</label>
+        <div id="chatter-shift-days" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveChatter()">💾 Save</button>
@@ -1032,6 +1075,7 @@ var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-
 
 var NAV = [
   { id: 'overview',   icon: '🏠', label: 'Dashboard',       roles: ['admin','va','chatter','traffic'], section: 'Workspace' },
+  { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',     roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'],                             section: null },
@@ -1123,8 +1167,9 @@ function navigate(page) {
   if (page === 'sops') loadSOPs();
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
-  if (page === 'chatters') loadChatterWeeks();
+  if (page === 'chatters') loadChatterShifts();
   if (page === 'reports') loadReportsOverview();
+  if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
 }
 
@@ -1744,6 +1789,102 @@ async function saveEditOrder() {
   if(o)Object.assign(o,updates);
   filterContentOrders();
   closeModal('co-edit-modal');
+}
+
+// ── Leaderboard ──────────────────────────────────────────────
+// Combines sales_records (earnings/sales count/gross -- same definitions as the Sales
+// Records tab) with the chatter_performance rollup (Golden Ratio/Fan CVR/Sales-per-Hr --
+// same definitions as the Chatter Performance tab), keyed by chatter_id, so a chatter shows
+// up here even if only one of the two sources has data for the selected period.
+async function loadLeaderboard(){
+  const startEl=document.getElementById('lb-start'); const endEl=document.getElementById('lb-end');
+  if(!startEl||!endEl) return;
+  const start=startEl.value, end=endEl.value||startEl.value;
+  const[{data:srData},{data:cpData}]=await Promise.all([
+    sb.from('sales_records').select('*'),
+    sb.from('chatter_performance').select('*')
+  ]);
+  // Empty start = "All Time": skip the date filter entirely rather than treat it as a
+  // zero-length range that would match nothing.
+  const srRows=(srData||[]).filter(r=>!start||overlaps(r.week_of,r.week_end,start,end));
+  const cpRows=(cpData||[]).filter(r=>!start||overlaps(r.week_of,r.week_end,start,end));
+
+  const blank=()=>({sales:0, earnings:0, gross:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, hoursSum:0, perfSales:0});
+  const map=new Map();
+  srRows.forEach(r=>{
+    if(!r.chatter_id) return;
+    if(!map.has(r.chatter_id)) map.set(r.chatter_id, {id:r.chatter_id, name:r.chatter_name, ...blank()});
+    const g=map.get(r.chatter_id);
+    g.sales++; g.earnings+=parseFloat(r.earnings||0); g.gross+=parseFloat(r.gross_revenue||0);
+  });
+  cpRows.forEach(r=>{
+    const key=r.chatter_id; if(!key) return;
+    if(!map.has(key)) map.set(key, {id:key, name:r.chatter_name, ...blank()});
+    const g=map.get(key);
+    if(!g.name) g.name=r.chatter_name;
+    const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10); if(!isNaN(dmsNum)) g.dms+=dmsNum;
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim()); if(!isNaN(cvrNum)){g.cvrSum+=cvrNum; g.cvrCount++;}
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim()); if(!isNaN(goldenNum)){g.goldenSum+=goldenNum; g.goldenCount++;}
+    const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim()); if(!isNaN(hoursNum)) g.hoursSum+=hoursNum;
+    g.perfSales+=parseFloat(r.sales||0);
+  });
+
+  STATE.leaderboardRows=[...map.values()].map(g=>({
+    ...g,
+    avgCvr: g.cvrCount?g.cvrSum/g.cvrCount:null,
+    avgGolden: g.goldenCount?g.goldenSum/g.goldenCount:null,
+    salesPerHr: g.hoursSum>0?(g.perfSales||g.earnings)/g.hoursSum:null,
+  }));
+  renderLeaderboard();
+}
+
+function setLeaderboardPeriod(kind){
+  if(kind==='all'){
+    document.getElementById('lb-start').value='';
+    document.getElementById('lb-end').value='';
+    loadLeaderboard();
+    return;
+  }
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('lb-start').value=start;
+  document.getElementById('lb-end').value=end;
+  loadLeaderboard();
+}
+
+const LB_SORTERS={
+  earnings:(a,b)=>b.earnings-a.earnings,
+  sales:(a,b)=>b.sales-a.sales,
+  gross:(a,b)=>b.gross-a.gross,
+  golden:(a,b)=>(b.avgGolden??-Infinity)-(a.avgGolden??-Infinity),
+  cvr:(a,b)=>(b.avgCvr??-Infinity)-(a.avgCvr??-Infinity),
+  sph:(a,b)=>(b.salesPerHr??-Infinity)-(a.salesPerHr??-Infinity),
+};
+const LB_MEDALS=['🥇','🥈','🥉'];
+const LB_MEDAL_COLORS=['#facc15','#c0c0c0','#cd7f32'];
+
+function renderLeaderboard(){
+  const sortEl=document.getElementById('lb-sort'); const searchEl=document.getElementById('lb-search');
+  if(!sortEl) return;
+  const sortKey=sortEl.value;
+  const search=(searchEl.value||'').trim().toLowerCase();
+  let rows=(STATE.leaderboardRows||[]).filter(r=>!search||(r.name||'').toLowerCase().includes(search));
+  rows=rows.slice().sort(LB_SORTERS[sortKey]||LB_SORTERS.earnings);
+
+  const grid=document.getElementById('lb-grid'); const empty=document.getElementById('lb-empty');
+  if(!rows.length){ grid.innerHTML=''; empty.style.display='block'; return; } empty.style.display='none';
+  grid.innerHTML=rows.map((r,i)=>`
+    <div class="card" style="margin:0;${i<3?`border-color:${LB_MEDAL_COLORS[i]};`:''}">
+      <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${LB_MEDALS[i]||`#${i+1}`} ${r.name||'(unknown)'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+        <div><span style="color:var(--text2);">Earnings</span><br><strong class="profit">$${fmt(r.earnings)}</strong></div>
+        <div><span style="color:var(--text2);">Sales</span><br><strong>${r.sales}</strong></div>
+        <div><span style="color:var(--text2);">Gross</span><br><strong>$${fmt(r.gross)}</strong></div>
+        <div><span style="color:var(--text2);">Golden Ratio</span><br><strong>${r.avgGolden!==null?r.avgGolden.toFixed(2)+'%':'—'}</strong></div>
+        <div><span style="color:var(--text2);">Fan CVR</span><br><strong>${r.avgCvr!==null?r.avgCvr.toFixed(2)+'%':'—'}</strong></div>
+        <div><span style="color:var(--text2);">Sales/Hr</span><br><strong>${r.salesPerHr!==null?'$'+fmt(r.salesPerHr):'—'}</strong></div>
+      </div>
+    </div>
+  `).join('');
 }
 
 // ── Reports ──────────────────────────────────────────────────
@@ -3078,9 +3219,53 @@ async function delModel(id){
 }
 
 // ── Chatters ─────────────────────────────────────────────────
+const SHIFT_DAY_LABELS=[{n:1,l:'Mon'},{n:2,l:'Tue'},{n:3,l:'Wed'},{n:4,l:'Thu'},{n:5,l:'Fri'},{n:6,l:'Sat'},{n:0,l:'Sun'}];
+var _chatterShiftDays=[];
+function renderShiftDayToggles(){
+  const el=document.getElementById('chatter-shift-days'); if(!el) return;
+  el.innerHTML=SHIFT_DAY_LABELS.map(d=>`<button type="button" class="btn btn-sm ${_chatterShiftDays.includes(d.n)?'btn-primary':'btn-ghost'}" onclick="toggleShiftDay(${d.n})">${d.l}</button>`).join('');
+}
+function toggleShiftDay(n){
+  const i=_chatterShiftDays.indexOf(n);
+  if(i>-1) _chatterShiftDays.splice(i,1); else _chatterShiftDays.push(n);
+  renderShiftDayToggles();
+}
+// Collapses a working-days array into a compact display string, e.g. Mon-Fri instead of
+// listing all five days -- purely cosmetic, doesn't affect what's actually stored.
+function shiftDaysLabel(days){
+  if(!days||!days.length) return '—';
+  const order=[1,2,3,4,5,6,0];
+  const sorted=order.filter(d=>days.includes(d));
+  const labels={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'};
+  if(sorted.length===7) return 'Every day';
+  if(sorted.join(',')==='1,2,3,4,5') return 'Mon–Fri';
+  return sorted.map(d=>labels[d]).join(', ');
+}
+async function loadChatterShifts(){
+  const{data,error}=await sb.from('chatter_shifts').select('*');
+  if(error){ console.error('loadChatterShifts',error); return; }
+  STATE.chatterShifts={};
+  (data||[]).forEach(s=>{ STATE.chatterShifts[s.chatter_id]=s.working_days||[]; });
+  renderChatters();
+}
+function openAddChatterModal(){
+  document.getElementById('chatter-modal-title').textContent='Add Chatter';
+  document.getElementById('chatter-id').value='';
+  document.getElementById('chatter-name').value='';
+  document.getElementById('chatter-email').value='';
+  document.getElementById('chatter-rate').value=3;
+  document.getElementById('chatter-commission').value=5;
+  _chatterShiftDays=[];
+  renderShiftDayToggles();
+  openModal('chatter-modal');
+}
+
 function renderChatters(){
   const tbody=document.getElementById('chatters-body'); tbody.innerHTML='';
-  STATE.chatters.forEach(c=>{tbody.innerHTML+=`<tr><td><strong>${c.name}</strong></td><td style="color:var(--text2);">${c.email||'—'}</td><td>$${c.hourly_rate||3}/hr</td><td>${c.commission_pct||5}%</td><td><button class="btn btn-sm btn-ghost" onclick="editChatter('${c.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delChatter('${c.id}')">✕</button></td></tr>`;});
+  STATE.chatters.forEach(c=>{
+    const shiftDays=(STATE.chatterShifts||{})[c.id]||[];
+    tbody.innerHTML+=`<tr><td><strong>${c.name}</strong></td><td style="color:var(--text2);">${c.email||'—'}</td><td>$${c.hourly_rate||3}/hr</td><td>${c.commission_pct||5}%</td><td style="font-size:12px;color:var(--text2);">${shiftDaysLabel(shiftDays)}</td><td><button class="btn btn-sm btn-ghost" onclick="editChatter('${c.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delChatter('${c.id}')">✕</button></td></tr>`;
+  });
 }
 
 function populateChatterDropdown(){
@@ -3095,22 +3280,31 @@ function editChatter(id){
   document.getElementById('chatter-modal-title').textContent='Edit Chatter';
   document.getElementById('chatter-id').value=c.id; document.getElementById('chatter-name').value=c.name;
   document.getElementById('chatter-email').value=c.email||''; document.getElementById('chatter-rate').value=c.hourly_rate||3;
-  document.getElementById('chatter-commission').value=c.commission_pct||5; openModal('chatter-modal');
+  document.getElementById('chatter-commission').value=c.commission_pct||5;
+  _chatterShiftDays=((STATE.chatterShifts||{})[id]||[]).slice();
+  renderShiftDayToggles();
+  openModal('chatter-modal');
 }
 
 async function saveChatter(){
   const id=document.getElementById('chatter-id').value;
   const p={name:document.getElementById('chatter-name').value.trim(),email:document.getElementById('chatter-email').value.trim(),hourly_rate:document.getElementById('chatter-rate').value,commission_pct:document.getElementById('chatter-commission').value};
   if(!p.name)return alert('Name required');
+  let chatterId=id;
   if(id){await sb.from('chatters').update(p).eq('id',id);const i=STATE.chatters.findIndex(c=>c.id===id);if(i>-1)STATE.chatters[i]={...STATE.chatters[i],...p};}
-  else{const{data}=await sb.from('chatters').insert(p).select().single();STATE.chatters.push(data);}
+  else{const{data}=await sb.from('chatters').insert(p).select().single();STATE.chatters.push(data);chatterId=data.id;}
+  if(chatterId){
+    await sb.from('chatter_shifts').upsert({chatter_id:chatterId, working_days:_chatterShiftDays, updated_at:new Date().toISOString()},{onConflict:'chatter_id'});
+    STATE.chatterShifts=STATE.chatterShifts||{}; STATE.chatterShifts[chatterId]=_chatterShiftDays.slice();
+  }
   renderChatters();populateChatterDropdown();closeModal('chatter-modal');
   document.getElementById('chatter-id').value=''; document.getElementById('chatter-modal-title').textContent='Add Chatter';
+  _chatterShiftDays=[]; renderShiftDayToggles();
 }
 
 async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();}
 
-function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));}
+function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));if(tab==='summary')loadChatterCostSummary();}
 
 function previewWage(){const id=document.getElementById('hours-chatter').value;const c=STATE.chatters.find(x=>x.id===id);if(!c)return;const h=parseFloat(document.getElementById('hours-count').value||0);const e=parseFloat(document.getElementById('hours-earnings').value||0);const base=h*(parseFloat(c.hourly_rate||3));const comm=e*(parseFloat(c.commission_pct||5)/100);document.getElementById('hours-preview').textContent=`Base: $${fmt(base)} + Commission: $${fmt(comm)} = Total: $${fmt(base+comm)}`;}
 
@@ -3121,6 +3315,108 @@ async function logHours(){
   const{error}=await sb.from('chatter_hours').insert({chatter_id:c.id,chatter_name:c.name,week_of:document.getElementById('hours-week').value,hours:h,hourly_rate:c.hourly_rate||3,commission_earned:e,commission_pct:c.commission_pct||5,total_wage:total});
   if(error)return showAlert('hours-alert',error.message,'error');
   showAlert('hours-alert',`Logged! Total: $${fmt(total)}`,'success');
+}
+
+// ── Chatter Cost & ROI ──────────────────────────────────────────
+// Cost per chatter for the selected range: prefers auto-calculated cost (scheduled hours from
+// Employee Performance x hourly rate, plus commission x attributed Sales Records earnings)
+// whenever either upload has data for that chatter in range; falls back to manually logged
+// chatter_hours only when neither upload source has anything for them that week. This is the
+// cross-link between the two uploads and the existing manual entry, not a replacement of it.
+function blankCostRow(id,name,rate,pct){
+  return {id, name, hourlyRate:rate, commissionPct:pct, manualCost:0, manualHours:0, scheduledHours:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, revenue:0, salesCount:0};
+}
+async function loadChatterCostSummary(){
+  const startEl=document.getElementById('cms-start'); const endEl=document.getElementById('cms-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const[{data:hoursData},{data:cpData},{data:srData}]=await Promise.all([
+    sb.from('chatter_hours').select('*'),
+    sb.from('chatter_performance').select('*'),
+    sb.from('sales_records').select('*'),
+  ]);
+  const hoursRows=(hoursData||[]).filter(h=>h.week_of && h.week_of>=start && h.week_of<=end);
+  const cpRows=(cpData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+  const srRows=(srData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const map=new Map();
+  STATE.chatters.forEach(c=>map.set(c.id, blankCostRow(c.id,c.name,parseFloat(c.hourly_rate||3),parseFloat(c.commission_pct||5))));
+  hoursRows.forEach(h=>{
+    const key=h.chatter_id||('manual:'+normalizeName(h.chatter_name||''));
+    if(!map.has(key)) map.set(key, blankCostRow(key,h.chatter_name,parseFloat(h.hourly_rate||3),parseFloat(h.commission_pct||5)));
+    const g=map.get(key);
+    g.manualCost+=parseFloat(h.total_wage||0);
+    g.manualHours+=parseFloat(h.hours||0);
+  });
+  cpRows.forEach(r=>{
+    const key=r.chatter_id; if(!key) return;
+    if(!map.has(key)) map.set(key, blankCostRow(key,r.chatter_name,3,5));
+    const g=map.get(key);
+    const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim()); if(!isNaN(hoursNum)) g.scheduledHours+=hoursNum;
+    const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10); if(!isNaN(dmsNum)) g.dms+=dmsNum;
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim()); if(!isNaN(cvrNum)){g.cvrSum+=cvrNum; g.cvrCount++;}
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim()); if(!isNaN(goldenNum)){g.goldenSum+=goldenNum; g.goldenCount++;}
+  });
+  srRows.forEach(r=>{
+    const key=r.chatter_id; if(!key) return;
+    if(!map.has(key)) map.set(key, blankCostRow(key,r.chatter_name,3,5));
+    const g=map.get(key);
+    g.revenue+=parseFloat(r.earnings||0);
+    g.salesCount++;
+  });
+
+  const rows=[...map.values()]
+    .filter(g=>g.manualCost||g.manualHours||g.scheduledHours||g.revenue||g.salesCount)
+    .map(g=>{
+      const hasAuto = g.scheduledHours>0 || g.revenue>0;
+      const autoCost = hasAuto ? (g.scheduledHours*g.hourlyRate)+(g.revenue*(g.commissionPct/100)) : null;
+      const cost = autoCost!==null ? autoCost : (g.manualCost||null);
+      const source = autoCost!==null
+        ? (g.manualCost>0 ? 'Auto + manual logged' : 'Auto (from uploads)')
+        : (g.manualCost>0 ? 'Manual' : '—');
+      const roi = cost && g.revenue ? g.revenue/cost : null;
+      return {...g, autoCost, cost, source, roi,
+        avgCvr: g.cvrCount?g.cvrSum/g.cvrCount:null,
+        avgGolden: g.goldenCount?g.goldenSum/g.goldenCount:null,
+      };
+    })
+    .sort((a,b)=>(b.revenue||0)-(a.revenue||0));
+
+  renderChatterCostSummary(rows);
+}
+function renderChatterCostSummary(rows){
+  const tbody=document.getElementById('cms-table'); const totalsEl=document.getElementById('cms-totals');
+  if(!tbody) return;
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text2);">No chatter activity for this period yet</td></tr>';
+    if(totalsEl) totalsEl.innerHTML='';
+    return;
+  }
+  let totalCost=0, totalRevenue=0;
+  tbody.innerHTML=rows.map(g=>{
+    totalCost+=g.cost||0; totalRevenue+=g.revenue||0;
+    const hoursDisplay = g.autoCost!==null ? `${g.scheduledHours.toFixed(1)}h` : (g.manualHours?`${g.manualHours.toFixed(1)}h`:'—');
+    return `<tr>
+      <td><strong>${g.name}</strong></td>
+      <td style="font-size:11px;color:var(--text2);">${g.source}</td>
+      <td>${hoursDisplay}</td>
+      <td>${g.cost!==null?'$'+fmt(g.cost):'—'}</td>
+      <td class="profit">$${fmt(g.revenue)}</td>
+      <td>${g.roi!==null?g.roi.toFixed(2)+'x':'—'}</td>
+      <td>${g.avgGolden!==null?g.avgGolden.toFixed(2)+'%':'—'}</td>
+      <td>${g.avgCvr!==null?g.avgCvr.toFixed(2)+'%':'—'}</td>
+      <td>${g.dms||'—'}</td>
+    </tr>`;
+  }).join('');
+  const overallRoi = totalCost>0 ? (totalRevenue/totalCost).toFixed(2)+'x' : '—';
+  if(totalsEl) totalsEl.innerHTML=`Total cost: <strong>$${fmt(totalCost)}</strong> &middot; Total revenue: <strong class="profit">$${fmt(totalRevenue)}</strong> &middot; Overall ROI: <strong>${overallRoi}</strong>`;
+}
+function setChatterCostPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('cms-start').value=start;
+  document.getElementById('cms-end').value=end;
+  loadChatterCostSummary();
 }
 
 async function loadChatterWeeks(){
