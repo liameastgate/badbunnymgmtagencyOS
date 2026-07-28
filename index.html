@@ -665,17 +665,9 @@
           </div>
         </div>
         <div class="card" style="margin-top:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-            <div class="card-title" style="margin:0;">📅 Shift Calendar</div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <button class="btn btn-sm btn-ghost" onclick="changeRosterCalMonth(-1)">◀</button>
-              <span id="roster-cal-label" style="font-weight:700;min-width:130px;text-align:center;"></span>
-              <button class="btn btn-sm btn-ghost" onclick="changeRosterCalMonth(1)">▶</button>
-              <button class="btn btn-sm btn-ghost" onclick="jumpRosterCalToday()">Today</button>
-            </div>
-          </div>
-          <div style="font-size:11px;color:var(--text2);margin:-6px 0 12px;">Add each chatter's shift manually — click the + on a day. All times are AEST. Click an existing entry to edit or remove it.</div>
-          <div id="roster-cal-grid"></div>
+          <div class="card-title" style="margin:0 0 4px;">📅 Weekly Roster</div>
+          <div style="font-size:11px;color:var(--text2);margin:-2px 0 14px;">Repeats every week — this is the standing schedule, not tied to specific dates. Click + Add to assign a chatter to a slot. All times are AEST.</div>
+          <div id="roster-grid"></div>
         </div>
       </div>
       <div id="chatter-tab-hours" style="display:none;">
@@ -1039,22 +1031,19 @@
   </div>
 </div>
 
-<!-- Shift Entry Modal -->
-<div class="modal-overlay" id="shift-entry-modal">
+<!-- Roster Slot Modal -->
+<div class="modal-overlay" id="roster-slot-modal">
   <div class="modal">
-    <div class="modal-title"><span id="shift-entry-modal-title">Add Shift</span><button class="modal-close" onclick="closeModal('shift-entry-modal')">✕</button></div>
-    <input type="hidden" id="shift-entry-id">
+    <div class="modal-title"><span>Add to Roster</span><button class="modal-close" onclick="closeModal('roster-slot-modal')">✕</button></div>
+    <input type="hidden" id="roster-slot-weekday">
+    <input type="hidden" id="roster-slot-slot">
     <div class="form-grid">
-      <div class="form-group full"><label>Date</label><input type="date" id="shift-entry-date"></div>
-      <div class="form-group full"><label>Chatter</label><select id="shift-entry-chatter"></select></div>
-      <div class="form-group"><label>Start Time (AEST)</label><input type="time" id="shift-entry-start"></div>
-      <div class="form-group"><label>End Time (AEST)</label><input type="time" id="shift-entry-end"></div>
-      <div class="form-group full"><label>Note (optional)</label><input type="text" id="shift-entry-note" placeholder="e.g. covering for Elle"></div>
+      <div class="form-group full"><div id="roster-slot-label" style="font-size:15px;font-weight:700;"></div></div>
+      <div class="form-group full"><label>Chatter</label><select id="roster-slot-chatter"></select></div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveShiftEntry()">💾 Save</button>
-      <button class="btn btn-ghost" onclick="closeModal('shift-entry-modal')">Cancel</button>
-      <button id="shift-entry-delete-btn" class="btn btn-danger" style="display:none;margin-left:auto;" onclick="deleteShiftEntryFromModal()">🗑️ Delete</button>
+      <button class="btn btn-primary" onclick="saveRosterSlot()">💾 Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('roster-slot-modal')">Cancel</button>
     </div>
   </div>
 </div>
@@ -1221,7 +1210,7 @@ function navigate(page) {
   if (page === 'sops') loadSOPs();
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
-  if (page === 'chatters') { loadChatterShifts(); loadRosterShiftEntries(); }
+  if (page === 'chatters') { loadChatterShifts(); loadRosterSlots(); }
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -1661,6 +1650,32 @@ function resizeImageFile(file,cb){
 // so PDFs are stored directly in the model_sheets.pdf_url text column (same "no bucket needed"
 // pattern as the base64 thumbnail uploads in Content Orders). Guards against huge files since
 // base64 inflates size ~33% and PostgREST has a request-size ceiling.
+// Opens a PDF given either a data: URI (uploaded file) or a plain http(s) URL (Drive link etc).
+// Chrome blocks top-level navigation straight to a data: URL (window.open/target=_blank on
+// one is a silent no-op), so those get converted to a Blob + object URL first -- that IS
+// allowed to open in a new tab. Regular URLs just open directly, no conversion needed.
+// encodeURIComponent leaves ' unescaped (it's in its "safe" set), which would break out of
+// the single-quoted onclick="...decodeURIComponent('...')..." attribute these get embedded
+// in -- belt-and-braces since neither base64 data: URIs nor Drive URLs normally contain one.
+function pdfUrlEscape(u){ return encodeURIComponent(u||'').replace(/'/g,'%27'); }
+function openPdfLink(url){
+  if(!url) return;
+  if(!url.startsWith('data:')){ window.open(url,'_blank'); return; }
+  try{
+    const commaIdx=url.indexOf(',');
+    const meta=url.slice(0,commaIdx);
+    const b64=url.slice(commaIdx+1);
+    const mime=(meta.match(/data:([^;]+)/)||[])[1]||'application/pdf';
+    const byteChars=atob(b64);
+    const byteNumbers=new Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++) byteNumbers[i]=byteChars.charCodeAt(i);
+    const blob=new Blob([new Uint8Array(byteNumbers)],{type:mime});
+    const blobUrl=URL.createObjectURL(blob);
+    window.open(blobUrl,'_blank');
+  }catch(e){
+    alert('Could not open PDF: '+e.message);
+  }
+}
 function readPdfFile(file,cb){
   if(!file)return;
   if(file.type&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name||'')){alert('Please choose a PDF file.');return;}
@@ -2557,8 +2572,10 @@ function previewChatterReport(rows) {
     const fans=getField(row,'Fans chatted')||'';
     const cvr=getField(row,'Fan CVR')||'';
     const golden=getField(row,'Golden ratio','Golden Ratio')||'';
-    const unlockRate=getField(row,'Unlock rate','Unlock Rate','PPV unlock rate','PPV Unlock Rate','Unlocked rate','Unlock %','Unlock ratio','Unlock Ratio')||'';
-    const ppvsUnlocked=getField(row,'PPVs unlocked','PPVs Unlocked','PPV unlocked','PPV Unlocked')||'';
+    const unlockRate=getField(row,'Unlock rate','Unlock Rate','PPV unlock rate','PPV Unlock Rate','Unlocked rate','Unlock %','Unlock ratio','Unlock Ratio')
+      ||getFieldFuzzy(row,'unlock',['rate','ratio','%','pct'],[])||'';
+    const ppvsUnlocked=getField(row,'PPVs unlocked','PPVs Unlocked','PPV unlocked','PPV Unlocked')
+      ||getFieldFuzzy(row,'unlock',[],['rate','ratio','%','pct'])||'';
     const hours=getField(row,'Scheduled hours','Scheduled Hours')||'';
     const sph=cleanAmount(getField(row,'Sales per hour','Sales Per Hour')||0);
     const {chatter, matchType}=findChatterMatch(name,'');
@@ -2845,6 +2862,25 @@ function deriveRowFields(row,model){
   row.agency_net=agencyNet;
   row.agency_profit=agencyNet;
   row.model_payout=row.total_earnings-agencyNet;
+}
+
+// Last-resort lookup for when an exact/tolerant candidate list still doesn't match --
+// scans every key in the row for one containing `mustContain`, preferring a key that also
+// hints at being a rate/percentage over a plain count (e.g. distinguishing "Unlock rate %"
+// from "PPVs unlocked"). Only meant as a safety net for fields whose real export header is
+// unknown/drifting -- getField's exact-then-tolerant matching should be tried first.
+function getFieldFuzzy(row,mustContain,preferHints,avoidHints){
+  preferHints=preferHints||[]; avoidHints=avoidHints||[];
+  const keys=Object.keys(row);
+  const lc=k=>k.toLowerCase();
+  const matches=keys.filter(k=>lc(k).includes(mustContain));
+  if(!matches.length) return undefined;
+  // Prefer matches that don't hit an avoid-hint (e.g. exclude "% "/"rate" columns when looking
+  // for a plain count) over ones that do, then within that pool prefer one with a preferHint.
+  const clean=matches.filter(k=>!avoidHints.some(h=>lc(k).includes(h)));
+  const pool=clean.length?clean:matches;
+  const found=pool.find(k=>preferHints.some(h=>lc(k).includes(h)))||pool[0];
+  return row[found]!=='' ? row[found] : undefined;
 }
 
 // Looks up a field by trying each candidate header name verbatim first, then falling back to
@@ -3357,7 +3393,7 @@ function toggleHistoryGroup(gid){
 function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
-  STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td style="color:var(--text2);font-size:12px;">${m.niche||'—'}</td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<a href="${pdfUrl}" target="_blank" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</a>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+  STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td style="color:var(--text2);font-size:12px;">${m.niche||'—'}</td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(pdfUrl)}'))" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</button>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
   // Quick stats panel
   const statsEl=document.getElementById('models-stats-body');
   if(statsEl){
@@ -3443,130 +3479,81 @@ async function loadChatterShifts(){
   STATE.chatterShifts={};
   (data||[]).forEach(s=>{ STATE.chatterShifts[s.chatter_id]=s.working_days||[]; });
   renderChatters();
-  renderRosterCalendar();
 }
 
-// ── Roster shift calendar ───────────────────────────────────
-// Fully manual: every cell is empty until someone adds an entry. Replaces the earlier
-// recurring-weekday-pattern version entirely (per Liam) -- entries are tied to an exact date
-// with an exact start/end time (always AEST, the agency's working timezone), not a repeating
-// day-of-week rule, so covering a shift or a one-off doesn't require editing a chatter's
-// permanent pattern.
-var _rosterCalDate=new Date(); _rosterCalDate.setDate(1);
-var _rosterShiftEntries=[];
+// ── Weekly Roster (recurring template) ──────────────────────
+// A fixed, repeating schedule -- three time slots x Mon-Fri, not tied to any specific date.
+// Assigning a chatter to a slot means "every week, this chatter works this slot" until removed.
+const ROSTER_SLOTS=[{n:0,label:'12am–10am'},{n:1,label:'10am–6pm'},{n:2,label:'6pm–12am'}];
+const ROSTER_WEEKDAYS=[{n:1,label:'Mon'},{n:2,label:'Tue'},{n:3,label:'Wed'},{n:4,label:'Thu'},{n:5,label:'Fri'}];
 const ROSTER_CAL_PALETTE=['#4a9eff','#ff6b6b','#4ade80','#facc15','#c084fc','#fb923c','#22d3ee','#f472b6'];
-function changeRosterCalMonth(delta){ _rosterCalDate.setMonth(_rosterCalDate.getMonth()+delta); loadRosterShiftEntries(); }
-function jumpRosterCalToday(){ _rosterCalDate=new Date(); _rosterCalDate.setDate(1); loadRosterShiftEntries(); }
-function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-async function loadRosterShiftEntries(){
-  const year=_rosterCalDate.getFullYear(), month=_rosterCalDate.getMonth();
-  const rangeStart=ymd(new Date(year,month,1)), rangeEnd=ymd(new Date(year,month+1,0));
-  const{data,error}=await sb.from('chatter_shift_entries').select('*').gte('shift_date',rangeStart).lte('shift_date',rangeEnd).order('start_time');
-  if(error){ console.error('loadRosterShiftEntries',error); return; }
-  _rosterShiftEntries=data||[];
-  renderRosterCalendar();
-}
-// "14:30" -> "2:30 PM". Falls back to the raw value if it's not a normal HH:MM time (e.g. null).
-function formatTime12h(t){
-  if(!t) return '';
-  const[h,m]=t.split(':').map(Number);
-  if(isNaN(h)||isNaN(m)) return t;
-  const period=h>=12?'PM':'AM';
-  const h12=h%12===0?12:h%12;
-  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
-}
+var _rosterSlots=[];
 function chatterColorById(id){const i=STATE.chatters.findIndex(x=>x.id===id);return ROSTER_CAL_PALETTE[i>=0?i%ROSTER_CAL_PALETTE.length:0];}
-function renderRosterCalendar(){
-  const grid=document.getElementById('roster-cal-grid'); const label=document.getElementById('roster-cal-label');
-  if(!grid||!label) return;
-  const year=_rosterCalDate.getFullYear(), month=_rosterCalDate.getMonth();
-  label.textContent=_rosterCalDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  const today=new Date();
-  const isCurrentMonth=today.getFullYear()===year&&today.getMonth()===month;
+async function loadRosterSlots(){
+  const{data,error}=await sb.from('chatter_roster_slots').select('*');
+  if(error){ console.error('loadRosterSlots',error); return; }
+  _rosterSlots=data||[];
+  renderRosterGrid();
+}
+function renderRosterGrid(){
+  const el=document.getElementById('roster-grid'); if(!el) return;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const firstWeekday=(new Date(year,month,1).getDay()+6)%7; // 0=Mon .. 6=Sun
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  const entriesByDate=new Map();
-  _rosterShiftEntries.forEach(e=>{
-    if(!entriesByDate.has(e.shift_date)) entriesByDate.set(e.shift_date,[]);
-    entriesByDate.get(e.shift_date).push(e);
+  const cellsFor=(weekday,slot)=>_rosterSlots.filter(s=>s.weekday===weekday&&s.slot===slot);
+  let html=`<div style="display:grid;grid-template-columns:110px repeat(5,1fr);gap:6px;">`;
+  html+=`<div></div>`+ROSTER_WEEKDAYS.map(w=>`<div style="font-size:12px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:4px;">${w.label}</div>`).join('');
+  ROSTER_SLOTS.forEach(slot=>{
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;">${slot.label}</div>`;
+    ROSTER_WEEKDAYS.forEach(w=>{
+      const entries=cellsFor(w.n,slot.n);
+      html+=`<div style="min-height:96px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
+          ${entries.map(e=>{
+            const color=chatterColorById(e.chatter_id);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;padding:3px 6px;border-radius:6px;background:${color}22;color:${color};">
+              <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.chatter_name}</span>
+              ${isAdmin?`<span onclick="deleteRosterSlot('${e.id}')" title="Remove" style="cursor:pointer;opacity:0.75;flex-shrink:0;">✕</span>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+        ${isAdmin?`<button onclick="openAddRosterSlot(${w.n},${slot.n})" style="background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;padding:5px 0;cursor:pointer;">+ Add</button>`:''}
+      </div>`;
+    });
   });
-  let cells='';
-  for(let i=0;i<firstWeekday;i++) cells+='<div style="min-height:110px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
-  for(let d=1;d<=daysInMonth;d++){
-    const dateStr=ymd(new Date(year,month,d));
-    const dayEntries=entriesByDate.get(dateStr)||[];
-    const isToday=isCurrentMonth&&today.getDate()===d;
-    cells+=`<div style="min-height:110px;background:var(--surface2);border-radius:6px;padding:6px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};display:flex;flex-direction:column;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:11px;font-weight:700;color:${isToday?'var(--accent)':'var(--text2)'};">${d}</span>
-        ${isAdmin?`<button onclick="openAddShiftEntry('${dateStr}')" title="Add shift" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;font-weight:700;padding:0 2px;line-height:1;">+</button>`:''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
-        ${dayEntries.map(e=>{
-          const color=chatterColorById(e.chatter_id);
-          const timeLabel=e.start_time?`${formatTime12h(e.start_time)}${e.end_time?'–'+formatTime12h(e.end_time):''} AEST`:'';
-          return `<div onclick="${isAdmin?`editShiftEntry('${e.id}')`:''}" style="cursor:${isAdmin?'pointer':'default'};font-size:10px;padding:3px 6px;border-radius:6px;background:${color}22;color:${color};" title="${isAdmin?'Click to edit/delete':''}">
-            <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.chatter_name}</div>
-            ${timeLabel?`<div style="opacity:0.85;">${timeLabel}</div>`:''}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-  const totalCells=firstWeekday+daysInMonth;
-  const trailing=(7-(totalCells%7))%7;
-  for(let i=0;i<trailing;i++) cells+='<div style="min-height:110px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
-  const dayHeaders=SHIFT_DAY_LABELS.map(d=>`<div style="font-size:11px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:6px;">${d.l}</div>`).join('');
-  grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">${dayHeaders}${cells}</div>`;
+  html+=`</div>`;
+  el.innerHTML=html;
 }
-function openAddShiftEntry(dateStr){
-  document.getElementById('shift-entry-modal-title').textContent='Add Shift';
-  document.getElementById('shift-entry-id').value='';
-  document.getElementById('shift-entry-date').value=dateStr;
-  document.getElementById('shift-entry-chatter').innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  document.getElementById('shift-entry-start').value='';
-  document.getElementById('shift-entry-end').value='';
-  document.getElementById('shift-entry-note').value='';
-  document.getElementById('shift-entry-delete-btn').style.display='none';
-  openModal('shift-entry-modal');
+function openAddRosterSlot(weekday,slot){
+  document.getElementById('roster-slot-weekday').value=weekday;
+  document.getElementById('roster-slot-slot').value=slot;
+  const wLabel=(ROSTER_WEEKDAYS.find(w=>w.n===weekday)||{}).label||'';
+  const sLabel=(ROSTER_SLOTS.find(s=>s.n===slot)||{}).label||'';
+  document.getElementById('roster-slot-label').textContent=`${wLabel} · ${sLabel} (AEST)`;
+  const assignedIds=new Set(_rosterSlots.filter(s=>s.weekday===weekday&&s.slot===slot).map(s=>s.chatter_id));
+  const available=STATE.chatters.filter(c=>!assignedIds.has(c.id));
+  const sel=document.getElementById('roster-slot-chatter');
+  sel.innerHTML=available.length
+    ? available.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+    : '<option value="">All chatters already assigned to this slot</option>';
+  openModal('roster-slot-modal');
 }
-function editShiftEntry(id){
-  const e=_rosterShiftEntries.find(x=>x.id===id); if(!e)return;
-  document.getElementById('shift-entry-modal-title').textContent='Edit Shift';
-  document.getElementById('shift-entry-id').value=e.id;
-  document.getElementById('shift-entry-date').value=e.shift_date;
-  document.getElementById('shift-entry-chatter').innerHTML=STATE.chatters.map(c=>`<option value="${c.id}"${c.id===e.chatter_id?' selected':''}>${c.name}</option>`).join('');
-  document.getElementById('shift-entry-start').value=e.start_time||'';
-  document.getElementById('shift-entry-end').value=e.end_time||'';
-  document.getElementById('shift-entry-note').value=e.note||'';
-  document.getElementById('shift-entry-delete-btn').style.display='inline-block';
-  openModal('shift-entry-modal');
-}
-async function saveShiftEntry(){
-  const id=document.getElementById('shift-entry-id').value;
-  const chatterId=document.getElementById('shift-entry-chatter').value;
+async function saveRosterSlot(){
+  const weekday=parseInt(document.getElementById('roster-slot-weekday').value,10);
+  const slot=parseInt(document.getElementById('roster-slot-slot').value,10);
+  const chatterId=document.getElementById('roster-slot-chatter').value;
   const chatter=STATE.chatters.find(c=>c.id===chatterId);
   if(!chatter) return alert('Select a chatter.');
-  const dateVal=document.getElementById('shift-entry-date').value;
-  if(!dateVal) return alert('Date required.');
-  const p={
-    chatter_id:chatterId, chatter_name:chatter.name, shift_date:dateVal,
-    start_time:document.getElementById('shift-entry-start').value||null,
-    end_time:document.getElementById('shift-entry-end').value||null,
-    note:document.getElementById('shift-entry-note').value.trim()||null,
-  };
-  const{error}=id ? await sb.from('chatter_shift_entries').update(p).eq('id',id) : await sb.from('chatter_shift_entries').insert(p);
-  if(error) return alert('Could not save shift: '+error.message);
-  closeModal('shift-entry-modal');
-  loadRosterShiftEntries();
+  const{error}=await sb.from('chatter_roster_slots').insert({chatter_id:chatterId,chatter_name:chatter.name,weekday,slot});
+  if(error){
+    if(error.code==='23505') return alert('That chatter is already assigned to this slot.');
+    return alert('Could not save: '+error.message);
+  }
+  closeModal('roster-slot-modal');
+  loadRosterSlots();
 }
-async function deleteShiftEntryFromModal(){
-  const id=document.getElementById('shift-entry-id').value; if(!id)return;
-  if(!confirm('Remove this shift entry?'))return;
-  await sb.from('chatter_shift_entries').delete().eq('id',id);
-  closeModal('shift-entry-modal');
-  loadRosterShiftEntries();
+async function deleteRosterSlot(id){
+  if(!confirm('Remove this chatter from the slot?'))return;
+  await sb.from('chatter_roster_slots').delete().eq('id',id);
+  loadRosterSlots();
 }
 function openAddChatterModal(){
   document.getElementById('chatter-modal-title').textContent='Add Chatter';
@@ -3622,12 +3609,12 @@ async function saveChatter(){
     await sb.from('chatter_shifts').upsert({chatter_id:chatterId, working_days:_chatterShiftDays, updated_at:new Date().toISOString()},{onConflict:'chatter_id'});
     STATE.chatterShifts=STATE.chatterShifts||{}; STATE.chatterShifts[chatterId]=_chatterShiftDays.slice();
   }
-  renderChatters();populateChatterDropdown();renderRosterCalendar();closeModal('chatter-modal');
+  renderChatters();populateChatterDropdown();renderRosterGrid();closeModal('chatter-modal');
   document.getElementById('chatter-id').value=''; document.getElementById('chatter-modal-title').textContent='Add Chatter';
   _chatterShiftDays=[]; renderShiftDayToggles();
 }
 
-async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();renderRosterCalendar();}
+async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();loadRosterSlots();}
 
 function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));if(tab==='summary')loadChatterCostSummary();}
 
@@ -4347,7 +4334,7 @@ async function showModelSheet(model){
           <div style="font-size:12px;color:var(--text2);margin-top:4px;">${model.of_account||''} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${model.split||20}% split</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${sheet.pdf_url?`<a href="${sheet.pdf_url}" target="_blank" class="btn btn-ghost">📄 View Info Sheet PDF</a>`:''}
+          ${sheet.pdf_url?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost">📄 View Info Sheet PDF</button>`:''}
           ${isAdmin?`<button class="btn btn-primary" onclick="saveSheet('${model.id}')">💾 Save</button>`:''}
         </div>
       </div>
@@ -4469,9 +4456,9 @@ function openSOP(id){
             <input type="file" id="sop-pdf-file" accept=".pdf,application/pdf" onchange="handleSopPdfFile(this.files[0])">
             <div id="sop-pdf-filename" style="font-size:11px;color:var(--text2);margin-top:4px;">${sop.pdf_url?'A PDF is attached — choose a new file to replace it.':''}</div>
           </div>
-          ${sop.pdf_url?`<div style="display:flex;gap:8px;"><a href="${sop.pdf_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Attached PDF</a><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
+          ${sop.pdf_url?`<div style="display:flex;gap:8px;"><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm">📄 View Attached PDF</button><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
         </div>`
-      :sop.pdf_url?`<div class="btn-row" style="margin-bottom:16px;"><a href="${sop.pdf_url}" target="_blank" class="btn btn-ghost">📄 View Attached PDF</a></div>`:''}
+      :sop.pdf_url?`<div class="btn-row" style="margin-bottom:16px;"><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost">📄 View Attached PDF</button></div>`:''}
     ${isAdmin
       ?`<textarea id="sop-content-input" style="width:100%;min-height:500px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:14px;line-height:1.8;color:var(--text);resize:vertical;font-family:inherit;">${(sop.content||'').replace(/</g,'&lt;')}</textarea>
          <div class="btn-row"><button class="btn btn-primary" onclick="saveSOP('${sop.id}')">💾 Save</button></div>`
