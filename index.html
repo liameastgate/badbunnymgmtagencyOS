@@ -2318,9 +2318,34 @@ function reassignChatterPerf(i,chatterId){
   renderChatterPreview();
 }
 
+// Before inserting a fresh weekly upload, checks whether this exact week already has rows in
+// this table. Uploading the same week twice used to silently add a second copy of everything,
+// which every summary/overview then SUMs -- so earnings for that week would double (reported
+// as "merging"). Returns true if the caller should proceed with its insert, false to abort.
+// On a match, offers to replace (delete the old rows for that week, then insert fresh) rather
+// than either silently duplicating or hard-blocking a legitimate correction re-upload.
+async function confirmReplaceWeek(table, weekOf, weekEnd, labelPlural){
+  let q=sb.from(table).select('id',{count:'exact',head:true}).eq('week_of',weekOf);
+  q = weekEnd ? q.eq('week_end',weekEnd) : q.is('week_end',null);
+  const{count,error}=await q;
+  if(error){ console.error('confirmReplaceWeek check failed for '+table,error); return true; } // fail open -- a broken check shouldn't block a save
+  if(!count) return true;
+  const range = weekEnd && weekEnd!==weekOf ? `${weekOf} to ${weekEnd}` : weekOf;
+  const ok=confirm(`${count} ${labelPlural} row${count!==1?'s':''} already saved for ${range}.\n\nUploading again will double-count it in every summary unless the old data is replaced first.\n\nClick OK to replace the existing data for this week, or Cancel to stop.`);
+  if(!ok) return false;
+  let delQ=sb.from(table).delete().eq('week_of',weekOf);
+  delQ = weekEnd ? delQ.eq('week_end',weekEnd) : delQ.is('week_end',null);
+  const{error:delError,data:delData}=await delQ.select('id');
+  if(delError){ alert('Could not clear the existing week -- save cancelled. '+delError.message); return false; }
+  if(!delData||!delData.length){ alert('Could not clear the existing week (0 rows removed) -- you may be missing delete permission on this table. Save cancelled rather than risk duplicating data.'); return false; }
+  return true;
+}
+
 async function saveChatterPerformance(){
   const raw=_parsedChatterPerf||[];
   if(!raw.length) return showAlert('chatter-report-alert','No data to save.','error');
+  const proceed=await confirmReplaceWeek('chatter_performance',raw[0].week_of,raw[0].week_end,'chatter performance');
+  if(!proceed) return;
   const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
   const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
   const{error}=await sb.from('chatter_performance').insert(rows);
@@ -2678,6 +2703,13 @@ function reassignReportRow(i,modelId){
 async function saveReportRows(){
   const raw=_parsedRows||[];
   if(!raw.length) return showAlert('report-alert','No data to save.','error');
+  const weekOf=raw[0].week_of, weekEnd=raw[0].week_end;
+  const proceed=await confirmReplaceWeek('weekly_reports',weekOf,weekEnd,'creator stats');
+  if(!proceed) return;
+  // Always clear any existing daily rows in this same date range before inserting fresh ones --
+  // creator_stats_daily has no week_of of its own to key a replace-check off, and stale rows
+  // here would double the day-of-week chart even if the weekly summary check above passed.
+  await sb.from('creator_stats_daily').delete().gte('stat_date',weekOf).lte('stat_date',weekEnd);
   // Strip fields that don't exist in the weekly_reports DB schema
   const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,raw_name,match_type,...r})=>r);
   const{error}=await sb.from('weekly_reports').insert(all);
@@ -2909,6 +2941,8 @@ function reassignSalesChatter(key,chatterId){
 async function saveSalesRecords(){
   const raw=_parsedSales||[];
   if(!raw.length) return showAlert('sales-alert','No data to save.','error');
+  const proceed=await confirmReplaceWeek('sales_records',raw[0].week_of,raw[0].week_end,'sales record');
+  if(!proceed) return;
   const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
   const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
   const{error}=await sb.from('sales_records').insert(rows);
