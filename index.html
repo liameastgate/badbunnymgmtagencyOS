@@ -359,7 +359,7 @@
           <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
           <div class="card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th>Sheet</th><th></th></tr></thead>
               <tbody id="models-body"></tbody>
             </table></div>
             <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
@@ -442,7 +442,7 @@
           <div class="form-group"><label>Week To</label><input type="date" id="inv-week-end"></div>
           <div class="form-group"><label>Salary Earnings ($)</label><input type="number" id="inv-salary" placeholder="0.00" step="0.01" min="0"></div>
           <div class="form-group"><label>Commission Earnings ($)</label><input type="number" id="inv-commission" placeholder="0.00" step="0.01" min="0"></div>
-          <div class="form-group full"><label>Description / Notes (optional)</label><input type="text" id="inv-desc" placeholder="e.g. 168hrs chatting, 5% commission on $X earnings"></div>
+          <div class="form-group full"><label>Chatter Name</label><input type="text" id="inv-desc" placeholder="e.g. Bella — who this invoice is for"></div>
           <div class="form-group full">
             <label>Upload Invoice (PDF or image)</label>
             <div id="inv-file-preview" style="display:none;margin-bottom:8px;">
@@ -469,7 +469,7 @@
           <div id="invoices-sync-alert" class="alert" style="margin-bottom:12px;"></div>
           <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week and moves it down to Processed; rejecting or marking it Processing moves it down too.</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-pending-body"></tbody>
           </table></div>
           <div id="invoices-pending-empty" class="empty" style="display:none;"><div class="empty-icon">🎉</div><p>Nothing waiting on review</p></div>
@@ -481,7 +481,7 @@
             <button class="btn btn-sm btn-ghost" onclick="backfillInvoiceExpenseSync()" title="Catches any already-approved invoices from before this sync existed">🔄 Sync Approved → Expenses</button>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-body"></tbody>
           </table></div>
           <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>Nothing processed yet</p></div>
@@ -490,7 +490,7 @@
         <div class="card">
           <div class="card-title">My Invoices</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Week</th><th>Amount</th><th>Description</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+            <thead><tr><th>Week</th><th>Amount</th><th>Chatter</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
             <tbody id="my-invoices-body"></tbody>
           </table></div>
           <div id="my-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
@@ -738,7 +738,8 @@
       <div class="form-group"><label>Week To</label><input type="date" id="inv-edit-week-end"></div>
       <div class="form-group"><label>Salary Earnings ($)</label><input type="number" id="inv-edit-salary" step="0.01" min="0"></div>
       <div class="form-group"><label>Commission Earnings ($)</label><input type="number" id="inv-edit-commission" step="0.01" min="0"></div>
-      <div class="form-group full"><label>Description / Notes</label><input type="text" id="inv-edit-desc"></div>
+      <div class="form-group full"><label>Chatter Name</label><input type="text" id="inv-edit-desc" placeholder="Who is this invoice for?"></div>
+      <div class="form-group full" id="inv-edit-notes-group" style="display:none;"><label>Admin Notes / Labels (admin only)</label><input type="text" id="inv-edit-notes" placeholder="e.g. Paid via Zelle, double-checked"></div>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px;" id="inv-edit-sync-note"></div>
     <div class="btn-row">
@@ -940,12 +941,13 @@ function showAuthMsg(msg, type) {
 
 // ── Data ─────────────────────────────────────────────────────
 async function loadAllData() {
-  const [m, c, o] = await Promise.all([
+  const [m, c, o, sheets] = await Promise.all([
     sb.from('models').select('*').order('name'),
     sb.from('chatters').select('*').order('name'),
     STATE.profile.role === 'model'
       ? sb.from('content_orders').select('*').eq('model_email', STATE.profile.email).order('created_at',{ascending:false})
-      : sb.from('content_orders').select('*').order('created_at',{ascending:false})
+      : sb.from('content_orders').select('*').order('created_at',{ascending:false}),
+    sb.from('model_sheets').select('model_id,pdf_url')
   ]);
   const rawModels = m.data||[];
   rawModels.sort((a,b)=>{
@@ -953,6 +955,8 @@ async function loadAllData() {
     return (order[a.mgmt_type]??0)-(order[b.mgmt_type]??0);
   });
   STATE.models = rawModels; STATE.chatters = c.data||[]; STATE.contentOrders = o.data||[];
+  STATE.modelSheetPdfs = {};
+  (sheets.data||[]).forEach(s=>{ if(s.pdf_url) STATE.modelSheetPdfs[s.model_id]=s.pdf_url; });
   renderModels(); renderChatters(); renderContentOrders(); populateModelDropdowns(); populateChatterDropdown();
 }
 
@@ -1064,12 +1068,16 @@ function populateModelDropdowns() {
   // Drive link banners
   const bannerEl=document.getElementById('co-drive-banners');
   if(bannerEl){
-    const withDrive=visibleModels.filter(m=>m.drive_link);
-    bannerEl.innerHTML=withDrive.map(m=>`
-      <div style="display:flex;align-items:center;gap:10px;background:rgba(30,79,255,0.08);border:1px solid rgba(30,79,255,0.2);border-radius:8px;padding:10px 14px;">
+    const withLinks=visibleModels.filter(m=>m.drive_link||STATE.modelSheetPdfs?.[m.id]);
+    bannerEl.innerHTML=withLinks.map(m=>{
+      const pdfUrl=STATE.modelSheetPdfs?.[m.id];
+      return `
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(30,79,255,0.08);border:1px solid rgba(30,79,255,0.2);border-radius:8px;padding:10px 14px;flex-wrap:wrap;">
         <span style="font-size:12px;font-weight:700;color:var(--text2);min-width:80px;">${m.name}</span>
-        <a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>
-      </div>`).join('');
+        ${m.drive_link?`<a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>`:''}
+        ${pdfUrl?`<a href="${pdfUrl}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📄 Info Sheet ↗</a>`:''}
+      </div>`;
+    }).join('');
   }
 }
 
@@ -1672,7 +1680,7 @@ function toggleHistoryGroup(gid){
 function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
-  STATE.models.forEach(m=>{tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+  STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<a href="${pdfUrl}" target="_blank" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</a>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
   // Quick stats panel
   const statsEl=document.getElementById('models-stats-body');
   if(statsEl){
@@ -1713,7 +1721,12 @@ async function saveModel(){
   document.getElementById('model-id').value=''; document.getElementById('model-modal-title').textContent='Add Model';
 }
 
-async function delModel(id){if(!confirm('Remove model?'))return;await sb.from('models').delete().eq('id',id);STATE.models=STATE.models.filter(m=>m.id!==id);renderModels();populateModelDropdowns();}
+async function delModel(id){
+  if(!confirm('Remove model?'))return;
+  const{error,data}=await sb.from('models').delete().eq('id',id).select();
+  if(error||!data||!data.length){alert('Could not delete this model — you may be missing delete permission on the models table. Ask an admin to check the Supabase RLS policy.');return;}
+  STATE.models=STATE.models.filter(m=>m.id!==id);renderModels();populateModelDropdowns();
+}
 
 // ── Chatters ─────────────────────────────────────────────────
 function renderChatters(){
@@ -1817,7 +1830,8 @@ function invoiceRowHtml(inv){
     <td>$${fmt(inv.commission_amount||0)}</td>
     <td><strong>$${fmt(inv.amount)}</strong></td>
     <td>${inv.invoice_file_url?`<a href="${inv.invoice_file_url}" target="_blank" class="btn btn-sm btn-ghost">📄 View</a>`:'—'}</td>
-    <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.description||'—'}</td>
+    <td style="font-size:12px;color:var(--text2);max-width:120px;">${inv.description||'—'}</td>
+    <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.admin_notes||'—'}</td>
     <td><span class="badge ${inv.status}">${inv.status}</span></td>
     <td style="display:flex;gap:4px;flex-wrap:wrap;">
       <button class="btn btn-sm btn-green" onclick="updateInvoice('${inv.id}','approved')">✓</button>
@@ -1945,6 +1959,10 @@ function editInvoice(id){
   document.getElementById('inv-edit-salary').value=inv.salary_amount||0;
   document.getElementById('inv-edit-commission').value=inv.commission_amount||0;
   document.getElementById('inv-edit-desc').value=inv.description||'';
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  const notesGroup=document.getElementById('inv-edit-notes-group');
+  notesGroup.style.display=isAdmin?'block':'none';
+  document.getElementById('inv-edit-notes').value=inv.admin_notes||'';
   document.getElementById('inv-edit-sync-note').textContent=inv.status==='approved'
     ?'This invoice is already Approved — saving will also update its linked expense to match.'
     :'';
@@ -1965,6 +1983,9 @@ async function saveEditInvoice(){
     salary_amount:salary, commission_amount:commission, amount:salary+commission,
     description:document.getElementById('inv-edit-desc').value.trim()
   };
+  // Admin notes are only editable/visible to admins — the field is hidden for a submitter
+  // editing their own pending invoice, so don't overwrite it with an empty value in that case.
+  if(['admin','va'].includes(STATE.profile?.role)) updates.admin_notes=document.getElementById('inv-edit-notes').value.trim();
   const{data,error}=await sb.from('invoices').update(updates).eq('id',id).select().single();
   if(error) return showAlert('inv-edit-alert',error.message,'error');
   const inv=STATE.invoices.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
@@ -2322,6 +2343,9 @@ async function saveSheet(modelId){
   };
   if(window._currentSheetId){await sb.from('model_sheets').update(payload).eq('id',window._currentSheetId);}
   else{const{data}=await sb.from('model_sheets').insert(payload).select().single();window._currentSheetId=data?.id;}
+  if(!STATE.modelSheetPdfs) STATE.modelSheetPdfs={};
+  if(payload.pdf_url) STATE.modelSheetPdfs[modelId]=payload.pdf_url; else delete STATE.modelSheetPdfs[modelId];
+  renderModels(); populateModelDropdowns();
   showAlert('sheet-alert','Saved!','success');
 }
 
