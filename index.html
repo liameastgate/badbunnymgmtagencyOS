@@ -402,6 +402,23 @@
 
       <!-- Creator Stats Upload -->
       <div id="report-tab-upload" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="cs-sum-start" onchange="loadCreatorStatsSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="cs-sum-end" onchange="loadCreatorStatsSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setCreatorStatsSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setCreatorStatsSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setCreatorStatsSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="cs-sum-stats" style="margin-bottom:14px;"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Model</th><th>Earnings</th><th>Payout</th><th>Agency Net</th><th>Renew %</th></tr></thead>
+            <tbody id="cs-sum-table"></tbody>
+          </table></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="color:var(--accent2);">Creator Statistics</div>
           <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
@@ -423,6 +440,24 @@
 
       <!-- Chatter Performance Upload (tab) -->
       <div id="report-tab-chatters" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="cp-sum-start" onchange="loadChatterPerfSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="cp-sum-end" onchange="loadChatterPerfSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setChatterPerfSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setChatterPerfSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setChatterPerfSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="cp-sum-stats" style="margin-bottom:14px;"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Chatter</th><th>Models</th><th>Sales</th><th>DMs Sent</th><th>Fan CVR</th><th>Golden Ratio</th><th>Sales/Hr</th></tr></thead>
+            <tbody id="cp-sum-table"></tbody>
+          </table></div>
+          <div id="cp-sum-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No chatter performance data for this period yet</p></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="color:var(--accent2);">Employee Performance</div>
           <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
@@ -448,6 +483,35 @@
 
       <!-- Sales Records Upload (tab) -->
       <div id="report-tab-sales" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="ss-sum-start" onchange="loadSalesSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="ss-sum-end" onchange="loadSalesSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setSalesSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setSalesSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setSalesSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="ss-sum-stats" style="margin-bottom:14px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Chatter Leaderboard</div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>#</th><th>Chatter</th><th>Sales</th><th>Earnings</th><th>Gross</th></tr></thead>
+                <tbody id="ss-sum-leaderboard"></tbody>
+              </table></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Sales by Model</div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>#</th><th>Model</th><th>Sales</th><th>Gross</th><th>Net</th></tr></thead>
+                <tbody id="ss-sum-models"></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="color:var(--accent2);">Sales Records</div>
           <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">Upload the Infloww "Sales record" export — every individual sale for the period, with the chatter who earned it where attributed</div>
@@ -1673,9 +1737,10 @@ function switchReportTab(tab) {
   document.getElementById('report-tab-sales').style.display=tab==='sales'?'block':'none';
   document.getElementById('report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='overview') loadReportsOverview();
+  if(tab==='upload') loadCreatorStatsSummary();
   if(tab==='history') loadReportHistory();
-  if(tab==='chatters') loadChatterPerfHistory();
-  if(tab==='sales') loadSalesHistory();
+  if(tab==='chatters'){ loadChatterPerfSummary(); loadChatterPerfHistory(); }
+  if(tab==='sales'){ loadSalesSummary(); loadSalesHistory(); }
 }
 
 // ── Weekly Reports Overview (dashboard tab) ────────────────────
@@ -1702,6 +1767,198 @@ function setReportsOverviewPeriod(kind){
   document.getElementById('wro-week-start').value=toISO(start);
   document.getElementById('wro-week-end').value=toISO(end);
   loadReportsOverview();
+}
+
+// Shared date-range helper for the per-tab Summary panels below (Creator Stats,
+// Chatter Performance, Sales Records) -- same math as setReportsOverviewPeriod's inline
+// version, factored out so the three new panels don't each re-duplicate it a third time.
+function computePeriodRange(kind){
+  const now=new Date();
+  let start,end;
+  if(kind==='last'){
+    const s=new Date(now); s.setDate(s.getDate()-((s.getDay()+6)%7)-7);
+    const e=new Date(s); e.setDate(s.getDate()+6);
+    start=s; end=e;
+  } else if(kind==='month'){
+    start=new Date(now.getFullYear(),now.getMonth(),1);
+    end=new Date(now.getFullYear(),now.getMonth()+1,0);
+  } else {
+    const s=new Date(now); s.setDate(s.getDate()-((s.getDay()+6)%7));
+    const e=new Date(s); e.setDate(s.getDate()+6);
+    start=s; end=e;
+  }
+  return {start:toLocalISO(start), end:toLocalISO(end)};
+}
+function ensureDefaultRange(startEl,endEl){
+  if(!startEl.value||!endEl.value){
+    const now=new Date();
+    const s=new Date(now); s.setDate(s.getDate()-((s.getDay()+6)%7));
+    const e=new Date(s); e.setDate(s.getDate()+6);
+    if(!startEl.value) startEl.value=toLocalISO(s);
+    if(!endEl.value) endEl.value=toLocalISO(e);
+  }
+}
+
+// ── Creator Stats Summary (standalone tab, own week range) ─────
+async function loadCreatorStatsSummary(){
+  const startEl=document.getElementById('cs-sum-start'); const endEl=document.getElementById('cs-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const{data}=await sb.from('weekly_reports').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const totalPayout=rows.reduce((s,r)=>s+parseFloat(r.model_payout||0),0);
+  const totalAgencyNet=rows.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
+  const activeModels=new Set(rows.map(r=>r.model_id||r.model_name)).size;
+  const avgRenew=rows.length?(rows.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/rows.length*100):0;
+
+  document.getElementById('cs-sum-stats').innerHTML=
+    statCard('Total Earnings','$'+fmt(totalEarnings),'white','purple')+
+    statCard('Model Payouts','$'+fmt(totalPayout),'','')+
+    statCard('Agency Net','$'+fmt(totalAgencyNet),'accent','blue')+
+    statCard('Active Models',activeModels,'','')+
+    statCard('Avg Renew %',avgRenew.toFixed(1)+'%','accent','green');
+
+  const sorted=rows.slice().sort((a,b)=>parseFloat(b.total_earnings||0)-parseFloat(a.total_earnings||0));
+  document.getElementById('cs-sum-table').innerHTML=sorted.length
+    ? sorted.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--text2);">No creator stats for this period</td></tr>';
+}
+function setCreatorStatsSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('cs-sum-start').value=start;
+  document.getElementById('cs-sum-end').value=end;
+  loadCreatorStatsSummary();
+}
+
+// ── Sales Records Summary (standalone tab, own week range) ─────
+async function loadSalesSummary(){
+  const startEl=document.getElementById('ss-sum-start'); const endEl=document.getElementById('ss-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const{data}=await sb.from('sales_records').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalGross=rows.reduce((s,r)=>s+parseFloat(r.gross_revenue||0),0);
+  const totalNet=rows.reduce((s,r)=>s+parseFloat(r.net_revenue||0),0);
+  const totalChatterEarnings=rows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+  const activeChatters=new Set(rows.filter(r=>r.chatter_id).map(r=>r.chatter_id)).size;
+  const activeModels=new Set(rows.filter(r=>r.model_id).map(r=>r.model_id)).size;
+
+  document.getElementById('ss-sum-stats').innerHTML=
+    statCard('Sales Count',rows.length,'','')+
+    statCard('Gross Revenue','$'+fmt(totalGross),'white','purple')+
+    statCard('Net Revenue','$'+fmt(totalNet),'','')+
+    statCard('Chatter Earnings','$'+fmt(totalChatterEarnings),'accent','green')+
+    statCard('Active Chatters',activeChatters,'','')+
+    statCard('Active Models',activeModels,'','');
+
+  const chatterMap=new Map();
+  rows.forEach(r=>{
+    if(!r.chatter_id) return;
+    if(!chatterMap.has(r.chatter_id)) chatterMap.set(r.chatter_id,{name:r.chatter_name,count:0,earnings:0,gross:0});
+    const g=chatterMap.get(r.chatter_id); g.count++; g.earnings+=parseFloat(r.earnings||0); g.gross+=parseFloat(r.gross_revenue||0);
+  });
+  const leaderboard=[...chatterMap.values()].sort((a,b)=>b.earnings-a.earnings);
+  document.getElementById('ss-sum-leaderboard').innerHTML=leaderboard.length
+    ? leaderboard.map((g,i)=>`<tr><td>${i+1}</td><td><strong>${g.name}</strong></td><td>${g.count}</td><td class="profit">$${fmt(g.earnings)}</td><td>$${fmt(g.gross)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No attributed sales for this period</td></tr>';
+
+  const modelMap=new Map();
+  rows.forEach(r=>{
+    if(!r.model_id) return;
+    if(!modelMap.has(r.model_id)) modelMap.set(r.model_id,{name:r.model_name,count:0,gross:0,net:0});
+    const g=modelMap.get(r.model_id); g.count++; g.gross+=parseFloat(r.gross_revenue||0); g.net+=parseFloat(r.net_revenue||0);
+  });
+  const byModel=[...modelMap.values()].sort((a,b)=>b.gross-a.gross);
+  document.getElementById('ss-sum-models').innerHTML=byModel.length
+    ? byModel.map((g,i)=>`<tr><td>${i+1}</td><td><strong>${g.name}</strong></td><td>${g.count}</td><td class="profit">$${fmt(g.gross)}</td><td>$${fmt(g.net)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No attributed sales for this period</td></tr>';
+}
+function setSalesSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('ss-sum-start').value=start;
+  document.getElementById('ss-sum-end').value=end;
+  loadSalesSummary();
+}
+
+// ── Chatter Performance Summary (standalone tab, own week range) ─
+async function loadChatterPerfSummary(){
+  const startEl=document.getElementById('cp-sum-start'); const endEl=document.getElementById('cp-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const{data}=await sb.from('chatter_performance').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const activeChatters=new Set(rows.map(r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||'')))).size;
+  let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0;
+  rows.forEach(r=>{
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
+  });
+
+  document.getElementById('cp-sum-stats').innerHTML=
+    statCard('Total Sales','$'+fmt(totalSales),'white','purple')+
+    statCard('Active Chatters',activeChatters,'','')+
+    statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'\u2014','accent','blue')+
+    statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'\u2014','accent','green');
+
+  // Rolled up one row per chatter -- identical logic to the combined Overview tab's
+  // chatter performance breakdown (see loadReportsOverview below), duplicated here so this
+  // panel works standalone off its own week range instead of the combined one.
+  const perfMap=new Map();
+  rows.forEach(r=>{
+    const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+    if(!perfMap.has(key)) perfMap.set(key,{name:r.chatter_name||'(unknown)', models:new Set(), entries:0, sales:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, hoursSum:0});
+    const g=perfMap.get(key);
+    g.entries++;
+    g.sales+=parseFloat(r.sales||0);
+    const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);
+    if(!isNaN(dmsNum)) g.dms+=dmsNum;
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(cvrNum)){ g.cvrSum+=cvrNum; g.cvrCount++; }
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(goldenNum)){ g.goldenSum+=goldenNum; g.goldenCount++; }
+    const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(hoursNum)) g.hoursSum+=hoursNum;
+    (r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[]).forEach(m=>g.models.add(m));
+  });
+  const perfList=[...perfMap.values()].sort((a,b)=>b.sales-a.sales);
+  const body=document.getElementById('cp-sum-table'); const empty=document.getElementById('cp-sum-empty');
+  if(perfList.length){
+    empty.style.display='none';
+    body.innerHTML=perfList.map(g=>{
+      const modelsLabel=g.models.size?`${g.models.size} model${g.models.size>1?'s':''}`:'\u2014';
+      const avgCvr=g.cvrCount?(g.cvrSum/g.cvrCount):null;
+      const avgGolden=g.goldenCount?(g.goldenSum/g.goldenCount):null;
+      const salesPerHr=g.hoursSum>0?(g.sales/g.hoursSum):0;
+      return `<tr>
+        <td><strong>${g.name}</strong> <span style="color:var(--text2);font-size:11px;">(${g.entries} entr${g.entries!==1?'ies':'y'})</span></td>
+        <td>${modelsLabel}</td>
+        <td class="profit">$${fmt(g.sales)}</td>
+        <td>${g.dms||'\u2014'}</td>
+        <td>${avgCvr!==null?avgCvr.toFixed(2)+'%':'\u2014'}</td>
+        <td>${avgGolden!==null?avgGolden.toFixed(2)+'%':'\u2014'}</td>
+        <td>$${fmt(salesPerHr)}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    body.innerHTML='';
+    empty.style.display='block';
+  }
+}
+function setChatterPerfSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('cp-sum-start').value=start;
+  document.getElementById('cp-sum-end').value=end;
+  loadChatterPerfSummary();
 }
 
 async function loadReportsOverview(){
@@ -1936,6 +2193,7 @@ async function saveChatterPerformance(){
   document.getElementById('chatter-save').style.display='none';
   document.getElementById('chatter-csv-input').value='';
   loadChatterPerfHistory();
+  loadChatterPerfSummary();
 }
 
 async function loadChatterPerfHistory(){
@@ -2184,6 +2442,7 @@ async function saveReportRows(){
   _parsedRows=null;
   document.getElementById('csv-preview').innerHTML='';
   document.getElementById('csv-save').style.display='none';
+  loadCreatorStatsSummary();
 }
 
 async function loadReportHistory(){
@@ -2406,6 +2665,7 @@ async function saveSalesRecords(){
   document.getElementById('sales-save').style.display='none';
   document.getElementById('sales-csv-input').value='';
   loadSalesHistory();
+  loadSalesSummary();
 }
 
 async function loadSalesHistory(){
