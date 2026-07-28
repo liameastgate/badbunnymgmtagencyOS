@@ -414,6 +414,25 @@
             </div>
           </div>
           <div class="stats-grid" id="cs-sum-stats" style="margin-bottom:14px;"></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Revenue Mix</div>
+              <div id="cs-sum-revenue-mix"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Fan Funnel</div>
+              <div id="cs-sum-funnel"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Earnings by Day of Week</div>
+            <div id="cs-sum-daychart"></div>
+          </div>
+
+          <div class="stats-grid" id="cs-sum-quality" style="margin-bottom:14px;"></div>
+
           <div class="table-wrap"><table>
             <thead><tr><th>#</th><th>Model</th><th>Earnings</th><th>Payout</th><th>Agency Net</th><th>Renew %</th></tr></thead>
             <tbody id="cs-sum-table"></tbody>
@@ -1805,7 +1824,10 @@ async function loadCreatorStatsSummary(){
   if(!startEl||!endEl) return;
   ensureDefaultRange(startEl,endEl);
   const start=startEl.value, end=endEl.value;
-  const{data}=await sb.from('weekly_reports').select('*');
+  const[{data},{data:dailyData}]=await Promise.all([
+    sb.from('weekly_reports').select('*'),
+    sb.from('creator_stats_daily').select('stat_date,total_earnings').gte('stat_date',start).lte('stat_date',end)
+  ]);
   const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
 
   const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
@@ -1821,10 +1843,106 @@ async function loadCreatorStatsSummary(){
     statCard('Active Models',activeModels,'','')+
     statCard('Avg Renew %',avgRenew.toFixed(1)+'%','accent','green');
 
+  renderRevenueMixBar(rows);
+  renderFanFunnel(rows);
+  renderDayOfWeekChart(dailyData||[]);
+  renderQualityStats(rows);
+
   const sorted=rows.slice().sort((a,b)=>parseFloat(b.total_earnings||0)-parseFloat(a.total_earnings||0));
   document.getElementById('cs-sum-table').innerHTML=sorted.length
     ? sorted.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--text2);">No creator stats for this period</td></tr>';
+}
+
+// Aggregate revenue-source breakdown across whatever rows are passed (already filtered to the
+// selected week range) -- pure CSS stacked bar, no charting library needed.
+function renderRevenueMixBar(rows){
+  const segments=[
+    {label:'Subscriptions', key:'subscription_earnings', color:'#6b8fff'},
+    {label:'Recurring Subs', key:'recurring_subscription_earnings', color:'#4a9eff'},
+    {label:'Tips', key:'tips_earnings', color:'#4ade80'},
+    {label:'Messages/PPV', key:'message_earnings', color:'#facc15'},
+    {label:'Streams', key:'streams_earnings', color:'#f472b6'},
+    {label:'Posts', key:'posts_earnings', color:'#a78bfa'},
+  ];
+  const totals=segments.map(s=>({...s, total:rows.reduce((sum,r)=>sum+parseFloat(r[s.key]||0),0)}));
+  const grandTotal=totals.reduce((s,t)=>s+t.total,0);
+  const el=document.getElementById('cs-sum-revenue-mix'); if(!el) return;
+  if(!grandTotal){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No revenue data for this period</div>'; return; }
+  const visible=totals.filter(t=>t.total>0);
+  const bar=visible.map(t=>`<div style="width:${(t.total/grandTotal*100).toFixed(2)}%;background:${t.color};height:100%;" title="${t.label}: $${fmt(t.total)}"></div>`).join('');
+  const legend=visible.map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block;flex-shrink:0;"></span>${t.label}: $${fmt(t.total)} (${(t.total/grandTotal*100).toFixed(1)}%)</div>`).join('');
+  el.innerHTML=`<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;">${bar}</div><div style="display:flex;flex-direction:column;gap:4px;">${legend}</div>`;
+}
+
+// Profile Visitors -> New Subscribers -> Active Fans -> Spenders, each bar sized relative to
+// the largest step (usually Visitors) with a conversion-from-previous-step percentage.
+function renderFanFunnel(rows){
+  const steps=[
+    {label:'Profile Visitors', value:rows.reduce((s,r)=>s+(r.profile_visitors||0),0)},
+    {label:'New Subscribers', value:rows.reduce((s,r)=>s+(r.new_subscribers||0),0)},
+    {label:'Active Fans', value:rows.reduce((s,r)=>s+(r.active_fans||0),0)},
+    {label:'Spenders', value:rows.reduce((s,r)=>s+(r.number_of_spenders||0),0)},
+  ];
+  const el=document.getElementById('cs-sum-funnel'); if(!el) return;
+  const max=Math.max(1,...steps.map(s=>s.value));
+  el.innerHTML=steps.map((s,i)=>{
+    const pct=(s.value/max*100).toFixed(1);
+    const conv = i>0 && steps[i-1].value>0 ? ` <span style="color:var(--text2);">(${(s.value/steps[i-1].value*100).toFixed(1)}% of prev)</span>` : '';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span>${s.label}</span><span><strong>${s.value.toLocaleString()}</strong>${conv}</span></div>
+      <div style="background:var(--surface2);border-radius:4px;height:10px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--accent);"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// Sums creator_stats_daily.total_earnings by day-of-week across all models for the period --
+// only source that can answer "which day actually earns" since weekly_reports is pre-summed.
+function renderDayOfWeekChart(dailyRows){
+  const el=document.getElementById('cs-sum-daychart'); if(!el) return;
+  if(!dailyRows.length){
+    el.innerHTML='<div style="color:var(--text2);font-size:12px;">No daily breakdown available for this period — make sure the uploaded Creator Statistics file includes the "Detail" sheet</div>';
+    return;
+  }
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const totals=new Array(7).fill(0);
+  dailyRows.forEach(r=>{
+    if(!r.stat_date) return;
+    const dow=new Date(r.stat_date+'T00:00:00').getDay();
+    totals[dow]+=parseFloat(r.total_earnings||0);
+  });
+  const max=Math.max(1,...totals);
+  const order=[1,2,3,4,5,6,0]; // Mon..Sun for readability
+  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:8px;height:120px;">`+
+    order.map(i=>{
+      const h=(totals[i]/max*100).toFixed(1);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">$${fmt(totals[i])}</div>
+        <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;height:${h}%;min-height:2px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">${dayNames[i]}</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+// Averages the fields where "-" in the source export must stay excluded (not 0) -- these were
+// parsed with numOrNull for exactly this reason, see extractCreatorStatFields.
+function renderQualityStats(rows){
+  const avg=(key)=>{
+    const vals=rows.map(r=>r[key]).filter(v=>v!==null&&v!==undefined);
+    return vals.length?vals.reduce((s,v)=>s+parseFloat(v),0)/vals.length:null;
+  };
+  const avgSpendPerSpender=avg('avg_spend_per_spender');
+  const avgSpendPerTxn=avg('avg_spend_per_transaction');
+  const avgEarningsPerFan=avg('avg_earnings_per_fan');
+  const avgReplyTime=avg('reply_time_minutes');
+  const avgSubLength=avg('avg_subscription_length_days');
+  const el=document.getElementById('cs-sum-quality'); if(!el) return;
+  el.innerHTML=
+    statCard('Avg Spend/Spender',avgSpendPerSpender!==null?'$'+fmt(avgSpendPerSpender):'—','','')+
+    statCard('Avg Spend/Txn',avgSpendPerTxn!==null?'$'+fmt(avgSpendPerTxn):'—','','')+
+    statCard('Avg Earnings/Fan',avgEarningsPerFan!==null?'$'+fmt(avgEarningsPerFan):'—','','')+
+    statCard('Avg Reply Time',avgReplyTime!==null?avgReplyTime.toFixed(1)+' min':'—','accent','blue')+
+    statCard('Avg Sub Length',avgSubLength!==null?avgSubLength.toFixed(0)+' days':'—','accent','green');
 }
 function setCreatorStatsSummaryPeriod(kind){
   const{start,end}=computePeriodRange(kind);
@@ -2070,7 +2188,27 @@ async function loadReportsOverview(){
 // ── Creator Stats handlers ────────────────────────────────────
 var _parsedRows=null;
 function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
-function handleCsvFile(file){parseCsvXlsx(file,rows=>previewReport(rows));}
+function handleCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      // The Infloww "Creator Statistics" export has a 2nd sheet ("...Detail") with one row
+      // per creator per DAY rather than per week -- that's what powers the day-of-week trend
+      // view. Detected by name rather than assumed to be index [1] so this degrades gracefully
+      // (falls back to summary-only) if Infloww ever renames or drops it.
+      const summaryName=wb.SheetNames[0];
+      const detailName=wb.SheetNames.find(n=>/detail/i.test(n));
+      const summaryRows=XLSX.utils.sheet_to_json(wb.Sheets[summaryName],{defval:''});
+      const detailRows=detailName?XLSX.utils.sheet_to_json(wb.Sheets[detailName],{defval:''}):[];
+      if(!summaryRows.length) return showAlert('report-alert','Could not parse file.','error');
+      previewReport(summaryRows,detailRows);
+    }catch(err){showAlert('report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+// Legacy single-sheet reader -- unused now that handleCsvFile reads both sheets directly,
+// left in place in case anything else ever wants a plain "just sheet 1" parse.
 function parseCsvXlsx(file,cb){
   const r=new FileReader();
   r.onload=e=>{
@@ -2355,7 +2493,107 @@ function deriveRowFields(row,model){
   row.model_payout=row.total_earnings-agencyNet;
 }
 
-function previewReport(rows) {
+// Looks up a field by trying each candidate header name verbatim first, then falling back to
+// a trim+lowercase match against the row's actual keys -- handles the trailing space Infloww
+// puts on "Engagement earnings ratio " and similar header quirks without hardcoding them.
+function getField(row,...names){
+  for(const n of names){ if(row[n]!==undefined && row[n]!=='') return row[n]; }
+  const keys=Object.keys(row);
+  for(const n of names){
+    const target=n.trim().toLowerCase();
+    const found=keys.find(k=>k.trim().toLowerCase()===target);
+    if(found && row[found]!=='') return row[found];
+  }
+  return undefined;
+}
+// Like cleanAmount, but returns null (not 0) for "-" or blank so a genuinely missing average
+// doesn't get silently treated as zero and drag down an aggregate later.
+function numOrNull(val){
+  if(val===undefined||val===null||val==='') return null;
+  const s=String(val).trim();
+  if(s==='-') return null;
+  const n=parseFloat(s.replace(/[$,%]/g,''));
+  return isNaN(n)?null:n;
+}
+function intOrNull(val){ const n=numOrNull(val); return n===null?null:Math.round(n); }
+// "19 days" -> 19 ; "-" -> null
+function parseDaysField(val){
+  if(val===undefined||val===null||val===''||String(val).trim()==='-') return null;
+  const m=String(val).match(/-?\d+(\.\d+)?/);
+  return m?parseFloat(m[0]):null;
+}
+// "24m 28s" -> 24.4667 (decimal minutes) ; "735m 33s" -> 735.55 ; "-" -> null
+function parseReplyTimeMinutes(val){
+  if(val===undefined||val===null||val===''||String(val).trim()==='-') return null;
+  const s=String(val).trim();
+  const m=s.match(/(\d+)m\s*(\d+)s/);
+  if(m) return parseFloat(m[1])+parseFloat(m[2])/60;
+  const mOnly=s.match(/^(\d+(\.\d+)?)m$/);
+  if(mOnly) return parseFloat(mOnly[1]);
+  const num=parseFloat(s);
+  return isNaN(num)?null:num;
+}
+// Every field below exists in both the weekly "Creator Statistics" sheet and the daily
+// "...Detail" sheet with identical headers -- shared so the two parsers below can't drift.
+function extractCreatorStatFields(row){
+  return {
+    subscription_earnings: cleanAmount(getField(row,'Subscription earnings Net')),
+    recurring_subscription_earnings: cleanAmount(getField(row,'Recurring subscription earnings Net')),
+    tips_earnings: cleanAmount(getField(row,'Tips Net')),
+    message_earnings: cleanAmount(getField(row,'Message Net')),
+    streams_earnings: cleanAmount(getField(row,'Streams Net')),
+    posts_earnings: cleanAmount(getField(row,'Posts Net')),
+    refunds: cleanAmount(getField(row,'Refunds Net')),
+    avg_hourly_earnings: numOrNull(getField(row,'Avg hourly earnings Net')),
+    avg_spend_per_spender: numOrNull(getField(row,'Avg spend per spender Net')),
+    avg_spend_per_transaction: numOrNull(getField(row,'Avg spend per transaction Net')),
+    avg_earnings_per_fan: numOrNull(getField(row,'Avg earnings per fan Net')),
+    engagement_earnings_ratio_pct: numOrNull(getField(row,'Engagement earnings ratio')),
+    contribution_pct: numOrNull(getField(row,'Contribution %')),
+    of_ranking_pct: numOrNull(getField(row,'OF ranking')),
+    new_subscriber_conversion_pct: numOrNull(getField(row,'New subscriber conversation','New subscriber conversion')),
+    following: intOrNull(getField(row,'Following')),
+    fans_with_renew_on: intOrNull(getField(row,'Fans with renew on')),
+    profile_visitors: intOrNull(getField(row,'Profile visitors')),
+    guest_profile_visitors: intOrNull(getField(row,'Guest profile visitors')),
+    user_profile_visitors: intOrNull(getField(row,'User profile visitors')),
+    new_subscribers: intOrNull(getField(row,'New subscribers')),
+    subscriber_renewals: intOrNull(getField(row,'Subscriber renewals')),
+    change_in_expired_fans: intOrNull(getField(row,'Change in expired fan count')),
+    number_of_spenders: intOrNull(getField(row,'Number of spenders')),
+    fans_chatted: intOrNull(getField(row,'Fans chatted')),
+    messages_sent: intOrNull(getField(row,'Messages sent')),
+    ppvs_sent: intOrNull(getField(row,'PPVs sent')),
+    avg_subscription_length_days: parseDaysField(getField(row,'Avg subscription length')),
+    reply_time_minutes: parseReplyTimeMinutes(getField(row,'Reply time')),
+  };
+}
+
+var _parsedDailyRows=null;
+// Parses the "Creator Statistics Detail" sheet (one row per creator per day) into rows
+// shaped for the creator_stats_daily table. Kept separate from previewReport's weekly parse
+// since it targets a different table entirely, not just a different view of the same rows.
+function parseDailyCreatorRows(detailRows){
+  return (detailRows||[]).map(row=>{
+    const name=getField(row,'Creator')||'';
+    const dateRaw=getField(row,'Date/Time Australia/Canberra','Date/Time')||'';
+    const statDate=String(dateRaw).trim().split(' ')[0];
+    const {model}=findModelMatch(name);
+    let renewPct=cleanAmount(getField(row,'Renew on %'));
+    if(renewPct>1) renewPct=renewPct/100;
+    return {
+      model_id:model?model.id:null,
+      model_name:model?model.name:name,
+      stat_date:statDate,
+      total_earnings:cleanAmount(getField(row,'Total earnings Net')),
+      renew_pct:renewPct,
+      active_fans:intOrNull(getField(row,'Active fans')),
+      ...extractCreatorStatFields(row),
+    };
+  }).filter(r=>r.stat_date && r.model_name);
+}
+
+function previewReport(rows, detailRows) {
   const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
   const autoDate = parseInflowwDate(firstDate);
   let weekStart = document.getElementById('report-week-start').value || autoDate.start;
@@ -2384,13 +2622,15 @@ function previewReport(rows) {
       total_earnings:earnings,
       renew_pct:renewPct, active_fans:activeFans, new_fans:newFans,
       msg_net:msgNet, tips_net:tipsNet, sub_net:subNet,
-      chatter_wages:0
+      chatter_wages:0,
+      ...extractCreatorStatFields(row),
     };
     deriveRowFields(r,model);
     return r;
   }).filter(r=>r.total_earnings>0||r.raw_name);
 
   _parsedRows=parsed;
+  _parsedDailyRows=parseDailyCreatorRows(detailRows);
   renderReportPreview();
 }
 
@@ -2417,7 +2657,11 @@ function renderReportPreview(){
       <td>${r.active_fans}</td>
     </tr>`;
   });
-  html+=`<tr style="font-weight:700;"><td colspan="2">TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div></div>`;
+  html+=`<tr style="font-weight:700;"><td colspan="2">TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td><td>—</td><td class="profit">$${fmt(totalN)}</td><td>—</td><td>—</td></tr></tbody></table></div>`;
+  const dailyCount=(_parsedDailyRows||[]).length;
+  html+= dailyCount
+    ? `<div style="font-size:11px;color:var(--text2);margin-top:8px;">📅 ${dailyCount} daily rows also detected — will save alongside the weekly summary, powering the day-by-day trend view.</div></div>`
+    : `<div style="font-size:11px;color:var(--text2);margin-top:8px;">No daily "Detail" sheet found in this file — day-by-day trend won't update from this upload.</div></div>`;
   document.getElementById('csv-preview').innerHTML=html;
   const saveBtn=document.getElementById('csv-save');
   if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
@@ -2438,8 +2682,18 @@ async function saveReportRows(){
   const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,raw_name,match_type,...r})=>r);
   const{error}=await sb.from('weekly_reports').insert(all);
   if(error) return showAlert('report-alert',error.message,'error');
-  showAlert('report-alert',`Saved! ${all.length} rows recorded.`,'success');
-  _parsedRows=null;
+  let msg=`Saved! ${all.length} rows recorded.`;
+  // Daily rows (creator_stats_daily) are a bonus, not the primary save -- if this fails,
+  // the weekly summary above is still safely saved, so surface it as a note, not a hard error.
+  const dailyRaw=_parsedDailyRows||[];
+  if(dailyRaw.length){
+    const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+    const dailyRows=dailyRaw.map(r=>({...r, upload_batch_id:batchId}));
+    const{error:dailyError}=await sb.from('creator_stats_daily').insert(dailyRows);
+    msg+= dailyError ? ` (Daily breakdown did not save: ${dailyError.message})` : ` +${dailyRows.length} daily rows.`;
+  }
+  showAlert('report-alert',msg,'success');
+  _parsedRows=null; _parsedDailyRows=null;
   document.getElementById('csv-preview').innerHTML='';
   document.getElementById('csv-save').style.display='none';
   loadCreatorStatsSummary();
