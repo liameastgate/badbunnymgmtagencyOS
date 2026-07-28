@@ -646,6 +646,19 @@
             <div id="hours-alert" class="alert"></div>
           </div>
         </div>
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <div class="card-title" style="margin:0;">📅 Shift Calendar</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="btn btn-sm btn-ghost" onclick="changeRosterCalMonth(-1)">◀</button>
+              <span id="roster-cal-label" style="font-weight:700;min-width:130px;text-align:center;"></span>
+              <button class="btn btn-sm btn-ghost" onclick="changeRosterCalMonth(1)">▶</button>
+              <button class="btn btn-sm btn-ghost" onclick="jumpRosterCalToday()">Today</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin:-6px 0 12px;">Shows each chatter's recurring shift days (set via the Shift Days toggle when adding/editing a chatter) mapped onto this month. Click a name to edit that chatter.</div>
+          <div id="roster-cal-grid"></div>
+        </div>
       </div>
       <div id="chatter-tab-hours" style="display:none;">
         <div class="card" style="max-width:600px;">
@@ -2673,6 +2686,24 @@ function findChatterMatch(name,email){
   return {chatter:null, matchType:'none'};
 }
 
+// Invoices have no chatter_id -- just submitted_by_name/email -- and submitters often type
+// their full name ("Mawell De Luna") where the roster only has a first name ("Mawell"), which
+// findChatterMatch's levenshtein threshold correctly rejects (too many edits to be a typo).
+// This adds a prefix/substring fallback for that specific shape of mismatch, used only for
+// matching invoices to chatters -- kept separate so it doesn't loosen the stricter CSV matching.
+function findChatterMatchLoose(name,email){
+  const strict=findChatterMatch(name,email);
+  if(strict.chatter) return strict;
+  const norm=normalizeName(name);
+  if(!norm) return {chatter:null, matchType:'none'};
+  const candidates=STATE.chatters.filter(c=>{
+    const cn=normalizeName(c.name);
+    return cn && (norm.startsWith(cn) || cn.startsWith(norm));
+  });
+  if(candidates.length===1) return {chatter:candidates[0], matchType:'fuzzy-loose'};
+  return {chatter:null, matchType:'none'};
+}
+
 // Recompute the derived fields (split/mgmt type/agency net/payout) for a parsed
 // row given whichever model is currently selected for it (matched or manually reassigned).
 function deriveRowFields(row,model){
@@ -3282,6 +3313,46 @@ async function loadChatterShifts(){
   STATE.chatterShifts={};
   (data||[]).forEach(s=>{ STATE.chatterShifts[s.chatter_id]=s.working_days||[]; });
   renderChatters();
+  renderRosterCalendar();
+}
+
+// ── Roster shift calendar ───────────────────────────────────
+// Pure visualization of each chatter's recurring weekly shift-day pattern (chatter_shifts.
+// working_days, day-of-week 0-6) mapped onto real dates for the displayed month. No separate
+// per-date schedule is stored -- a chatter set to work "Mon/Wed" shows up on every Monday and
+// Wednesday of whichever month is showing.
+var _rosterCalDate=new Date(); _rosterCalDate.setDate(1);
+const ROSTER_CAL_PALETTE=['#4a9eff','#ff6b6b','#4ade80','#facc15','#c084fc','#fb923c','#22d3ee','#f472b6'];
+function changeRosterCalMonth(delta){ _rosterCalDate.setMonth(_rosterCalDate.getMonth()+delta); renderRosterCalendar(); }
+function jumpRosterCalToday(){ _rosterCalDate=new Date(); _rosterCalDate.setDate(1); renderRosterCalendar(); }
+function renderRosterCalendar(){
+  const grid=document.getElementById('roster-cal-grid'); const label=document.getElementById('roster-cal-label');
+  if(!grid||!label) return;
+  const year=_rosterCalDate.getFullYear(), month=_rosterCalDate.getMonth();
+  label.textContent=_rosterCalDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const today=new Date();
+  const isCurrentMonth=today.getFullYear()===year&&today.getMonth()===month;
+  const firstWeekday=(new Date(year,month,1).getDay()+6)%7; // 0=Mon .. 6=Sun, matches SHIFT_DAY_LABELS order
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const chatterColor=c=>{const i=STATE.chatters.findIndex(x=>x.id===c.id);return ROSTER_CAL_PALETTE[i>=0?i%ROSTER_CAL_PALETTE.length:0];};
+  let cells='';
+  for(let i=0;i<firstWeekday;i++) cells+='<div style="min-height:84px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const weekday=new Date(year,month,d).getDay();
+    const scheduled=STATE.chatters.filter(c=>((STATE.chatterShifts||{})[c.id]||[]).includes(weekday));
+    const isToday=isCurrentMonth&&today.getDate()===d;
+    cells+=`<div style="min-height:84px;background:var(--surface2);border-radius:6px;padding:6px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};">
+      <div style="font-size:11px;font-weight:700;color:${isToday?'var(--accent)':'var(--text2)'};margin-bottom:4px;">${d}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        ${scheduled.map(c=>`<span onclick="editChatter('${c.id}')" style="cursor:pointer;font-size:10px;padding:2px 6px;border-radius:10px;background:${chatterColor(c)}22;color:${chatterColor(c)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Edit ${c.name}">${c.name}</span>`).join('')}
+      </div>
+    </div>`;
+  }
+  const totalCells=firstWeekday+daysInMonth;
+  const trailing=(7-(totalCells%7))%7;
+  for(let i=0;i<trailing;i++) cells+='<div style="min-height:84px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
+  const dayHeaders=SHIFT_DAY_LABELS.map(d=>`<div style="font-size:11px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:6px;">${d.l}</div>`).join('');
+  grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">${dayHeaders}${cells}</div>`;
 }
 function openAddChatterModal(){
   document.getElementById('chatter-modal-title').textContent='Add Chatter';
@@ -3337,12 +3408,12 @@ async function saveChatter(){
     await sb.from('chatter_shifts').upsert({chatter_id:chatterId, working_days:_chatterShiftDays, updated_at:new Date().toISOString()},{onConflict:'chatter_id'});
     STATE.chatterShifts=STATE.chatterShifts||{}; STATE.chatterShifts[chatterId]=_chatterShiftDays.slice();
   }
-  renderChatters();populateChatterDropdown();closeModal('chatter-modal');
+  renderChatters();populateChatterDropdown();renderRosterCalendar();closeModal('chatter-modal');
   document.getElementById('chatter-id').value=''; document.getElementById('chatter-modal-title').textContent='Add Chatter';
   _chatterShiftDays=[]; renderShiftDayToggles();
 }
 
-async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();}
+async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.from('chatters').delete().eq('id',id);STATE.chatters=STATE.chatters.filter(c=>c.id!==id);renderChatters();renderRosterCalendar();}
 
 function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));if(tab==='summary')loadChatterCostSummary();}
 
@@ -3381,14 +3452,16 @@ async function loadChatterCostSummary(){
   if(!startEl||!endEl) return;
   ensureDefaultRange(startEl,endEl);
   const start=startEl.value, end=endEl.value;
-  const[{data:hoursData},{data:cpData},{data:srData}]=await Promise.all([
+  const[{data:hoursData},{data:cpData},{data:srData},{data:invData}]=await Promise.all([
     sb.from('chatter_hours').select('*'),
     sb.from('chatter_performance').select('*'),
     sb.from('sales_records').select('*'),
+    sb.from('invoices').select('*').eq('role','chatter').neq('status','rejected'),
   ]);
   const hoursRows=(hoursData||[]).filter(h=>h.week_of && h.week_of>=start && h.week_of<=end);
   const cpRows=(cpData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
   const srRows=(srData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+  const invRows=(invData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
 
   const map=new Map();
   STATE.chatters.forEach(c=>map.set(c.id, blankCostRow(c.id,c.name,parseFloat(c.hourly_rate||3),parseFloat(c.commission_pct||5))));
@@ -3423,15 +3496,38 @@ async function loadChatterCostSummary(){
     g.salesCount++;
   });
 
+  // Cost should reflect what a chatter actually invoiced, not just the auto-calculated
+  // estimate, whenever they've submitted one for the week -- invoices are ground truth,
+  // uploads/manual hours are a stand-in until one exists. Excludes rejected invoices (those
+  // aren't being paid as submitted); everything else (pending/processing/approved) counts so
+  // the table reflects real submitted amounts, with the status shown in the Source column.
+  const invMap=new Map();
+  invRows.forEach(inv=>{
+    const{chatter}=findChatterMatchLoose(inv.submitted_by_name,inv.submitted_by_email);
+    if(!chatter) return;
+    if(!invMap.has(chatter.id)) invMap.set(chatter.id,{total:0,statuses:[]});
+    const g=invMap.get(chatter.id);
+    g.total+=parseFloat(inv.amount||0);
+    g.statuses.push(inv.status||'pending');
+  });
+
   const rows=[...map.values()]
-    .filter(g=>g.manualCost||g.manualHours||g.scheduledHours||g.revenue||g.salesCount)
+    .filter(g=>g.manualCost||g.manualHours||g.scheduledHours||g.revenue||g.salesCount||invMap.has(g.id))
     .map(g=>{
+      const invoiced=invMap.get(g.id);
       const hasAuto = g.scheduledHours>0 || g.revenue>0;
       const autoCost = hasAuto ? (g.scheduledHours*g.hourlyRate)+(g.revenue*(g.commissionPct/100)) : null;
-      const cost = autoCost!==null ? autoCost : (g.manualCost||null);
-      const source = autoCost!==null
-        ? (g.manualCost>0 ? 'Auto + manual logged' : 'Auto (from uploads)')
-        : (g.manualCost>0 ? 'Manual' : '—');
+      let cost, source;
+      if(invoiced){
+        cost=invoiced.total;
+        source=invoiced.statuses.every(s=>s==='approved') ? 'Invoiced (approved)' : 'Invoiced (pending review)';
+      } else if(autoCost!==null){
+        cost=autoCost;
+        source=g.manualCost>0 ? 'Auto + manual logged' : 'Auto (from uploads)';
+      } else {
+        cost=g.manualCost||null;
+        source=g.manualCost>0 ? 'Manual' : '—';
+      }
       const roi = cost && g.revenue ? g.revenue/cost : null;
       return {...g, autoCost, cost, source, roi,
         avgCvr: g.cvrCount?g.cvrSum/g.cvrCount:null,
