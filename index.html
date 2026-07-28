@@ -463,24 +463,34 @@
         <div id="inv-alert" class="alert"></div>
       </div>
       <div>
-        <div id="invoice-admin-panel" style="display:none;" class="card" style="margin-bottom:14px;">
-          <div class="card-title">All Invoices</div>
+        <div id="invoice-admin-panel" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">Needs Review</div>
           <div id="invoices-sync-alert" class="alert" style="margin-bottom:12px;"></div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week; moving it off Approved removes that synced expense.</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week and moves it down to Processed; rejecting or marking it Processing moves it down too.</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
+            <tbody id="invoices-pending-body"></tbody>
+          </table></div>
+          <div id="invoices-pending-empty" class="empty" style="display:none;"><div class="empty-icon">🎉</div><p>Nothing waiting on review</p></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">Processed Invoices</div>
           <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select>
+            <select id="inv-filter" onchange="filterInvoices()" style="width:160px;"><option value="">All</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select>
             <button class="btn btn-sm btn-ghost" onclick="backfillInvoiceExpenseSync()" title="Catches any already-approved invoices from before this sync existed">🔄 Sync Approved → Expenses</button>
           </div>
           <div class="table-wrap"><table>
             <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Notes</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-body"></tbody>
           </table></div>
-          <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No invoices yet</p></div>
+          <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>Nothing processed yet</p></div>
+        </div>
         </div>
         <div class="card">
           <div class="card-title">My Invoices</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Week</th><th>Amount</th><th>Description</th><th>Status</th><th>Submitted</th></tr></thead>
+            <thead><tr><th>Week</th><th>Amount</th><th>Description</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
             <tbody id="my-invoices-body"></tbody>
           </table></div>
           <div id="my-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
@@ -717,6 +727,61 @@
   </div>
 </div>
 
+<!-- Invoice Edit Modal -->
+<div class="modal-overlay" id="inv-edit-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Edit Invoice</span><button class="modal-close" onclick="closeModal('inv-edit-modal')">✕</button></div>
+    <input type="hidden" id="inv-edit-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Role</label><select id="inv-edit-role"><option value="chatter">Chatter</option><option value="traffic">Traffic Team</option><option value="va">VA / Manager</option></select></div>
+      <div class="form-group"><label>Week From</label><input type="date" id="inv-edit-week-start" onchange="syncInvEditWeek()"></div>
+      <div class="form-group"><label>Week To</label><input type="date" id="inv-edit-week-end"></div>
+      <div class="form-group"><label>Salary Earnings ($)</label><input type="number" id="inv-edit-salary" step="0.01" min="0"></div>
+      <div class="form-group"><label>Commission Earnings ($)</label><input type="number" id="inv-edit-commission" step="0.01" min="0"></div>
+      <div class="form-group full"><label>Description / Notes</label><input type="text" id="inv-edit-desc"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;" id="inv-edit-sync-note"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEditInvoice()">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal('inv-edit-modal')">Cancel</button>
+    </div>
+    <div id="inv-edit-alert" class="alert"></div>
+  </div>
+</div>
+
+<!-- Expense Edit Modal -->
+<div class="modal-overlay" id="exp-edit-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Edit Expense</span><button class="modal-close" onclick="closeModal('exp-edit-modal')">✕</button></div>
+    <input type="hidden" id="exp-edit-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Category</label>
+        <select id="exp-edit-category">
+          <option value="tools">Tools / Software</option>
+          <option value="ads">Ad Spend</option>
+          <option value="staff">Staff / Contractors</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Type</label>
+        <select id="exp-edit-recurring">
+          <option value="false">One-off</option>
+          <option value="true">Recurring</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Amount ($)</label><input type="number" id="exp-edit-amount" step="0.01" min="0"></div>
+      <div class="form-group"><label>Week From</label><input type="date" id="exp-edit-date" onchange="syncExpEditWeek()"></div>
+      <div class="form-group"><label>Week To</label><input type="date" id="exp-edit-date-end"></div>
+      <div class="form-group full"><label>Description</label><input type="text" id="exp-edit-desc"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEditExpense()">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal('exp-edit-modal')">Cancel</button>
+    </div>
+    <div id="exp-edit-alert" class="alert"></div>
+  </div>
+</div>
+
 <script>
 // ── CONFIG ───────────────────────────────────────────────────
 const SUPABASE_URL = 'https://wdppbcmirldkviqxtjml.supabase.co';
@@ -727,6 +792,7 @@ const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
+var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
 var NAV = [
   { id: 'overview',   icon: '🏠', label: 'Overview',        roles: ['admin','va','chatter','traffic'], section: 'Workspace' },
@@ -1722,14 +1788,28 @@ async function renderInvoicePage(){
   // Monday-of-this-week, computed so Sunday (getDay()===0) doesn't roll forward into next week.
   if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
   if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
-  if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderInvoicesTable(STATE.invoices);}
+  if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderPendingInvoices();filterInvoices();}
   renderMyInvoices();
 }
 
+// "Needs Review" — pending invoices only, so approving/rejecting visibly clears them from this list.
+function renderPendingInvoices(){
+  const tbody=document.getElementById('invoices-pending-body'); const empty=document.getElementById('invoices-pending-empty');
+  const invs=STATE.invoices.filter(i=>i.status==='pending');
+  tbody.innerHTML='';
+  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
+  invs.forEach(inv=>{tbody.innerHTML+=invoiceRowHtml(inv);});
+}
+
+// "Processed" — everything that's moved past pending (Approved/Processing/Rejected).
 function renderInvoicesTable(invs){
   const tbody=document.getElementById('invoices-body'); const empty=document.getElementById('invoices-empty'); tbody.innerHTML='';
   if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
-  invs.forEach(inv=>{tbody.innerHTML+=`<tr>
+  invs.forEach(inv=>{tbody.innerHTML+=invoiceRowHtml(inv);});
+}
+
+function invoiceRowHtml(inv){
+  return `<tr>
     <td>${inv.submitted_by_name}</td>
     <td><span class="badge ${inv.role}">${inv.role}</span></td>
     <td style="white-space:nowrap;">${fmtDate(inv.week_of)}</td>
@@ -1739,20 +1819,26 @@ function renderInvoicesTable(invs){
     <td>${inv.invoice_file_url?`<a href="${inv.invoice_file_url}" target="_blank" class="btn btn-sm btn-ghost">📄 View</a>`:'—'}</td>
     <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.description||'—'}</td>
     <td><span class="badge ${inv.status}">${inv.status}</span></td>
-    <td style="display:flex;gap:4px;">
+    <td style="display:flex;gap:4px;flex-wrap:wrap;">
       <button class="btn btn-sm btn-green" onclick="updateInvoice('${inv.id}','approved')">✓</button>
       <button class="btn btn-sm btn-ghost" onclick="updateInvoice('${inv.id}','processing')">⏳</button>
       <button class="btn btn-sm btn-danger" onclick="updateInvoice('${inv.id}','rejected')">✕</button>
-    </td></tr>`;});
+      <button class="btn btn-sm btn-ghost" onclick="editInvoice('${inv.id}')">✏</button>
+    </td></tr>`;
 }
 
-function filterInvoices(){const s=document.getElementById('inv-filter').value;renderInvoicesTable(s?STATE.invoices.filter(i=>i.status===s):STATE.invoices);}
+function filterInvoices(){
+  const s=document.getElementById('inv-filter').value;
+  const processed=STATE.invoices.filter(i=>i.status!=='pending');
+  renderInvoicesTable(s?processed.filter(i=>i.status===s):processed);
+}
 
 async function renderMyInvoices(){
   const{data}=await sb.from('invoices').select('*').eq('submitted_by_email',STATE.profile.email).order('created_at',{ascending:false});
+  MY_INVOICES_DATA=data||[];
   const tbody=document.getElementById('my-invoices-body'); const empty=document.getElementById('my-invoices-empty'); tbody.innerHTML='';
   if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
-  data.forEach(inv=>{tbody.innerHTML+=`<tr><td>${fmtDate(inv.week_of)}</td><td>$${fmt(inv.amount)}</td><td>${inv.description||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(inv.created_at)}</td></tr>`;});
+  data.forEach(inv=>{tbody.innerHTML+=`<tr><td>${fmtDate(inv.week_of)}</td><td>$${fmt(inv.amount)}</td><td>${inv.description||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(inv.created_at)}</td><td>${inv.status==='pending'?`<button class="btn btn-sm btn-ghost" onclick="editInvoice('${inv.id}')">✏</button>`:''}</td></tr>`;});
 }
 
 // Invoice file helpers
@@ -1834,8 +1920,75 @@ async function submitInvoice(){
 async function updateInvoice(id,status){
   const{error}=await sb.from('invoices').update({status}).eq('id',id);
   if(error) return showAlert('invoices-sync-alert',error.message,'error');
-  const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status; filterInvoices();
+  const inv=STATE.invoices.find(i=>i.id===id); if(inv)inv.status=status;
+  // Refresh both tables — a status change moves the row from Needs Review into (or out of) Processed.
+  renderPendingInvoices(); filterInvoices();
   if(inv) await syncInvoiceToExpense(inv,status);
+}
+
+function syncInvEditWeek(){
+  const start=document.getElementById('inv-edit-week-start').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('inv-edit-week-end').value=d.toISOString().split('T')[0];
+}
+
+// Admins can edit any invoice regardless of status; a submitter can only edit their own
+// while it's still Pending (enforced by which rows show the Edit button in the first place).
+function editInvoice(id){
+  const inv=STATE.invoices.find(x=>x.id===id)||MY_INVOICES_DATA.find(x=>x.id===id);
+  if(!inv)return;
+  document.getElementById('inv-edit-id').value=inv.id;
+  document.getElementById('inv-edit-role').value=inv.role||'chatter';
+  document.getElementById('inv-edit-week-start').value=inv.week_of||'';
+  document.getElementById('inv-edit-week-end').value=inv.week_end||'';
+  document.getElementById('inv-edit-salary').value=inv.salary_amount||0;
+  document.getElementById('inv-edit-commission').value=inv.commission_amount||0;
+  document.getElementById('inv-edit-desc').value=inv.description||'';
+  document.getElementById('inv-edit-sync-note').textContent=inv.status==='approved'
+    ?'This invoice is already Approved — saving will also update its linked expense to match.'
+    :'';
+  document.getElementById('inv-edit-alert').style.display='none';
+  openModal('inv-edit-modal');
+}
+
+async function saveEditInvoice(){
+  const id=document.getElementById('inv-edit-id').value;
+  const salary=parseFloat(document.getElementById('inv-edit-salary').value||0);
+  const commission=parseFloat(document.getElementById('inv-edit-commission').value||0);
+  const weekStart=document.getElementById('inv-edit-week-start').value;
+  const weekEnd=document.getElementById('inv-edit-week-end').value;
+  if(!weekStart||(salary+commission)===0) return showAlert('inv-edit-alert','Fill in a week start and at least one earnings amount.','error');
+  const updates={
+    role:document.getElementById('inv-edit-role').value,
+    week_of:weekStart, week_end:weekEnd||null,
+    salary_amount:salary, commission_amount:commission, amount:salary+commission,
+    description:document.getElementById('inv-edit-desc').value.trim()
+  };
+  const{data,error}=await sb.from('invoices').update(updates).eq('id',id).select().single();
+  if(error) return showAlert('inv-edit-alert',error.message,'error');
+  const inv=STATE.invoices.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
+  const myInv=MY_INVOICES_DATA.find(i=>i.id===id); if(myInv) Object.assign(myInv,updates);
+  renderPendingInvoices(); filterInvoices(); renderMyInvoices();
+  closeModal('inv-edit-modal');
+  // Keep a linked expense's amount/dates/description in step if this invoice is already approved.
+  if(data&&data.status==='approved') await resyncApprovedInvoiceExpense(data);
+}
+
+// Updates (rather than recreates) the expense already linked to an approved invoice, so editing
+// the invoice afterward doesn't leave a stale amount/date sitting in Expenses / Net Profit.
+async function resyncApprovedInvoiceExpense(inv){
+  try{
+    const roleLabel=ROLE_LABELS[inv.role]||inv.role;
+    const desc=`Invoice — ${inv.submitted_by_name||inv.submitted_by_email} (${roleLabel})${inv.description?': '+inv.description:''}`;
+    const{error}=await sb.from('expenses').update({
+      amount:inv.amount, description:desc, expense_date:inv.week_of, week_end:inv.week_end||null
+    }).eq('source_invoice_id',inv.id);
+    if(error) throw error;
+    if(document.getElementById('page-expenses')?.classList.contains('active')) loadExpenses();
+  }catch(e){
+    showAlert('invoices-sync-alert','Invoice updated, but its linked expense could not be re-synced: '+e.message,'error');
+  }
 }
 
 // Keeps Expenses in sync with invoice approvals: approving an invoice logs its total as a
@@ -2011,13 +2164,16 @@ function renderExpenses(data){
   data.forEach(e=>{
     const dateRange=e.week_end&&e.week_end!==e.expense_date?`${fmtDate(e.expense_date)} – ${fmtDate(e.week_end)}`:fmtDate(e.expense_date);
     const syncedBadge=e.source_invoice_id?`<span title="Auto-created from an approved invoice" style="margin-left:6px;font-size:10px;color:var(--accent2);">🔗 Invoice</span>`:'';
+    const editBtn=e.source_invoice_id
+      ?`<span title="Auto-created from an invoice — edit the invoice instead" style="color:var(--text2);font-size:11px;cursor:not-allowed;">✏</span>`
+      :`<button class="btn btn-sm btn-ghost" onclick="editExpense('${e.id}')">✏</button>`;
     tbody.innerHTML+=`<tr>
       <td style="white-space:nowrap;">${dateRange}</td>
       <td>${EXP_LABELS[e.category]||e.category}</td>
       <td>${e.description||'—'}${syncedBadge}</td>
       <td class="loss">$${fmt(e.amount)}</td>
       <td><span class="badge ${e.is_recurring?'processing':'pending'}">${e.is_recurring?'Recurring':'One-off'}</span></td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">✕</button></td>
+      <td style="display:flex;gap:4px;">${editBtn}<button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">✕</button></td>
     </tr>`;
   });
 }
@@ -2054,6 +2210,48 @@ async function deleteExpense(id){
   EXPENSES_DATA=EXPENSES_DATA.filter(e=>e.id!==id);
   filterExpenses();
   renderExpenseSummary();
+}
+
+function syncExpEditWeek(){
+  const start=document.getElementById('exp-edit-date').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('exp-edit-date-end').value=d.toISOString().split('T')[0];
+}
+
+// Only manually-added expenses are editable here — ones synced from an invoice (source_invoice_id
+// set) should be corrected by editing the invoice itself, so the two stay consistent.
+function editExpense(id){
+  const e=EXPENSES_DATA.find(x=>x.id===id); if(!e||e.source_invoice_id)return;
+  document.getElementById('exp-edit-id').value=e.id;
+  document.getElementById('exp-edit-category').value=e.category||'other';
+  document.getElementById('exp-edit-recurring').value=e.is_recurring?'true':'false';
+  document.getElementById('exp-edit-amount').value=e.amount||0;
+  document.getElementById('exp-edit-date').value=e.expense_date||'';
+  document.getElementById('exp-edit-date-end').value=e.week_end||'';
+  document.getElementById('exp-edit-desc').value=e.description||'';
+  document.getElementById('exp-edit-alert').style.display='none';
+  openModal('exp-edit-modal');
+}
+
+async function saveEditExpense(){
+  const id=document.getElementById('exp-edit-id').value;
+  const amount=parseFloat(document.getElementById('exp-edit-amount').value||0);
+  const desc=document.getElementById('exp-edit-desc').value.trim();
+  if(!amount||!desc) return showAlert('exp-edit-alert','Amount and description required.','error');
+  const updates={
+    category:document.getElementById('exp-edit-category').value,
+    is_recurring:document.getElementById('exp-edit-recurring').value==='true',
+    amount, description:desc,
+    expense_date:document.getElementById('exp-edit-date').value||new Date().toISOString().split('T')[0],
+    week_end:document.getElementById('exp-edit-date-end').value||null
+  };
+  const{error}=await sb.from('expenses').update(updates).eq('id',id);
+  if(error) return showAlert('exp-edit-alert',error.message,'error');
+  const e=EXPENSES_DATA.find(x=>x.id===id); if(e) Object.assign(e,updates);
+  filterExpenses();
+  renderExpenseSummary();
+  closeModal('exp-edit-modal');
 }
 
 // ── Model Sheets ─────────────────────────────────────────────
