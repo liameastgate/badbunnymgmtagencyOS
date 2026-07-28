@@ -304,6 +304,7 @@
       <div class="tabs">
         <div class="tab active" onclick="switchReportTab('upload')">Creator Stats</div>
         <div class="tab" onclick="switchReportTab('chatters')">Chatter Performance</div>
+        <div class="tab" onclick="switchReportTab('sales')">Sales Records</div>
         <div class="tab" onclick="switchReportTab('history')">History</div>
       </div>
 
@@ -340,6 +341,32 @@
         </div>
         <div id="chatter-report-alert" class="alert"></div>
         <div id="chatter-csv-preview" style="margin-top:14px;"></div>
+      </div>
+
+      <!-- Sales Records Upload (tab) -->
+      <div id="report-tab-sales" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Sales Records</div>
+          <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">Upload the Infloww "Sales record" export — every individual sale for the period, with the chatter who earned it where attributed</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="sales-week-start"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="sales-week-end"></div>
+          </div>
+          <div class="file-drop" onclick="document.getElementById('sales-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleSalesCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Sales Record CSV/XLSX</p>
+          </div>
+          <input type="file" id="sales-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleSalesCsvFile(this.files[0])">
+        </div>
+        <div id="sales-alert" class="alert"></div>
+        <div id="sales-preview" style="margin-top:14px;"></div>
+        <div id="sales-save" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="saveSalesRecords()">💾 Save Sales Records</button>
+        </div>
+        <div style="margin-top:24px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
+        <div id="sales-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div id="sales-history-groups" style="margin-top:10px;"></div>
+        <div id="sales-history-empty" class="empty" style="display:none;"><div class="empty-icon">💰</div><p>No sales records uploaded yet</p></div>
       </div>
 
       <!-- History -->
@@ -1359,12 +1386,14 @@ async function saveEditOrder() {
 
 // ── Reports ──────────────────────────────────────────────────
 function switchReportTab(tab) {
-  document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active',
-    (i===0&&tab==='upload')||(i===1&&tab==='chatters')||(i===2&&tab==='history')));
+  const order=['upload','chatters','sales','history'];
+  document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('report-tab-upload').style.display=tab==='upload'?'block':'none';
   document.getElementById('report-tab-chatters').style.display=tab==='chatters'?'block':'none';
+  document.getElementById('report-tab-sales').style.display=tab==='sales'?'block':'none';
   document.getElementById('report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='history') loadReportHistory();
+  if(tab==='sales') loadSalesHistory();
 }
 
 // ── Creator Stats handlers ────────────────────────────────────
@@ -1495,6 +1524,29 @@ function findModelMatch(name){
     return {model:candidates[0].model, matchType:'fuzzy'};
   }
   return {model:null, matchType:'none'};
+}
+
+// Same idea as findModelMatch but for chatters, tried by email first (most reliable) then by
+// fuzzy name. A blank name/email means the sale was never attributed to anyone (e.g. Infloww
+// leaves Subscriptions "Unassigned" by default) — that's a distinct, expected case, not a
+// failed match, so callers should treat matchType 'unassigned' as normal rather than an error.
+function findChatterMatch(name,email){
+  const normEmail=(email||'').trim().toLowerCase();
+  if(normEmail){
+    const exact=STATE.chatters.find(c=>(c.email||'').trim().toLowerCase()===normEmail);
+    if(exact) return {chatter:exact, matchType:'exact'};
+  }
+  const norm=normalizeName(name);
+  if(!norm) return {chatter:null, matchType:'unassigned'};
+  const exactName=STATE.chatters.find(c=>normalizeName(c.name)===norm);
+  if(exactName) return {chatter:exactName, matchType:'exact'};
+  const threshold=Math.min(3,Math.max(1,Math.ceil(norm.length*0.34)));
+  const candidates=STATE.chatters.map(c=>({chatter:c,dist:levenshtein(norm,normalizeName(c.name))}))
+    .filter(c=>c.dist<=threshold).sort((a,b)=>a.dist-b.dist);
+  if(candidates.length===1||(candidates.length>1&&candidates[0].dist<candidates[1].dist)){
+    return {chatter:candidates[0].chatter, matchType:'fuzzy'};
+  }
+  return {chatter:null, matchType:'none'};
 }
 
 // Recompute the derived fields (split/mgmt type/agency net/payout) for a parsed
@@ -1665,6 +1717,222 @@ async function deleteReportGroup(ids,label){
   if(!data||!data.length) return showAlert('report-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the weekly_reports table — ask Claude for the SQL to add one.','error');
   showAlert('report-history-alert',`Deleted ${data.length} row${data.length!==1?'s':''}.`,'success');
   loadReportHistory();
+}
+
+// ── Sales Records ────────────────────────────────────────────
+// Handles the Infloww "Sales record" export: one row per individual sale, with the
+// chatter who earned it (when Infloww attributed one) and the model it was sold under.
+var _parsedSales=null;
+
+function handleSalesCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleSalesCsvFile(e.dataTransfer.files[0]);}
+function handleSalesCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length)return showAlert('sales-alert','Could not parse file.','error');
+      previewSales(rows);
+    }catch(err){showAlert('sales-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+
+function extractDateOnly(raw){ return raw?String(raw).trim().split(' ')[0]:''; }
+
+function previewSales(rows){
+  const dateKey=r=>r['Date & time Australia/Canberra']||r['Date/Time Australia/Canberra']||r['Date/Time']||r['Date']||'';
+  const validRows=rows.filter(r=>dateKey(r));
+  if(!validRows.length) return showAlert('sales-alert','No valid rows found — expected a "Date & time" column like the Infloww Sales record export.','error');
+
+  const dates=validRows.map(r=>extractDateOnly(dateKey(r))).filter(Boolean).sort();
+  const autoStart=dates[0]||''; const autoEnd=dates[dates.length-1]||'';
+  const wkStartEl=document.getElementById('sales-week-start'); const wkEndEl=document.getElementById('sales-week-end');
+  if(autoStart && !wkStartEl.value) wkStartEl.value=autoStart;
+  if(autoEnd && !wkEndEl.value) wkEndEl.value=autoEnd;
+  const weekStart=wkStartEl.value||autoStart; const weekEnd=wkEndEl.value||autoEnd;
+
+  _parsedSales=validRows.map(row=>{
+    const employeeName=String(row['Employee']||'').trim();
+    const employeeEmail=String(row['Email']||'').trim();
+    const modelNameRaw=String(row['Creator']||row['Model']||'').trim();
+    const fanName=String(row['Fan']||'').trim();
+    const fanId=String(row['Fan ID']||row['Fan Id']||'').trim();
+    const earnings=cleanAmount(row['Earnings']);
+    const gross=cleanAmount(row['Gross revenue']||row['Gross Revenue']);
+    const net=cleanAmount(row['Net revenue']||row['Net Revenue']);
+    const saleType=String(row['Type']||'').trim();
+    const rule=String(row['Rule']||'').trim();
+    const status=String(row['Status']||'').trim();
+
+    const {model, matchType:modelMatchType}=findModelMatch(modelNameRaw);
+    const {chatter, matchType:chatterMatchType}=findChatterMatch(employeeName, employeeEmail);
+
+    return {
+      sale_date:dateKey(row), week_of:weekStart, week_end:weekEnd,
+      chatter_id:chatter?chatter.id:null, chatter_name:employeeName, chatter_email:employeeEmail, chatter_match_type:chatterMatchType,
+      model_id:model?model.id:null, model_name:modelNameRaw, model_match_type:modelMatchType,
+      fan_name:fanName, fan_id:fanId,
+      earnings, gross_revenue:gross, net_revenue:net,
+      sale_type:saleType, rule, status
+    };
+  });
+  renderSalesPreview();
+}
+
+function renderSalesPreview(){
+  const parsed=_parsedSales||[];
+  const totalGross=parsed.reduce((s,r)=>s+r.gross_revenue,0);
+  const totalNet=parsed.reduce((s,r)=>s+r.net_revenue,0);
+  const totalEarnings=parsed.reduce((s,r)=>s+r.earnings,0);
+  const unassignedCount=parsed.filter(r=>!r.chatter_name).length;
+  const needsReviewCount=parsed.filter(r=>r.chatter_name && r.chatter_match_type==='none').length;
+
+  // Per-chatter rollup — skip rows with no employee name at all (normal for Subscriptions,
+  // which Infloww leaves Unassigned by default rather than crediting a specific chatter).
+  const chatterMap=new Map();
+  parsed.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name));
+    if(!chatterMap.has(key)) chatterMap.set(key,{name:r.chatter_name, chatter_id:r.chatter_id, match_type:r.chatter_match_type, count:0, earnings:0, gross:0, net:0});
+    const g=chatterMap.get(key);
+    g.count++; g.earnings+=r.earnings; g.gross+=r.gross_revenue; g.net+=r.net_revenue;
+  });
+
+  const chatterOptions=selectedId=>`<option value=""${!selectedId?' selected':''}>— Unmatched —</option>`+
+    STATE.chatters.map(c=>`<option value="${c.id}"${c.id===selectedId?' selected':''}>${c.name}</option>`).join('');
+
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} sales · ${document.getElementById('sales-week-start').value} to ${document.getElementById('sales-week-end').value}</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;">
+      <div>Gross: <strong>$${fmt(totalGross)}</strong></div>
+      <div>Net: <strong>$${fmt(totalNet)}</strong></div>
+      <div>Chatter Earnings: <strong class="profit">$${fmt(totalEarnings)}</strong></div>
+      <div style="color:var(--text2);">${unassignedCount} sale${unassignedCount!==1?'s':''} with no chatter attribution (normal for Subscriptions)</div>
+      ${needsReviewCount?`<div style="color:var(--red);font-weight:700;">${needsReviewCount} sale${needsReviewCount!==1?'s':''} named a chatter we couldn't match — reassign below</div>`:''}
+    </div>
+    <div style="font-size:12px;color:var(--text2);font-weight:700;margin-bottom:6px;">By Chatter</div>
+    <div class="table-wrap"><table><thead><tr><th>Chatter</th><th>Sales</th><th>Earnings</th><th>Gross</th><th>Net</th><th></th></tr></thead><tbody>`;
+
+  chatterMap.forEach((g,key)=>{
+    const badge=g.match_type==='exact'?'':
+      g.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
+      `<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr>
+      <td><strong>${g.name}</strong>${badge}</td>
+      <td>${g.count}</td>
+      <td class="profit">$${fmt(g.earnings)}</td>
+      <td>$${fmt(g.gross)}</td>
+      <td>$${fmt(g.net)}</td>
+      <td><select onchange="reassignSalesChatter('${key}',this.value)" style="width:150px;font-size:12px;">${chatterOptions(g.chatter_id)}</select></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // Per-model rollup, read-only — reuses the same fuzzy matching Creator Stats already relies on.
+  const modelMap=new Map();
+  parsed.forEach(r=>{
+    const key=r.model_id||('raw:'+normalizeName(r.model_name||''));
+    if(!modelMap.has(key)) modelMap.set(key,{name:r.model_name||'(unknown)', match_type:r.model_match_type, count:0, gross:0, net:0});
+    const g=modelMap.get(key); g.count++; g.gross+=r.gross_revenue; g.net+=r.net_revenue;
+  });
+  html+=`<div style="margin-top:16px;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:6px;">By Model</div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Sales</th><th>Gross</th><th>Net</th></tr></thead><tbody>`;
+  modelMap.forEach(g=>{
+    const badge=g.match_type==='exact'?'':g.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;">~ fuzzy</span>`:`<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr><td><strong>${g.name}</strong>${badge}</td><td>${g.count}</td><td>$${fmt(g.gross)}</td><td>$${fmt(g.net)}</td></tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+
+  document.getElementById('sales-preview').innerHTML=html;
+  const saveBtn=document.getElementById('sales-save');
+  if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
+}
+
+// Reassigns every parsed sale for a given chatter rollup key to a different chatter (or back to
+// unmatched) — done at the rollup level rather than per individual sale row, since a single
+// upload can carry 100+ line items and re-picking a chatter once should apply to all of theirs.
+function reassignSalesChatter(key,chatterId){
+  const chatter=chatterId?STATE.chatters.find(c=>c.id===chatterId):null;
+  (_parsedSales||[]).forEach(r=>{
+    if(!r.chatter_name) return;
+    const rKey=r.chatter_id||('raw:'+normalizeName(r.chatter_name));
+    if(rKey===key){ r.chatter_id=chatter?chatter.id:null; r.chatter_match_type=chatter?'manual':'none'; }
+  });
+  renderSalesPreview();
+}
+
+async function saveSalesRecords(){
+  const raw=_parsedSales||[];
+  if(!raw.length) return showAlert('sales-alert','No data to save.','error');
+  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
+  const{error}=await sb.from('sales_records').insert(rows);
+  if(error) return showAlert('sales-alert',error.message,'error');
+  showAlert('sales-alert',`Saved! ${rows.length} sales recorded.`,'success');
+  _parsedSales=null;
+  document.getElementById('sales-preview').innerHTML='';
+  document.getElementById('sales-save').style.display='none';
+  document.getElementById('sales-csv-input').value='';
+  loadSalesHistory();
+}
+
+async function loadSalesHistory(){
+  const{data}=await sb.from('sales_records').select('*').order('week_of',{ascending:false});
+  const container=document.getElementById('sales-history-groups'); const empty=document.getElementById('sales-history-empty');
+  if(!container) return;
+  container.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+
+  // Group by upload batch (not just week) so re-uploads/corrections for the same week
+  // stay distinct and can each be deleted independently.
+  const groups=new Map();
+  data.forEach(r=>{
+    const key=r.upload_batch_id||('legacy:'+r.week_of+'|'+r.week_end);
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(r);
+  });
+
+  groups.forEach((rows,key)=>{
+    const wStart=rows[0].week_of, wEnd=rows[0].week_end;
+    const label=wEnd?`${fmtDate(wStart)} – ${fmtDate(wEnd)}`:fmtDate(wStart);
+    const totalGross=rows.reduce((s,r)=>s+parseFloat(r.gross_revenue||0),0);
+    const totalNet=rows.reduce((s,r)=>s+parseFloat(r.net_revenue||0),0);
+    const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+    const idsAttr=JSON.stringify(rows.map(r=>r.id)).replace(/"/g,"'");
+    const gid='sgrp-'+key.replace(/[^a-z0-9]/gi,'_');
+
+    const wrap=document.createElement('div');
+    wrap.className='card'; wrap.style.marginBottom='10px';
+    wrap.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div onclick="toggleHistoryGroup('${gid}')" style="cursor:pointer;user-select:none;flex:1;">
+          <span style="font-weight:700;font-size:14px;color:#fff;">${label}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">${rows.length} sale${rows.length!==1?'s':''}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Gross: <strong style="color:#fff;">$${fmt(totalGross)}</strong></span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Net: <strong style="color:#fff;">$${fmt(totalNet)}</strong></span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Chatter Earnings: <strong style="color:var(--accent2);">$${fmt(totalEarnings)}</strong></span>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteSalesGroup(${idsAttr},'${label.replace(/'/g,"\\'")}')">✕ Delete Upload</button>
+        <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;">▼</span>
+      </div>
+      <div id="${gid}" style="display:none;margin-top:14px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Chatter</th><th>Model</th><th>Fan</th><th>Type</th><th>Earnings</th><th>Gross</th><th>Net</th></tr></thead>
+          <tbody>${rows.map(r=>`<tr><td style="white-space:nowrap;font-size:11px;">${r.sale_date?String(r.sale_date).split(' ')[0]:''}</td><td>${r.chatter_name||'—'}</td><td>${r.model_name||'—'}</td><td style="font-size:11px;color:var(--text2);">${r.fan_name||'—'}</td><td style="font-size:11px;">${r.sale_type||'—'}</td><td>$${fmt(r.earnings)}</td><td>$${fmt(r.gross_revenue)}</td><td>$${fmt(r.net_revenue)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    container.appendChild(wrap);
+  });
+}
+
+async function deleteSalesGroup(ids,label){
+  if(!ids||!ids.length)return;
+  if(!confirm(`Delete all ${ids.length} sale${ids.length!==1?'s':''} for ${label||'this upload'}? This cannot be undone.`))return;
+  const{data,error}=await sb.from('sales_records').delete().in('id',ids).select();
+  if(error) return showAlert('sales-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('sales-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the sales_records table — ask Claude for the SQL to add one.','error');
+  showAlert('sales-history-alert',`Deleted ${data.length} sale${data.length!==1?'s':''}.`,'success');
+  loadSalesHistory();
 }
 
 function toggleHistoryGroup(gid){
