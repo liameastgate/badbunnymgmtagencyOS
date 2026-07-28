@@ -321,6 +321,34 @@
       </div>
     </div>
 
+    <!-- Content Ideas -->
+    <div class="page" id="page-ideas">
+      <div class="page-title">Content Ideas</div>
+      <div class="page-sub">Trending formats and hooks by niche — auto-refreshed weekly, source-linked</div>
+      <div id="ideas-admin-panel" style="display:none;">
+        <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openIdeaModal()">➕ Add Idea</button></div>
+      </div>
+      <div class="card">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="idea-filter-niche" onchange="filterContentIdeas()" style="width:180px;"><option value="">All Niches</option></select>
+          <select id="idea-filter-status" onchange="filterContentIdeas()" style="width:160px;">
+            <option value="">All Statuses</option>
+            <option value="new">New</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="used">Used</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+          <select id="idea-sort" onchange="filterContentIdeas()" style="width:170px;">
+            <option value="date_desc">Newest first</option>
+            <option value="date_asc">Oldest first</option>
+            <option value="niche">Niche (A–Z)</option>
+          </select>
+        </div>
+        <div id="ideas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
+        <div id="ideas-empty" class="empty" style="display:none;"><div class="empty-icon">💡</div><p>No content ideas yet — check back after the next weekly refresh, or add one manually</p></div>
+      </div>
+    </div>
+
     <!-- Weekly Reports -->
     <div class="page" id="page-reports">
       <div class="page-title">Weekly Reports</div>
@@ -460,7 +488,7 @@
           <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
           <div class="card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Split %</th><th>Chatters</th><th>Sheet</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Niche</th><th>Split %</th><th>Chatters</th><th>Sheet</th><th></th></tr></thead>
               <tbody id="models-body"></tbody>
             </table></div>
             <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
@@ -780,6 +808,8 @@
       <div class="form-group"><label>Status</label><select id="model-platform"><option>Active</option><option>Onboarding</option><option>Paused</option><option>Offboarded</option></select></div>
       <div class="form-group"><label>Management Type</label><select id="model-mgmt-type"><option value="full_scale">Full Scale</option><option value="chatting">Chatting</option></select></div>
       <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
+      <div class="form-group"><label>Niche</label><input type="text" id="model-niche" placeholder="e.g. Fitness, Cosplay, Gaming" list="niche-suggestions"></div>
+      <datalist id="niche-suggestions"></datalist>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
       <div class="form-group full"><label>Google Drive Link</label><input type="url" id="model-drive" placeholder="https://drive.google.com/..."></div>
@@ -788,6 +818,26 @@
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
       <button class="btn btn-ghost" onclick="closeModal('model-modal')">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- Content Idea Modal -->
+<div class="modal-overlay" id="idea-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Add Content Idea</span><button class="modal-close" onclick="closeModal('idea-modal')">✕</button></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Niche</label><input type="text" id="idea-niche" placeholder="e.g. Fitness" list="niche-suggestions"></div>
+      <div class="form-group"><label>Source</label><select id="idea-source"><option value="manual">Manual</option><option value="web_search">Web Search</option><option value="metricool_hashtag">Metricool — Hashtag</option><option value="metricool_top_post">Metricool — Top Post</option></select></div>
+      <div class="form-group full"><label>Title</label><input type="text" id="idea-title" placeholder="e.g. POV get-ready-with-me + trending audio"></div>
+      <div class="form-group full"><label>Description</label><textarea id="idea-desc" placeholder="Why it's working, format notes, hook..."></textarea></div>
+      <div class="form-group full"><label>Source Link (optional)</label><input type="url" id="idea-url" placeholder="https://..."></div>
+      <div class="form-group full"><label>Hashtags (optional)</label><input type="text" id="idea-hashtags" placeholder="#fitness, #gym"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveContentIdea()">💾 Save Idea</button>
+      <button class="btn btn-ghost" onclick="closeModal('idea-modal')">Cancel</button>
+    </div>
+    <div id="idea-alert" class="alert"></div>
   </div>
 </div>
 
@@ -893,7 +943,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [] };
+var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [] };
 var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
 var NAV = [
@@ -902,6 +952,7 @@ var NAV = [
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'],         section: null },
   { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'],                             section: null },
   { id: 'content',    icon: '📹', label: 'Content Orders',  roles: ['admin','va','model'],                     section: 'Operations' },
+  { id: 'ideas',      icon: '💡', label: 'Content Ideas',   roles: ['admin','va','model'],                     section: null },
   { id: 'reports',    icon: '📊', label: 'Weekly Reports',  roles: ['admin','va'],                             section: null },
   { id: 'models',     icon: '👤', label: 'Model Settings',  roles: ['admin','va'],                             section: null },
   { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',    roles: ['admin','va'],                             section: null },
@@ -990,6 +1041,7 @@ function navigate(page) {
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') loadChatterWeeks();
   if (page === 'reports') loadReportsOverview();
+  if (page === 'ideas') loadContentIdeas();
 }
 
 function switchAuthTab(tab) {
@@ -1907,7 +1959,7 @@ function overlaps(rowStart,rowEnd,filterStart,filterEnd){
 // Strips accents/punctuation/case so "Chloé", "CHLOE", "chloe " etc all line up.
 function normalizeName(s){
   return String(s||'')
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .normalize('NFKD').replace(/[̀-ͯ]/g,'')
     .toLowerCase().replace(/[^a-z0-9]/g,'').trim();
 }
 function levenshtein(a,b){
@@ -2366,7 +2418,7 @@ function toggleHistoryGroup(gid){
 function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
-  STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<a href="${pdfUrl}" target="_blank" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</a>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
+  STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td style="color:var(--text2);font-size:12px;">${m.niche||'—'}</td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<a href="${pdfUrl}" target="_blank" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</a>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
   // Quick stats panel
   const statsEl=document.getElementById('models-stats-body');
   if(statsEl){
@@ -2393,13 +2445,14 @@ function editModel(id){
   document.getElementById('model-of').value=m.of_account||''; document.getElementById('model-platform').value=m.platform||'Active';
   document.getElementById('model-mgmt-type').value=m.mgmt_type||'full_scale';
   document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
+  document.getElementById('model-niche').value=m.niche||'';
   document.getElementById('model-email').value=m.email||'';
   document.getElementById('model-drive').value=m.drive_link||''; openModal('model-modal');
 }
 
 async function saveModel(){
   const id=document.getElementById('model-id').value;
-  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null};
+  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null,niche:document.getElementById('model-niche').value.trim()||null};
   if(!p.name)return alert('Name required');
   if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
   else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
@@ -3127,6 +3180,112 @@ async function addSOP(){
 async function updateSOPTitle(id,val){await sb.from('sops').update({title:val}).eq('id',id);}
 async function updateSOPContent(id,val){await sb.from('sops').update({content:val}).eq('id',id);}
 async function deleteSOP(id){if(!confirm('Delete this SOP?'))return;await sb.from('sops').delete().eq('id',id);loadSOPs();}
+
+// ── Content Ideas ─────────────────────────────────────────────
+const IDEA_STATUS_BADGE={new:'pending',reviewed:'processing',used:'approved',dismissed:'rejected'};
+const IDEA_SOURCE_LABEL={web_search:'🔎 Web Search',metricool_hashtag:'📈 Metricool — Hashtag',metricool_top_post:'📈 Metricool — Top Post',manual:'✍️ Manual'};
+
+async function loadContentIdeas(){
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  const panel=document.getElementById('ideas-admin-panel'); if(panel) panel.style.display=isAdmin?'block':'none';
+  const{data,error}=await sb.from('content_ideas').select('*').order('created_at',{ascending:false});
+  if(error){console.error('loadContentIdeas',error);return;}
+  STATE.contentIdeas=data||[];
+  populateIdeaNicheFilter();
+  filterContentIdeas();
+}
+
+function populateIdeaNicheFilter(){
+  const sel=document.getElementById('idea-filter-niche'); if(!sel)return;
+  const cur=sel.value;
+  const niches=[...new Set([
+    ...STATE.contentIdeas.map(i=>i.niche).filter(Boolean),
+    ...STATE.models.map(m=>m.niche).filter(Boolean)
+  ])].sort();
+  sel.innerHTML='<option value="">All Niches</option>'+niches.map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.value=cur;
+}
+
+function filterContentIdeas(){
+  const niche=document.getElementById('idea-filter-niche')?.value||'';
+  const status=document.getElementById('idea-filter-status')?.value||'';
+  const sort=document.getElementById('idea-sort')?.value||'date_desc';
+  let rows=STATE.contentIdeas.slice();
+  if(niche) rows=rows.filter(i=>i.niche===niche);
+  if(status) rows=rows.filter(i=>i.status===status);
+  if(sort==='date_asc') rows.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  else if(sort==='niche') rows.sort((a,b)=>(a.niche||'').localeCompare(b.niche||''));
+  else rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  renderContentIdeas(rows);
+}
+
+function renderContentIdeas(rows){
+  const grid=document.getElementById('ideas-grid'); const empty=document.getElementById('ideas-empty');
+  if(!grid)return;
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  if(!rows.length){grid.innerHTML='';if(empty)empty.style.display='block';return;} if(empty)empty.style.display='none';
+  grid.innerHTML=rows.map(i=>`
+    <div class="card" style="margin:0;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:0.04em;">${i.niche||'General'}</span>
+        <span class="badge ${IDEA_STATUS_BADGE[i.status]||'pending'}">${i.status}</span>
+      </div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${i.title}</div>
+      ${i.description?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px;white-space:pre-wrap;">${i.description}</div>`:''}
+      ${i.hashtags?`<div style="font-size:11px;color:var(--accent);margin-bottom:10px;">${i.hashtags}</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text2);margin-bottom:10px;">
+        <span>${IDEA_SOURCE_LABEL[i.source]||i.source||'—'}</span>
+        <span>${fmtDate(i.created_at)}</span>
+      </div>
+      ${i.source_url?`<a href="${i.source_url}" target="_blank" class="btn btn-sm btn-ghost" style="margin-bottom:10px;display:inline-block;">🔗 View Source</a>`:''}
+      ${isAdmin?`
+      <div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px;">
+        <select onchange="updateIdeaStatus('${i.id}',this.value)" style="flex:1;font-size:12px;">
+          <option value="new" ${i.status==='new'?'selected':''}>New</option>
+          <option value="reviewed" ${i.status==='reviewed'?'selected':''}>Reviewed</option>
+          <option value="used" ${i.status==='used'?'selected':''}>Used</option>
+          <option value="dismissed" ${i.status==='dismissed'?'selected':''}>Dismissed</option>
+        </select>
+        <button class="btn btn-sm btn-danger" onclick="deleteContentIdea('${i.id}')">✕</button>
+      </div>`:''}
+    </div>
+  `).join('');
+}
+
+function openIdeaModal(){
+  document.getElementById('idea-alert').textContent='';
+  document.getElementById('idea-niche').value='';
+  document.getElementById('idea-title').value='';
+  document.getElementById('idea-desc').value='';
+  document.getElementById('idea-url').value='';
+  document.getElementById('idea-hashtags').value='';
+  document.getElementById('idea-source').value='manual';
+  openModal('idea-modal');
+}
+
+async function saveContentIdea(){
+  const niche=document.getElementById('idea-niche').value.trim();
+  const title=document.getElementById('idea-title').value.trim();
+  if(!niche||!title){document.getElementById('idea-alert').textContent='Niche and title are required';return;}
+  const p={niche,title,description:document.getElementById('idea-desc').value.trim()||null,source:document.getElementById('idea-source').value,source_url:document.getElementById('idea-url').value.trim()||null,hashtags:document.getElementById('idea-hashtags').value.trim()||null,status:'new'};
+  const{data,error}=await sb.from('content_ideas').insert(p).select().single();
+  if(error){document.getElementById('idea-alert').textContent='Could not save — check permissions.';return;}
+  STATE.contentIdeas.unshift(data); populateIdeaNicheFilter(); filterContentIdeas(); closeModal('idea-modal');
+}
+
+async function updateIdeaStatus(id,status){
+  const{error}=await sb.from('content_ideas').update({status}).eq('id',id);
+  if(error){alert('Could not update status — you may be missing write permission.');return;}
+  const i=STATE.contentIdeas.findIndex(x=>x.id===id); if(i>-1) STATE.contentIdeas[i].status=status;
+  filterContentIdeas();
+}
+
+async function deleteContentIdea(id){
+  if(!confirm('Delete this content idea?'))return;
+  const{error,data}=await sb.from('content_ideas').delete().eq('id',id).select();
+  if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_ideas table.');return;}
+  STATE.contentIdeas=STATE.contentIdeas.filter(x=>x.id!==id); filterContentIdeas();
+}
 
 // ── Management / KPIs ─────────────────────────────────────────
 async function loadManagement(){
