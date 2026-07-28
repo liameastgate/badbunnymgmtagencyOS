@@ -1646,14 +1646,49 @@ async function loadReportsOverview(){
     ? sortedCreators.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td>$${fmt(r.total_earnings)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`).join('')
     : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No creator stats for this period</td></tr>';
 
-  // Chatter Performance breakdown — from chatter_performance
+  // Chatter Performance breakdown — rolled up one row per chatter. The underlying export has
+  // one row per chatter per day/session, so a single week can carry 10+ raw rows per chatter;
+  // summing/averaging those into one row keeps this readable, matching how the Leaderboard and
+  // Creator Earnings tables above are already aggregated rather than listing every raw row.
   const perfBody=document.getElementById('wro-chatter-performance');
   const perfEmpty=document.getElementById('wro-perf-empty');
-  if(perfRows.length){
+  const perfMap=new Map();
+  perfRows.forEach(r=>{
+    const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+    if(!perfMap.has(key)) perfMap.set(key,{name:r.chatter_name||'(unknown)', models:new Set(), entries:0, sales:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, hoursSum:0});
+    const g=perfMap.get(key);
+    g.entries++;
+    g.sales+=parseFloat(r.sales||0);
+    const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);
+    if(!isNaN(dmsNum)) g.dms+=dmsNum;
+    // Parse directly with parseFloat rather than cleanAmount here — cleanAmount falls back to 0
+    // for anything unparseable (e.g. "-"), which would silently count a missing value as 0%
+    // and drag the average down. parseFloat correctly returns NaN for those so they're skipped.
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(cvrNum)){ g.cvrSum+=cvrNum; g.cvrCount++; }
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(goldenNum)){ g.goldenSum+=goldenNum; g.goldenCount++; }
+    const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(hoursNum)) g.hoursSum+=hoursNum;
+    (r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[]).forEach(m=>g.models.add(m));
+  });
+  const perfList=[...perfMap.values()].sort((a,b)=>b.sales-a.sales);
+  if(perfList.length){
     perfEmpty.style.display='none';
-    perfBody.innerHTML=perfRows.map(r=>{
-      const creatorList=r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[];
-      return `<tr><td><strong>${r.chatter_name}</strong></td><td>${creatorList.length?creatorList.length+' model'+(creatorList.length>1?'s':''):'—'}</td><td class="profit">$${fmt(r.sales)}</td><td>${r.dms_sent||'—'}</td><td>${r.fan_cvr||'—'}</td><td>${r.golden_ratio||'—'}</td><td>$${fmt(r.sales_per_hour)}</td></tr>`;
+    perfBody.innerHTML=perfList.map(g=>{
+      const modelsLabel=g.models.size?`${g.models.size} model${g.models.size>1?'s':''}`:'—';
+      const avgCvr=g.cvrCount?(g.cvrSum/g.cvrCount):null;
+      const avgGolden=g.goldenCount?(g.goldenSum/g.goldenCount):null;
+      const salesPerHr=g.hoursSum>0?(g.sales/g.hoursSum):0;
+      return `<tr>
+        <td><strong>${g.name}</strong> <span style="color:var(--text2);font-size:11px;">(${g.entries} entr${g.entries!==1?'ies':'y'})</span></td>
+        <td>${modelsLabel}</td>
+        <td class="profit">$${fmt(g.sales)}</td>
+        <td>${g.dms||'—'}</td>
+        <td>${avgCvr!==null?avgCvr.toFixed(2)+'%':'—'}</td>
+        <td>${avgGolden!==null?avgGolden.toFixed(2)+'%':'—'}</td>
+        <td>$${fmt(salesPerHr)}</td>
+      </tr>`;
     }).join('');
   } else {
     perfBody.innerHTML='';
