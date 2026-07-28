@@ -506,6 +506,24 @@
             <tbody id="cp-sum-table"></tbody>
           </table></div>
           <div id="cp-sum-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No chatter performance data for this period yet</p></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Sales Mix</div>
+              <div id="cp-sum-revenue-mix"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Engagement Funnel</div>
+              <div id="cp-sum-funnel"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Sales by Chatter</div>
+            <div id="cp-sum-chatterchart"></div>
+          </div>
+
+          <div class="stats-grid" id="cp-sum-quality"></div>
         </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="color:var(--accent2);">Employee Performance</div>
@@ -656,7 +674,7 @@
               <button class="btn btn-sm btn-ghost" onclick="jumpRosterCalToday()">Today</button>
             </div>
           </div>
-          <div style="font-size:11px;color:var(--text2);margin:-6px 0 12px;">Shows each chatter's recurring shift days (set via the Shift Days toggle when adding/editing a chatter) mapped onto this month. Click a name to edit that chatter.</div>
+          <div style="font-size:11px;color:var(--text2);margin:-6px 0 12px;">Add each chatter's shift manually — click the + on a day. All times are AEST. Click an existing entry to edit or remove it.</div>
           <div id="roster-cal-grid"></div>
         </div>
       </div>
@@ -856,6 +874,7 @@
       <div class="page-sub">Click a model to view their info sheet</div>
       <div style="display:flex;gap:16px;align-items:flex-start;">
         <div style="width:180px;flex-shrink:0;">
+          <button id="sheets-add-model-btn" class="btn btn-primary btn-sm" style="width:100%;margin-bottom:10px;display:none;" onclick="openModal('model-modal')">➕ Add Model</button>
           <div id="sheets-model-list" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
         <div style="flex:1;">
@@ -1016,6 +1035,26 @@
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveChatter()">💾 Save</button>
       <button class="btn btn-ghost" onclick="closeModal('chatter-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shift Entry Modal -->
+<div class="modal-overlay" id="shift-entry-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="shift-entry-modal-title">Add Shift</span><button class="modal-close" onclick="closeModal('shift-entry-modal')">✕</button></div>
+    <input type="hidden" id="shift-entry-id">
+    <div class="form-grid">
+      <div class="form-group full"><label>Date</label><input type="date" id="shift-entry-date"></div>
+      <div class="form-group full"><label>Chatter</label><select id="shift-entry-chatter"></select></div>
+      <div class="form-group"><label>Start Time (AEST)</label><input type="time" id="shift-entry-start"></div>
+      <div class="form-group"><label>End Time (AEST)</label><input type="time" id="shift-entry-end"></div>
+      <div class="form-group full"><label>Note (optional)</label><input type="text" id="shift-entry-note" placeholder="e.g. covering for Elle"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveShiftEntry()">💾 Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('shift-entry-modal')">Cancel</button>
+      <button id="shift-entry-delete-btn" class="btn btn-danger" style="display:none;margin-left:auto;" onclick="deleteShiftEntryFromModal()">🗑️ Delete</button>
     </div>
   </div>
 </div>
@@ -1182,7 +1221,7 @@ function navigate(page) {
   if (page === 'sops') loadSOPs();
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
-  if (page === 'chatters') loadChatterShifts();
+  if (page === 'chatters') { loadChatterShifts(); loadRosterShiftEntries(); }
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -1456,16 +1495,14 @@ function populateModelDropdowns() {
   // Drive link banners
   const bannerEl=document.getElementById('co-drive-banners');
   if(bannerEl){
-    const withLinks=visibleModels.filter(m=>m.drive_link||STATE.modelSheetPdfs?.[m.id]);
-    bannerEl.innerHTML=withLinks.map(m=>{
-      const pdfUrl=STATE.modelSheetPdfs?.[m.id];
-      return `
+    // Info Sheet PDF link intentionally excluded here — Model Sheets is the correct home for
+    // that, this banner is just for the Drive link content is actually uploaded to.
+    const withLinks=visibleModels.filter(m=>m.drive_link);
+    bannerEl.innerHTML=withLinks.map(m=>`
       <div style="display:flex;align-items:center;gap:10px;background:rgba(30,79,255,0.08);border:1px solid rgba(30,79,255,0.2);border-radius:8px;padding:10px 14px;flex-wrap:wrap;">
         <span style="font-size:12px;font-weight:700;color:var(--text2);min-width:80px;">${m.name}</span>
-        ${m.drive_link?`<a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>`:''}
-        ${pdfUrl?`<a href="${pdfUrl}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📄 Info Sheet ↗</a>`:''}
-      </div>`;
-    }).join('');
+        <a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>
+      </div>`).join('');
   }
 }
 
@@ -2186,19 +2223,22 @@ async function loadChatterPerfSummary(){
 
   const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
   const activeChatters=new Set(rows.map(r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||'')))).size;
-  let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0;
+  let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0,unlockSum=0,unlockCount=0;
   rows.forEach(r=>{
     const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
     if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
     const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
     if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
+    const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(unlockNum)){unlockSum+=unlockNum;unlockCount++;}
   });
 
   document.getElementById('cp-sum-stats').innerHTML=
     statCard('Total Sales','$'+fmt(totalSales),'white','purple')+
     statCard('Active Chatters',activeChatters,'','')+
     statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'\u2014','accent','blue')+
-    statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'\u2014','accent','green');
+    statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'\u2014','accent','green')+
+    statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'\u2014','accent','purple');
 
   // Rolled up one row per chatter -- identical logic to the combined Overview tab's
   // chatter performance breakdown (see loadReportsOverview below), duplicated here so this
@@ -2247,6 +2287,87 @@ async function loadChatterPerfSummary(){
     body.innerHTML='';
     empty.style.display='block';
   }
+
+  renderChatterSalesMix(rows);
+  renderChatterFunnel(rows);
+  renderChatterBarChart(perfList);
+  renderChatterQualityStats({cvrSum,cvrCount,goldenSum,goldenCount,unlockSum,unlockCount},rows);
+}
+
+// Same visual pattern as the Creator Stats deep-dive (renderRevenueMixBar/renderFanFunnel/
+// renderDayOfWeekChart/renderQualityStats) applied to chatter_performance instead -- pure CSS,
+// no charting library, so it matches the rest of the app.
+function renderChatterSalesMix(rows){
+  const segments=[
+    {label:'PPV Sales', key:'ppv_sales', color:'#facc15'},
+    {label:'Tips', key:'tips', color:'#4ade80'},
+  ];
+  const ppvTotal=rows.reduce((s,r)=>s+parseFloat(r.ppv_sales||0),0);
+  const tipsTotal=rows.reduce((s,r)=>s+parseFloat(r.tips||0),0);
+  const salesTotal=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const otherTotal=Math.max(0,salesTotal-ppvTotal-tipsTotal);
+  const totals=[...segments.map(s=>({...s,total:s.key==='ppv_sales'?ppvTotal:tipsTotal})),{label:'Other Sales',color:'#6b8fff',total:otherTotal}];
+  const grandTotal=totals.reduce((s,t)=>s+t.total,0);
+  const el=document.getElementById('cp-sum-revenue-mix'); if(!el) return;
+  if(!grandTotal){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No sales data for this period</div>'; return; }
+  const visible=totals.filter(t=>t.total>0);
+  const bar=visible.map(t=>`<div style="width:${(t.total/grandTotal*100).toFixed(2)}%;background:${t.color};height:100%;" title="${t.label}: $${fmt(t.total)}"></div>`).join('');
+  const legend=visible.map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block;flex-shrink:0;"></span>${t.label}: $${fmt(t.total)} (${(t.total/grandTotal*100).toFixed(1)}%)</div>`).join('');
+  el.innerHTML=`<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;">${bar}</div><div style="display:flex;flex-direction:column;gap:4px;">${legend}</div>`;
+}
+
+// DMs Sent -> Fans Chatted -> PPVs Unlocked: the closest thing chatter_performance has to a
+// conversion funnel (there's no per-sale row here the way sales_records has, just weekly
+// per-chatter totals).
+function renderChatterFunnel(rows){
+  const parseCount=(val)=>{const n=parseInt(String(val||'').replace(/[^0-9.-]/g,''),10);return isNaN(n)?0:n;};
+  const steps=[
+    {label:'DMs Sent', value:rows.reduce((s,r)=>s+parseCount(r.dms_sent),0)},
+    {label:'Fans Chatted', value:rows.reduce((s,r)=>s+parseCount(r.fans_chatted),0)},
+    {label:'PPVs Unlocked', value:rows.reduce((s,r)=>s+parseCount(r.ppvs_unlocked),0)},
+  ];
+  const el=document.getElementById('cp-sum-funnel'); if(!el) return;
+  const max=Math.max(1,...steps.map(s=>s.value));
+  el.innerHTML=steps.map((s,i)=>{
+    const pct=(s.value/max*100).toFixed(1);
+    const conv = i>0 && steps[i-1].value>0 ? ` <span style="color:var(--text2);">(${(s.value/steps[i-1].value*100).toFixed(1)}% of prev)</span>` : '';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span>${s.label}</span><span><strong>${s.value.toLocaleString()}</strong>${conv}</span></div>
+      <div style="background:var(--surface2);border-radius:4px;height:10px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--accent);"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// Ranked bar chart of sales by chatter, capped to the top 8 so it stays readable when the
+// roster is large -- the full breakdown is already in the table above this.
+function renderChatterBarChart(perfList){
+  const el=document.getElementById('cp-sum-chatterchart'); if(!el) return;
+  if(!perfList.length){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No chatter performance data for this period</div>'; return; }
+  const top=perfList.slice(0,8);
+  const max=Math.max(1,...top.map(g=>g.sales));
+  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:8px;height:120px;">`+
+    top.map(g=>{
+      const h=(g.sales/max*100).toFixed(1);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">$${fmt(g.sales)}</div>
+        <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;height:${h}%;min-height:2px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${g.name}</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+function renderChatterQualityStats(agg,rows){
+  const el=document.getElementById('cp-sum-quality'); if(!el) return;
+  const totalDms=rows.reduce((s,r)=>{const n=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);return s+(isNaN(n)?0:n);},0);
+  const totalHours=rows.reduce((s,r)=>{const n=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());return s+(isNaN(n)?0:n);},0);
+  const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const salesPerHr=totalHours>0?totalSales/totalHours:null;
+  el.innerHTML=
+    statCard('Avg Fan CVR',agg.cvrCount?(agg.cvrSum/agg.cvrCount).toFixed(2)+'%':'—','','blue')+
+    statCard('Avg Golden Ratio',agg.goldenCount?(agg.goldenSum/agg.goldenCount).toFixed(2)+'%':'—','','green')+
+    statCard('Avg Unlock Ratio',agg.unlockCount?(agg.unlockSum/agg.unlockCount).toFixed(2)+'%':'—','','purple')+
+    statCard('Sales/Hr',salesPerHr!==null?'$'+fmt(salesPerHr):'—','accent','blue')+
+    statCard('Total DMs Sent',totalDms||'—','accent','');
 }
 function setChatterPerfSummaryPeriod(kind){
   const{start,end}=computePeriodRange(kind);
@@ -2421,19 +2542,25 @@ function previewChatterReport(rows) {
   if(!weekStart) return showAlert('chatter-report-alert','Could not detect date range — please select a Week From manually.','error');
 
   _parsedChatterPerf=rows.map(row=>{
-    const name=String(row['Employees']||row['Employee']||'').trim();
-    const models=String(row['Creators']||'').trim();
-    const sales=cleanAmount(row['Sales']||0);
-    const ppv=cleanAmount(row['PPV sales']||row['PPV Sales']||0);
-    const tips=cleanAmount(row['Tips']||0);
-    const dms=row['Direct messages sent']||row['DMs sent']||'';
-    const fans=row['Fans chatted']||'';
-    const cvr=row['Fan CVR']||'';
-    const golden=row['Golden ratio']||row['Golden Ratio']||'';
-    const unlockRate=row['Unlock rate']||row['Unlock Rate']||'';
-    const ppvsUnlocked=row['PPVs unlocked']||row['PPVs Unlocked']||'';
-    const hours=row['Scheduled hours']||row['Scheduled Hours']||'';
-    const sph=cleanAmount(row['Sales per hour']||row['Sales Per Hour']||0);
+    // getField() trims/lowercases and tries each candidate name against the row's actual
+    // keys, not just an exact bracket match -- a plain row['Unlock rate']||row['Unlock Rate']
+    // silently returns '' forever if Infloww's real header differs by so much as a trailing
+    // space or a word (e.g. "PPV unlock rate"), which is exactly what happened here: Golden
+    // Ratio populated fine but Unlock Ratio came back empty on every upload. A few plausible
+    // header spellings are listed so this keeps working even if the export wording drifts.
+    const name=String(getField(row,'Employees','Employee')||'').trim();
+    const models=String(getField(row,'Creators')||'').trim();
+    const sales=cleanAmount(getField(row,'Sales')||0);
+    const ppv=cleanAmount(getField(row,'PPV sales','PPV Sales')||0);
+    const tips=cleanAmount(getField(row,'Tips')||0);
+    const dms=getField(row,'Direct messages sent','DMs sent')||'';
+    const fans=getField(row,'Fans chatted')||'';
+    const cvr=getField(row,'Fan CVR')||'';
+    const golden=getField(row,'Golden ratio','Golden Ratio')||'';
+    const unlockRate=getField(row,'Unlock rate','Unlock Rate','PPV unlock rate','PPV Unlock Rate','Unlocked rate','Unlock %','Unlock ratio','Unlock Ratio')||'';
+    const ppvsUnlocked=getField(row,'PPVs unlocked','PPVs Unlocked','PPV unlocked','PPV Unlocked')||'';
+    const hours=getField(row,'Scheduled hours','Scheduled Hours')||'';
+    const sph=cleanAmount(getField(row,'Sales per hour','Sales Per Hour')||0);
     const {chatter, matchType}=findChatterMatch(name,'');
     return {
       week_of:weekStart, week_end:weekEnd||null,
@@ -3270,6 +3397,9 @@ async function saveModel(){
   else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
   renderModels();populateModelDropdowns();closeModal('model-modal');
   document.getElementById('model-id').value=''; document.getElementById('model-modal-title').textContent='Add Model';
+  // Model Sheets lists STATE.models directly, so a model added there needs an immediate
+  // refresh rather than waiting for the next time the page is opened.
+  if(document.getElementById('page-sheets')?.classList.contains('active')) loadModelSheets();
 }
 
 async function delModel(id){
@@ -3317,14 +3447,35 @@ async function loadChatterShifts(){
 }
 
 // ── Roster shift calendar ───────────────────────────────────
-// Pure visualization of each chatter's recurring weekly shift-day pattern (chatter_shifts.
-// working_days, day-of-week 0-6) mapped onto real dates for the displayed month. No separate
-// per-date schedule is stored -- a chatter set to work "Mon/Wed" shows up on every Monday and
-// Wednesday of whichever month is showing.
+// Fully manual: every cell is empty until someone adds an entry. Replaces the earlier
+// recurring-weekday-pattern version entirely (per Liam) -- entries are tied to an exact date
+// with an exact start/end time (always AEST, the agency's working timezone), not a repeating
+// day-of-week rule, so covering a shift or a one-off doesn't require editing a chatter's
+// permanent pattern.
 var _rosterCalDate=new Date(); _rosterCalDate.setDate(1);
+var _rosterShiftEntries=[];
 const ROSTER_CAL_PALETTE=['#4a9eff','#ff6b6b','#4ade80','#facc15','#c084fc','#fb923c','#22d3ee','#f472b6'];
-function changeRosterCalMonth(delta){ _rosterCalDate.setMonth(_rosterCalDate.getMonth()+delta); renderRosterCalendar(); }
-function jumpRosterCalToday(){ _rosterCalDate=new Date(); _rosterCalDate.setDate(1); renderRosterCalendar(); }
+function changeRosterCalMonth(delta){ _rosterCalDate.setMonth(_rosterCalDate.getMonth()+delta); loadRosterShiftEntries(); }
+function jumpRosterCalToday(){ _rosterCalDate=new Date(); _rosterCalDate.setDate(1); loadRosterShiftEntries(); }
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+async function loadRosterShiftEntries(){
+  const year=_rosterCalDate.getFullYear(), month=_rosterCalDate.getMonth();
+  const rangeStart=ymd(new Date(year,month,1)), rangeEnd=ymd(new Date(year,month+1,0));
+  const{data,error}=await sb.from('chatter_shift_entries').select('*').gte('shift_date',rangeStart).lte('shift_date',rangeEnd).order('start_time');
+  if(error){ console.error('loadRosterShiftEntries',error); return; }
+  _rosterShiftEntries=data||[];
+  renderRosterCalendar();
+}
+// "14:30" -> "2:30 PM". Falls back to the raw value if it's not a normal HH:MM time (e.g. null).
+function formatTime12h(t){
+  if(!t) return '';
+  const[h,m]=t.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)) return t;
+  const period=h>=12?'PM':'AM';
+  const h12=h%12===0?12:h%12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+function chatterColorById(id){const i=STATE.chatters.findIndex(x=>x.id===id);return ROSTER_CAL_PALETTE[i>=0?i%ROSTER_CAL_PALETTE.length:0];}
 function renderRosterCalendar(){
   const grid=document.getElementById('roster-cal-grid'); const label=document.getElementById('roster-cal-label');
   if(!grid||!label) return;
@@ -3332,27 +3483,90 @@ function renderRosterCalendar(){
   label.textContent=_rosterCalDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const today=new Date();
   const isCurrentMonth=today.getFullYear()===year&&today.getMonth()===month;
-  const firstWeekday=(new Date(year,month,1).getDay()+6)%7; // 0=Mon .. 6=Sun, matches SHIFT_DAY_LABELS order
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  const firstWeekday=(new Date(year,month,1).getDay()+6)%7; // 0=Mon .. 6=Sun
   const daysInMonth=new Date(year,month+1,0).getDate();
-  const chatterColor=c=>{const i=STATE.chatters.findIndex(x=>x.id===c.id);return ROSTER_CAL_PALETTE[i>=0?i%ROSTER_CAL_PALETTE.length:0];};
+  const entriesByDate=new Map();
+  _rosterShiftEntries.forEach(e=>{
+    if(!entriesByDate.has(e.shift_date)) entriesByDate.set(e.shift_date,[]);
+    entriesByDate.get(e.shift_date).push(e);
+  });
   let cells='';
-  for(let i=0;i<firstWeekday;i++) cells+='<div style="min-height:84px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
+  for(let i=0;i<firstWeekday;i++) cells+='<div style="min-height:110px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
   for(let d=1;d<=daysInMonth;d++){
-    const weekday=new Date(year,month,d).getDay();
-    const scheduled=STATE.chatters.filter(c=>((STATE.chatterShifts||{})[c.id]||[]).includes(weekday));
+    const dateStr=ymd(new Date(year,month,d));
+    const dayEntries=entriesByDate.get(dateStr)||[];
     const isToday=isCurrentMonth&&today.getDate()===d;
-    cells+=`<div style="min-height:84px;background:var(--surface2);border-radius:6px;padding:6px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};">
-      <div style="font-size:11px;font-weight:700;color:${isToday?'var(--accent)':'var(--text2)'};margin-bottom:4px;">${d}</div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        ${scheduled.map(c=>`<span onclick="editChatter('${c.id}')" style="cursor:pointer;font-size:10px;padding:2px 6px;border-radius:10px;background:${chatterColor(c)}22;color:${chatterColor(c)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Edit ${c.name}">${c.name}</span>`).join('')}
+    cells+=`<div style="min-height:110px;background:var(--surface2);border-radius:6px;padding:6px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:11px;font-weight:700;color:${isToday?'var(--accent)':'var(--text2)'};">${d}</span>
+        ${isAdmin?`<button onclick="openAddShiftEntry('${dateStr}')" title="Add shift" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;font-weight:700;padding:0 2px;line-height:1;">+</button>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
+        ${dayEntries.map(e=>{
+          const color=chatterColorById(e.chatter_id);
+          const timeLabel=e.start_time?`${formatTime12h(e.start_time)}${e.end_time?'–'+formatTime12h(e.end_time):''} AEST`:'';
+          return `<div onclick="${isAdmin?`editShiftEntry('${e.id}')`:''}" style="cursor:${isAdmin?'pointer':'default'};font-size:10px;padding:3px 6px;border-radius:6px;background:${color}22;color:${color};" title="${isAdmin?'Click to edit/delete':''}">
+            <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.chatter_name}</div>
+            ${timeLabel?`<div style="opacity:0.85;">${timeLabel}</div>`:''}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
   }
   const totalCells=firstWeekday+daysInMonth;
   const trailing=(7-(totalCells%7))%7;
-  for(let i=0;i<trailing;i++) cells+='<div style="min-height:84px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
+  for(let i=0;i<trailing;i++) cells+='<div style="min-height:110px;background:var(--surface2);border-radius:6px;opacity:0.4;"></div>';
   const dayHeaders=SHIFT_DAY_LABELS.map(d=>`<div style="font-size:11px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:6px;">${d.l}</div>`).join('');
   grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">${dayHeaders}${cells}</div>`;
+}
+function openAddShiftEntry(dateStr){
+  document.getElementById('shift-entry-modal-title').textContent='Add Shift';
+  document.getElementById('shift-entry-id').value='';
+  document.getElementById('shift-entry-date').value=dateStr;
+  document.getElementById('shift-entry-chatter').innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('shift-entry-start').value='';
+  document.getElementById('shift-entry-end').value='';
+  document.getElementById('shift-entry-note').value='';
+  document.getElementById('shift-entry-delete-btn').style.display='none';
+  openModal('shift-entry-modal');
+}
+function editShiftEntry(id){
+  const e=_rosterShiftEntries.find(x=>x.id===id); if(!e)return;
+  document.getElementById('shift-entry-modal-title').textContent='Edit Shift';
+  document.getElementById('shift-entry-id').value=e.id;
+  document.getElementById('shift-entry-date').value=e.shift_date;
+  document.getElementById('shift-entry-chatter').innerHTML=STATE.chatters.map(c=>`<option value="${c.id}"${c.id===e.chatter_id?' selected':''}>${c.name}</option>`).join('');
+  document.getElementById('shift-entry-start').value=e.start_time||'';
+  document.getElementById('shift-entry-end').value=e.end_time||'';
+  document.getElementById('shift-entry-note').value=e.note||'';
+  document.getElementById('shift-entry-delete-btn').style.display='inline-block';
+  openModal('shift-entry-modal');
+}
+async function saveShiftEntry(){
+  const id=document.getElementById('shift-entry-id').value;
+  const chatterId=document.getElementById('shift-entry-chatter').value;
+  const chatter=STATE.chatters.find(c=>c.id===chatterId);
+  if(!chatter) return alert('Select a chatter.');
+  const dateVal=document.getElementById('shift-entry-date').value;
+  if(!dateVal) return alert('Date required.');
+  const p={
+    chatter_id:chatterId, chatter_name:chatter.name, shift_date:dateVal,
+    start_time:document.getElementById('shift-entry-start').value||null,
+    end_time:document.getElementById('shift-entry-end').value||null,
+    note:document.getElementById('shift-entry-note').value.trim()||null,
+  };
+  const{error}=id ? await sb.from('chatter_shift_entries').update(p).eq('id',id) : await sb.from('chatter_shift_entries').insert(p);
+  if(error) return alert('Could not save shift: '+error.message);
+  closeModal('shift-entry-modal');
+  loadRosterShiftEntries();
+}
+async function deleteShiftEntryFromModal(){
+  const id=document.getElementById('shift-entry-id').value; if(!id)return;
+  if(!confirm('Remove this shift entry?'))return;
+  await sb.from('chatter_shift_entries').delete().eq('id',id);
+  closeModal('shift-entry-modal');
+  loadRosterShiftEntries();
 }
 function openAddChatterModal(){
   document.getElementById('chatter-modal-title').textContent='Add Chatter';
@@ -4094,8 +4308,10 @@ async function saveEditExpense(){
 
 // ── Model Sheets ─────────────────────────────────────────────
 async function loadModelSheets(){
+  const addBtn=document.getElementById('sheets-add-model-btn');
+  if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
   const list=document.getElementById('sheets-model-list'); list.innerHTML='';
-  if(!STATE.models.length){document.getElementById('sheets-content').innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No models added yet</p></div>';return;}
+  if(!STATE.models.length){document.getElementById('sheets-content').innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No models added yet — use + Add Model to create one</p></div>';return;}
   // Preserve whichever model's sheet was open (e.g. re-navigating to this page)
   // instead of always jumping back to the first model.
   const prevModelId=window._currentSheetModelId;
@@ -4228,8 +4444,10 @@ function renderSOPNav(isAdmin){
   });
 }
 
+var _sopPdfDataUrl=null;
 function openSOP(id){
   CURRENT_SOP_ID=id;
+  _sopPdfDataUrl=null;
   const sop=SOPS_DATA.find(s=>s.id===id);
   if(!sop)return;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
@@ -4244,20 +4462,47 @@ function openSOP(id){
           onfocus="this.style.borderBottomColor='var(--accent)'" onblur="this.style.borderBottomColor='transparent'">`
       :`<div style="font-size:26px;font-weight:800;margin-bottom:20px;">${sop.title}</div>`}
     ${isAdmin
+      ?`<div class="card" style="margin-bottom:16px;">
+          <div class="card-title">Attached PDF (optional)</div>
+          <div class="form-group">
+            <label>Upload PDF File</label>
+            <input type="file" id="sop-pdf-file" accept=".pdf,application/pdf" onchange="handleSopPdfFile(this.files[0])">
+            <div id="sop-pdf-filename" style="font-size:11px;color:var(--text2);margin-top:4px;">${sop.pdf_url?'A PDF is attached — choose a new file to replace it.':''}</div>
+          </div>
+          ${sop.pdf_url?`<div style="display:flex;gap:8px;"><a href="${sop.pdf_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Attached PDF</a><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
+        </div>`
+      :sop.pdf_url?`<div class="btn-row" style="margin-bottom:16px;"><a href="${sop.pdf_url}" target="_blank" class="btn btn-ghost">📄 View Attached PDF</a></div>`:''}
+    ${isAdmin
       ?`<textarea id="sop-content-input" style="width:100%;min-height:500px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:14px;line-height:1.8;color:var(--text);resize:vertical;font-family:inherit;">${(sop.content||'').replace(/</g,'&lt;')}</textarea>
          <div class="btn-row"><button class="btn btn-primary" onclick="saveSOP('${sop.id}')">💾 Save</button></div>`
       :`<div style="white-space:pre-wrap;font-size:14px;line-height:1.8;color:var(--text2);">${sop.content||'No content yet.'}</div>`}
   </div>`;
 }
+function handleSopPdfFile(file){
+  if(!file)return;
+  readPdfFile(file,(dataUrl,name)=>{
+    _sopPdfDataUrl=dataUrl;
+    const label=document.getElementById('sop-pdf-filename'); if(label)label.textContent=`Ready to upload: ${name}`;
+  });
+}
+async function clearSopPdf(id){
+  if(!confirm('Remove the attached PDF from this SOP?'))return;
+  await sb.from('sops').update({pdf_url:null}).eq('id',id);
+  const sop=SOPS_DATA.find(s=>s.id===id); if(sop)sop.pdf_url=null;
+  openSOP(id);
+}
 
 async function saveSOP(id){
   const title=document.getElementById('sop-title-input')?.value||'';
   const content=document.getElementById('sop-content-input')?.value||'';
-  await sb.from('sops').update({title,content}).eq('id',id);
+  const updates={title,content};
+  if(_sopPdfDataUrl) updates.pdf_url=_sopPdfDataUrl;
+  await sb.from('sops').update(updates).eq('id',id);
   const sop=SOPS_DATA.find(s=>s.id===id);
-  if(sop){sop.title=title;sop.content=content;}
+  if(sop) Object.assign(sop,updates);
   renderSOPNav(['admin','va'].includes(STATE.profile?.role));
   setTimeout(()=>{const n=document.getElementById('sop-nav-'+id);if(n){n.style.background='var(--surface2)';n.style.color='var(--text)';}},10);
+  if(_sopPdfDataUrl){ _sopPdfDataUrl=null; openSOP(id); } // refresh to show the new View/Remove PDF controls
 }
 
 async function addSOP(){
