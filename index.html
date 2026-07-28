@@ -651,12 +651,13 @@
         <div class="card" style="max-width:600px;">
           <div class="card-title">Log Weekly Hours</div>
           <div class="form-grid">
-            <div class="form-group"><label>Chatter</label><select id="hours-chatter2" onchange="previewWage()"></select></div>
+            <div class="form-group"><label>Chatter</label><select id="hours-chatter2" onchange="previewWage('2')"></select></div>
             <div class="form-group"><label>Week Of</label><input type="date" id="hours-week2"></div>
-            <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count2" placeholder="168" oninput="previewWage()"></div>
-            <div class="form-group"><label>Model Earnings</label><input type="number" id="hours-earnings2" placeholder="0.00" step="0.01" oninput="previewWage()"></div>
+            <div class="form-group"><label>Hours Worked</label><input type="number" id="hours-count2" placeholder="168" oninput="previewWage('2')"></div>
+            <div class="form-group"><label>Model Earnings</label><input type="number" id="hours-earnings2" placeholder="0.00" step="0.01" oninput="previewWage('2')"></div>
           </div>
-          <div class="btn-row"><button class="btn btn-primary" onclick="logHours()">💾 Save Hours</button></div>
+          <div id="hours-preview2" style="margin-top:14px;font-size:13px;color:var(--text2);"></div>
+          <div class="btn-row"><button class="btn btn-primary" onclick="logHours('2')">💾 Save Hours</button></div>
           <div id="hours-alert2" class="alert"></div>
         </div>
       </div>
@@ -674,7 +675,7 @@
             </div>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Chatter</th><th>Source</th><th>Hours</th><th>Cost</th><th>Revenue</th><th>ROI</th><th>Golden Ratio</th><th>Unlock Ratio</th><th>Fan CVR</th><th>DMs Sent</th></tr></thead>
+            <thead><tr><th>Chatter</th><th>Source</th><th>Hours</th><th>Cost</th><th>Agency Net</th><th>Sales</th><th>ROI</th><th>Golden Ratio</th><th>Unlock Ratio</th><th>Fan CVR</th><th>DMs Sent</th></tr></thead>
             <tbody id="cms-table"></tbody>
           </table></div>
           <div id="cms-totals" style="margin-top:12px;font-size:13px;color:var(--text2);"></div>
@@ -3303,10 +3304,15 @@ function renderChatters(){
 }
 
 function populateChatterDropdown(){
-  const sel=document.getElementById('hours-chatter'); if(!sel) return;
-  const prevVal=sel.value;
-  sel.innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  if(prevVal && [...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+  // Two duplicate "Log Weekly Hours" forms exist -- one inline on the Roster tab
+  // (#hours-chatter) and one on the dedicated Log Hours tab (#hours-chatter2). Both need
+  // populating or the Log Hours tab's dropdown is silently empty.
+  ['hours-chatter','hours-chatter2'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    const prevVal=sel.value;
+    sel.innerHTML=STATE.chatters.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if(prevVal && [...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+  });
 }
 
 function editChatter(id){
@@ -3340,15 +3346,25 @@ async function delChatter(id){if(!confirm('Remove chatter?'))return;await sb.fro
 
 function switchChatterTab(tab){['roster','hours','summary'].forEach(t=>document.getElementById('chatter-tab-'+t).style.display=t===tab?'block':'none');document.querySelectorAll('#page-chatters .tab').forEach((el,i)=>el.classList.toggle('active',['roster','hours','summary'][i]===tab));if(tab==='summary')loadChatterCostSummary();}
 
-function previewWage(){const id=document.getElementById('hours-chatter').value;const c=STATE.chatters.find(x=>x.id===id);if(!c)return;const h=parseFloat(document.getElementById('hours-count').value||0);const e=parseFloat(document.getElementById('hours-earnings').value||0);const base=h*(parseFloat(c.hourly_rate||3));const comm=e*(parseFloat(c.commission_pct||5)/100);document.getElementById('hours-preview').textContent=`Base: $${fmt(base)} + Commission: $${fmt(comm)} = Total: $${fmt(base+comm)}`;}
+function previewWage(suffix){
+  suffix=suffix||'';
+  const previewEl=document.getElementById('hours-preview'+suffix); if(!previewEl)return;
+  const id=document.getElementById('hours-chatter'+suffix).value;const c=STATE.chatters.find(x=>x.id===id);if(!c)return;
+  const h=parseFloat(document.getElementById('hours-count'+suffix).value||0);const e=parseFloat(document.getElementById('hours-earnings'+suffix).value||0);
+  const base=h*(parseFloat(c.hourly_rate||3));const comm=e*(parseFloat(c.commission_pct||5)/100);
+  previewEl.textContent=`Base: $${fmt(base)} + Commission: $${fmt(comm)} = Total: $${fmt(base+comm)}`;
+}
 
-async function logHours(){
-  const id=document.getElementById('hours-chatter').value; const c=STATE.chatters.find(x=>x.id===id); if(!c)return showAlert('hours-alert','Select a chatter.','error');
-  const h=parseFloat(document.getElementById('hours-count').value||0); const e=parseFloat(document.getElementById('hours-earnings').value||0);
+async function logHours(suffix){
+  suffix=suffix||'';
+  const alertId='hours-alert'+suffix;
+  const id=document.getElementById('hours-chatter'+suffix).value; const c=STATE.chatters.find(x=>x.id===id); if(!c)return showAlert(alertId,'Select a chatter.','error');
+  const h=parseFloat(document.getElementById('hours-count'+suffix).value||0); const e=parseFloat(document.getElementById('hours-earnings'+suffix).value||0);
   const base=h*(parseFloat(c.hourly_rate||3)); const comm=e*(parseFloat(c.commission_pct||5)/100); const total=base+comm;
-  const{error}=await sb.from('chatter_hours').insert({chatter_id:c.id,chatter_name:c.name,week_of:document.getElementById('hours-week').value,hours:h,hourly_rate:c.hourly_rate||3,commission_earned:e,commission_pct:c.commission_pct||5,total_wage:total});
-  if(error)return showAlert('hours-alert',error.message,'error');
-  showAlert('hours-alert',`Logged! Total: $${fmt(total)}`,'success');
+  const{error}=await sb.from('chatter_hours').insert({chatter_id:c.id,chatter_name:c.name,week_of:document.getElementById('hours-week'+suffix).value,hours:h,hourly_rate:c.hourly_rate||3,commission_earned:e,commission_pct:c.commission_pct||5,total_wage:total});
+  if(error)return showAlert(alertId,error.message,'error');
+  showAlert(alertId,`Logged! Total: $${fmt(total)}`,'success');
+  loadChatterCostSummary();
 }
 
 // ── Chatter Cost & ROI ──────────────────────────────────────────
@@ -3397,7 +3413,13 @@ async function loadChatterCostSummary(){
     const key=r.chatter_id; if(!key) return;
     if(!map.has(key)) map.set(key, blankCostRow(key,r.chatter_name,3,5));
     const g=map.get(key);
-    g.revenue+=parseFloat(r.earnings||0);
+    // r.earnings is the creator's raw OF earnings for the sale (straight from the Infloww
+    // export), not what the agency actually keeps. Apply the matched model's split% so
+    // "revenue"/ROI here reflects agency net, not gross creator earnings. Falls back to 20%
+    // (same default used elsewhere) if the sale's model couldn't be matched.
+    const saleModel=STATE.models.find(m=>m.id===r.model_id);
+    const splitPct=saleModel?parseFloat(saleModel.split||20):20;
+    g.revenue+=parseFloat(r.earnings||0)*(splitPct/100);
     g.salesCount++;
   });
 
@@ -3425,7 +3447,7 @@ function renderChatterCostSummary(rows){
   const tbody=document.getElementById('cms-table'); const totalsEl=document.getElementById('cms-totals');
   if(!tbody) return;
   if(!rows.length){
-    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--text2);">No chatter activity for this period yet</td></tr>';
+    tbody.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--text2);">No chatter activity for this period yet</td></tr>';
     if(totalsEl) totalsEl.innerHTML='';
     return;
   }
@@ -3439,6 +3461,7 @@ function renderChatterCostSummary(rows){
       <td>${hoursDisplay}</td>
       <td>${g.cost!==null?'$'+fmt(g.cost):'—'}</td>
       <td class="profit">$${fmt(g.revenue)}</td>
+      <td>${g.salesCount||'—'}</td>
       <td>${g.roi!==null?g.roi.toFixed(2)+'x':'—'}</td>
       <td>${g.avgGolden!==null?g.avgGolden.toFixed(2)+'%':'—'}</td>
       <td>${g.avgUnlock!==null?g.avgUnlock.toFixed(2)+'%':'—'}</td>
@@ -4278,12 +4301,34 @@ async function loadManagement(){
     const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
     const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
     const kpis=data?.value||{};
+
+    // Chatter-side actuals for the same latest week -- same source/definitions as the
+    // Chatter Performance summary tab, just rolled into one number each rather than per-chatter.
+    const{data:cpData}=await sb.from('chatter_performance').select('*').eq('week_of',latest);
+    const cpRows=cpData||[];
+    let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0,unlockSum=0,unlockCount=0,dmsTotal=0,salesTotal=0,hoursTotal=0;
+    cpRows.forEach(r=>{
+      const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim()); if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
+      const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim()); if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
+      const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim()); if(!isNaN(unlockNum)){unlockSum+=unlockNum;unlockCount++;}
+      const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10); if(!isNaN(dmsNum)) dmsTotal+=dmsNum;
+      const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim()); if(!isNaN(hoursNum)) hoursTotal+=hoursNum;
+      salesTotal+=parseFloat(r.sales||0);
+    });
+    const salesPerHr=hoursTotal>0?salesTotal/hoursTotal:null;
+
     document.getElementById('kpi-comparison').innerHTML=`
       <div class="stats-grid" style="margin-top:0;">
         ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
         ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
         ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
         ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
+        ${statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'—','','green')}
+        ${statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'—','','blue')}
+        ${statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'—','','')}
+        ${statCard('DMs Sent',dmsTotal||'—','','')}
+        ${statCard('Sales/Hr',salesPerHr!==null?'$'+fmt(salesPerHr):'—','','purple')}
+        ${statCard('Total Sales','$'+fmt(salesTotal),'','purple')}
       </div>`;
   }
 }
