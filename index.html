@@ -353,16 +353,17 @@
     <!-- Content Performance -->
     <div class="page" id="page-contentperf">
       <div class="page-title">Content Performance</div>
-      <div class="page-sub">Instagram post performance — views, follower growth, and posting time</div>
+      <div class="page-sub">Instagram post performance — views, retention, saves, and follower growth per video</div>
       <div class="btn-row" style="margin-bottom:12px;">
         <button class="btn btn-primary" onclick="openContentPerfModal()">➕ Add Entry</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('cp-csv-input').click()">📤 Upload CSV / Spreadsheet</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('cp-csv-input').click()">📤 Upload Meta Content Export</button>
         <input type="file" id="cp-csv-input" accept=".csv,.xlsx,.xls" style="display:none;" onchange="if(this.files[0])handleContentPerfFile(this.files[0]);this.value='';">
       </div>
       <div id="cp-preview-card" class="card" style="display:none;">
         <div class="card-title">Preview — confirm models before saving</div>
+        <div id="cp-preview-summary" style="font-size:12px;color:var(--text2);margin-bottom:10px;"></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Time</th><th>Model</th><th>Views</th><th>New Followers</th><th>Caption</th></tr></thead>
+          <thead><tr><th>Thumb</th><th>Date</th><th>Model</th><th>Type</th><th>Views</th><th>Likes</th><th>Saves</th><th>Follows</th><th>Caption</th></tr></thead>
           <tbody id="cp-preview-body"></tbody>
         </table></div>
         <div class="btn-row" style="margin-top:12px;">
@@ -374,7 +375,16 @@
       <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
         <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="cp-start" onchange="filterContentPerfEntries()"></div>
         <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="cp-end" onchange="filterContentPerfEntries()"></div>
-        <select id="cp-filter-model" onchange="filterContentPerfEntries()" style="width:180px;"><option value="">All Models</option></select>
+        <select id="cp-filter-model" onchange="filterContentPerfEntries()" style="width:170px;"><option value="">All Models</option></select>
+        <select id="cp-sort" onchange="filterContentPerfEntries()" style="width:180px;">
+          <option value="rating_desc">Rating: Best first</option>
+          <option value="date_desc">Date: Newest first</option>
+          <option value="date_asc">Date: Oldest first</option>
+          <option value="views_desc">Views: High to low</option>
+          <option value="likes_desc">Likes: High to low</option>
+          <option value="follows_desc">Follows: High to low</option>
+          <option value="saves_desc">Saves: High to low</option>
+        </select>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-sm btn-ghost" onclick="setContentPerfPeriod('last')">Last Week</button>
           <button class="btn btn-sm btn-ghost" onclick="setContentPerfPeriod('week')">This Week</button>
@@ -382,14 +392,9 @@
           <button class="btn btn-sm btn-ghost" onclick="setContentPerfPeriod('all')">All Time</button>
         </div>
       </div>
-      <div id="cp-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Time</th><th>Model</th><th>Views</th><th>New Followers</th><th>Caption</th><th></th></tr></thead>
-          <tbody id="cp-table-body"></tbody>
-        </table></div>
-        <div id="cp-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No content performance entries yet</p></div>
-      </div>
+      <div id="cp-summary" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>
+      <div id="cp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+      <div id="cp-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No content performance entries yet</p></div>
     </div>
 
     <!-- Leaderboard -->
@@ -1004,6 +1009,7 @@
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
       <div class="form-group full"><label>Google Drive Link</label><input type="url" id="model-drive" placeholder="https://drive.google.com/..."></div>
+      <div class="form-group full"><label>Instagram Handles (comma separated, no @ — used to auto-match Content Performance uploads)</label><input type="text" id="model-ig-handles" placeholder="liamshellahung, liam_backup"></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
@@ -1039,20 +1045,45 @@
     <input type="hidden" id="cp-edit-id">
     <div class="form-grid">
       <div class="form-group"><label>Model</label><select id="cp-model"></select></div>
-      <div class="form-group"><label>Platform</label><select id="cp-platform"><option value="instagram">Instagram</option></select></div>
+      <div class="form-group"><label>Post Type</label><select id="cp-post-type"><option value="IG reel">Reel</option><option value="IG image">Image</option><option value="IG carousel">Carousel</option><option value="IG video">Video</option></select></div>
       <div class="form-group"><label>Post Date</label><input type="date" id="cp-date"></div>
       <div class="form-group"><label>Post Time</label><input type="time" id="cp-time"></div>
-      <div class="form-group"><label>Views</label><input type="number" id="cp-views" placeholder="0" min="0"></div>
-      <div class="form-group"><label>New Followers</label><input type="number" id="cp-followers" placeholder="0" min="0"></div>
+      <div class="form-group full"><label>Permalink (optional — auto-fetches thumbnail)</label><input type="url" id="cp-url" placeholder="https://instagram.com/reel/..." onblur="autoFetchCpThumb()"></div>
       <div class="form-group full"><label>Caption (optional)</label><input type="text" id="cp-caption" placeholder="e.g. GRWM reel"></div>
-      <div class="form-group full"><label>Post Link (optional)</label><input type="url" id="cp-url" placeholder="https://instagram.com/..."></div>
+      <div id="cp-thumb-preview-wrap" style="display:none;" class="form-group full">
+        <img id="cp-thumb-preview-img" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
+      </div>
+      <div class="form-group"><label>Duration (sec)</label><input type="number" id="cp-duration" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Views</label><input type="number" id="cp-views" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Reach</label><input type="number" id="cp-reach" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Likes</label><input type="number" id="cp-likes" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Comments</label><input type="number" id="cp-comments" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Shares</label><input type="number" id="cp-shares" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Saves</label><input type="number" id="cp-saves" placeholder="0" min="0"></div>
+      <div class="form-group"><label>New Followers</label><input type="number" id="cp-followers" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Avg Watch Time (sec, manual)</label><input type="number" id="cp-watch-time" placeholder="0" min="0" step="0.1"></div>
+      <div class="form-group"><label>Retention % (manual)</label><input type="number" id="cp-retention" placeholder="0" min="0" max="100" step="0.1"></div>
       <div class="form-group full"><label>Notes (optional)</label><textarea id="cp-notes" rows="2"></textarea></div>
     </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px;">Watch time and retention aren't in Meta's bulk export — Instagram only shows those in each Reel's own in-app insights panel, so they're entered by hand.</div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveContentPerfEntry()">💾 Save</button>
       <button class="btn btn-ghost" onclick="closeModal('cp-modal')">Cancel</button>
     </div>
     <div id="cp-alert" class="alert"></div>
+  </div>
+</div>
+
+<!-- Content Performance Insights Modal -->
+<div class="modal-overlay" id="cp-insights-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-title"><span>Post Insights</span><button class="modal-close" onclick="closeModal('cp-insights-modal')">✕</button></div>
+    <div id="cp-insights-body"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="cp-insights-edit-btn">✎ Edit</button>
+      <button class="btn btn-danger" id="cp-insights-delete-btn">✕ Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('cp-insights-modal')">Close</button>
+    </div>
   </div>
 </div>
 
@@ -3499,12 +3530,12 @@ function editModel(id){
   document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
   document.getElementById('model-niche').value=m.niche||'';
   document.getElementById('model-email').value=m.email||'';
-  document.getElementById('model-drive').value=m.drive_link||''; openModal('model-modal');
+  document.getElementById('model-drive').value=m.drive_link||''; document.getElementById('model-ig-handles').value=(m.instagram_handles||[]).join(', '); openModal('model-modal');
 }
 
 async function saveModel(){
   const id=document.getElementById('model-id').value;
-  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null,niche:document.getElementById('model-niche').value.trim()||null};
+  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null,niche:document.getElementById('model-niche').value.trim()||null,instagram_handles:document.getElementById('model-ig-handles').value.split(',').map(s=>s.trim().replace(/^@/,'').toLowerCase()).filter(Boolean)};
   if(!p.name)return alert('Name required');
   if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
   else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
@@ -4702,16 +4733,30 @@ function filterContentPerfEntries(){
   const start=document.getElementById('cp-start')?.value||'';
   const end=document.getElementById('cp-end')?.value||'';
   const modelId=document.getElementById('cp-filter-model')?.value||'';
+  const sortKey=document.getElementById('cp-sort')?.value||'rating_desc';
   let rows=STATE.contentPerf.slice();
   if(start) rows=rows.filter(r=>r.post_date>=start);
   if(end) rows=rows.filter(r=>r.post_date<=end);
   if(modelId) rows=rows.filter(r=>r.model_id===modelId);
-  rows.sort((a,b)=>{
-    if(a.post_date!==b.post_date) return (b.post_date||'').localeCompare(a.post_date||'');
-    return (b.post_time||'').localeCompare(a.post_time||'');
-  });
+
+  // Rating is computed across the *filtered* set so it reflects "how did this post do
+  // compared to this model's other posts in the current window" rather than all-time.
+  const ratings=computeContentPerfRatings(rows);
+  rows.forEach(r=>{ r._rating=ratings.has(r.id)?ratings.get(r.id):null; });
+
+  const sorters={
+    rating_desc:(a,b)=>(b._rating??-1)-(a._rating??-1),
+    date_desc:(a,b)=>(b.post_date||'').localeCompare(a.post_date||'')||(b.post_time||'').localeCompare(a.post_time||''),
+    date_asc:(a,b)=>(a.post_date||'').localeCompare(b.post_date||'')||(a.post_time||'').localeCompare(b.post_time||''),
+    views_desc:(a,b)=>(b.views||0)-(a.views||0),
+    likes_desc:(a,b)=>(b.likes||0)-(a.likes||0),
+    follows_desc:(a,b)=>(b.new_followers||0)-(a.new_followers||0),
+    saves_desc:(a,b)=>(b.saves||0)-(a.saves||0),
+  };
+  rows.sort(sorters[sortKey]||sorters.rating_desc);
+
   renderContentPerfSummary(rows);
-  renderContentPerfTable(rows);
+  renderContentPerfGrid(rows);
 }
 
 function setContentPerfPeriod(kind){
@@ -4727,67 +4772,194 @@ function setContentPerfPeriod(kind){
   filterContentPerfEntries();
 }
 
+// ── Rating score ─────────────────────────────────────────────
+// Weighted composite, percentile-ranked against the *same model's* other posts in the
+// current view — a score of 80 means "beat 80% of this model's own posts here", not a
+// cross-model comparison against accounts with very different baselines.
+// Weights favor retention/watch-time/saves (quality signals) over raw views/likes (vanity),
+// per priority order: watch time, retention, save rate, views, likes, follows.
+// Watch time / retention aren't bulk-exportable from Instagram, so a post missing those
+// manual fields has that weight proportionally redistributed across whatever it does have,
+// rather than being silently scored down for data nobody had a chance to enter.
+const CP_RATING_WEIGHTS={ retention:0.20, watchRatio:0.20, saveRate:0.20, views:0.15, follows:0.15, likes:0.10 };
+
+function cpMetricValue(r,key){
+  switch(key){
+    case 'retention': return (r.retention_pct==null||r.retention_pct==='')?null:parseFloat(r.retention_pct);
+    case 'watchRatio': return (r.watch_time_avg_sec&&r.duration_sec)?Math.min(1,r.watch_time_avg_sec/r.duration_sec):null;
+    case 'saveRate': { const base=r.reach||r.views||0; return base>0?(r.saves||0)/base:null; }
+    case 'views': return r.views==null?null:r.views;
+    case 'follows': return r.new_followers==null?null:r.new_followers;
+    case 'likes': return r.likes==null?null:r.likes;
+    default: return null;
+  }
+}
+
+function computeContentPerfRatings(rows){
+  const ratings=new Map();
+  const byModel=new Map();
+  rows.forEach(r=>{ const k=r.model_id||'_unassigned'; if(!byModel.has(k))byModel.set(k,[]); byModel.get(k).push(r); });
+  byModel.forEach(group=>{
+    const keys=Object.keys(CP_RATING_WEIGHTS);
+    const sorted={};
+    keys.forEach(k=>{ sorted[k]=group.map(r=>cpMetricValue(r,k)).filter(v=>v!=null).sort((a,b)=>a-b); });
+    group.forEach(r=>{
+      let weightedSum=0, weightTotal=0;
+      keys.forEach(k=>{
+        const v=cpMetricValue(r,k);
+        if(v==null || sorted[k].length<2) return; // need at least 2 data points to rank against
+        const w=CP_RATING_WEIGHTS[k];
+        const below=sorted[k].filter(x=>x<v).length;
+        const pct=below/(sorted[k].length-1);
+        weightedSum+=pct*w; weightTotal+=w;
+      });
+      ratings.set(r.id, weightTotal>0 ? Math.round((weightedSum/weightTotal)*100) : null);
+    });
+  });
+  return ratings;
+}
+
+function cpRatingColor(score){
+  if(score==null) return 'var(--text2)';
+  if(score>=70) return '#4a9eff';
+  if(score>=40) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
 function renderContentPerfSummary(rows){
   const el=document.getElementById('cp-summary'); if(!el) return;
   const totalViews=rows.reduce((s,r)=>s+(r.views||0),0);
-  const totalFollowers=rows.reduce((s,r)=>s+(r.new_followers||0),0);
+  const totalFollows=rows.reduce((s,r)=>s+(r.new_followers||0),0);
+  const totalSaves=rows.reduce((s,r)=>s+(r.saves||0),0);
   const posts=rows.length;
-  const avgViews=posts?Math.round(totalViews/posts):0;
+  const rated=rows.filter(r=>r._rating!=null);
+  const avgRating=rated.length?Math.round(rated.reduce((s,r)=>s+r._rating,0)/rated.length):null;
   el.innerHTML=
     statCard('Posts',posts,'accent')+
     statCard('Total Views',totalViews.toLocaleString())+
-    statCard('New Followers',totalFollowers.toLocaleString(),'accent')+
-    statCard('Avg Views / Post',avgViews.toLocaleString());
+    statCard('New Followers',totalFollows.toLocaleString(),'accent')+
+    statCard('Total Saves',totalSaves.toLocaleString())+
+    statCard('Avg Rating',avgRating==null?'—':avgRating,'accent');
 }
 
-function renderContentPerfTable(rows){
-  const body=document.getElementById('cp-table-body'); const empty=document.getElementById('cp-empty');
-  if(!body) return;
-  if(!rows.length){body.innerHTML='';if(empty)empty.style.display='block';return;} if(empty)empty.style.display='none';
-  body.innerHTML=rows.map(r=>`
-    <tr>
-      <td>${fmtDate(r.post_date)}</td>
-      <td>${r.post_time?String(r.post_time).slice(0,5):'—'}</td>
-      <td>${r.model_name||'—'}</td>
-      <td>${(r.views||0).toLocaleString()}</td>
-      <td>${(r.new_followers||0).toLocaleString()}</td>
-      <td>${r.caption?r.caption:''}${r.post_url?` <a href="${r.post_url}" target="_blank">🔗</a>`:(r.caption?'':'—')}</td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-sm btn-ghost" onclick="openContentPerfModal('${r.id}')">✎</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteContentPerfEntry('${r.id}')">✕</button>
-      </td>
-    </tr>`).join('');
+function cpThumbHtml(r){
+  if(r.thumbnail_url) return `<img src="${r.thumbnail_url}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px 8px 0 0;">`;
+  const icon=(r.post_type==='IG reel'||r.post_type==='IG video')?'🎬':(r.post_type==='IG carousel'?'🖼️':'📷');
+  return `<div style="width:100%;aspect-ratio:1/1;border-radius:8px 8px 0 0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:32px;">${icon}</div>`;
 }
+
+function renderContentPerfGrid(rows){
+  const grid=document.getElementById('cp-grid'); const empty=document.getElementById('cp-empty');
+  if(!grid) return;
+  if(!rows.length){grid.innerHTML='';if(empty)empty.style.display='block';return;} if(empty)empty.style.display='none';
+  grid.innerHTML=rows.map(r=>{
+    const score=r._rating;
+    return `
+    <div class="card" style="margin:0;padding:0;overflow:hidden;">
+      ${cpThumbHtml(r)}
+      <div style="padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;">
+          <span style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.model_name||'Unassigned'}</span>
+          <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:${cpRatingColor(score)};flex-shrink:0;">${score==null?'—':score}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.caption||'—'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px;color:var(--text2);margin-bottom:8px;">
+          <div>👁 ${(r.views||0).toLocaleString()}</div>
+          <div>❤️ ${(r.likes||0).toLocaleString()}</div>
+          <div>➕ ${(r.new_followers||0).toLocaleString()}</div>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:8px;">${fmtDate(r.post_date)}${r.post_time?' · '+String(r.post_time).slice(0,5):''}</div>
+        <button class="btn btn-sm btn-ghost" style="width:100%;" onclick="openContentPerfInsights('${r.id}')">📊 Insights</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Insights modal ───────────────────────────────────────────
+function openContentPerfInsights(id){
+  const r=STATE.contentPerf.find(x=>x.id===id); if(!r) return;
+  const score=r._rating;
+  const reachOrViews=r.reach||r.views||0;
+  const saveRate=reachOrViews?(((r.saves||0)/reachOrViews)*100).toFixed(1):null;
+  const watchRatio=(r.watch_time_avg_sec&&r.duration_sec)?((r.watch_time_avg_sec/r.duration_sec)*100).toFixed(0):null;
+  const row=(label,val)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">${label}</span><span style="font-weight:600;">${val}</span></div>`;
+  const section=(title,rowsHtml)=>`<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--accent2);margin-bottom:6px;">${title}</div>${rowsHtml}</div>`;
+  const permalink=r.post_url;
+  const body=`
+    <div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;">
+      ${r.thumbnail_url?`<img src="${r.thumbnail_url}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;">`:''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:14px;">${r.model_name||'Unassigned'}</div>
+        <div style="font-size:12px;color:var(--text2);margin:4px 0;">${r.caption||'—'}</div>
+        <div style="font-size:11px;color:var(--text2);">${fmtDate(r.post_date)}${r.post_time?' · '+String(r.post_time).slice(0,5):''} · ${r.post_type||'—'}</div>
+        ${permalink?`<a href="${permalink}" target="_blank" style="font-size:11px;color:var(--accent2);">🔗 View on Instagram</a>`:''}
+      </div>
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-size:22px;font-weight:800;color:${cpRatingColor(score)};">${score==null?'—':score}</div>
+        <div style="font-size:9px;color:var(--text2);text-transform:uppercase;">Rating</div>
+      </div>
+    </div>
+    ${section('Reach & Views', row('Views',(r.views||0).toLocaleString())+row('Reach',(r.reach||0).toLocaleString()))}
+    ${section('Engagement', row('Likes',(r.likes||0).toLocaleString())+row('Comments',(r.comments||0).toLocaleString())+row('Shares',(r.shares||0).toLocaleString())+row('Saves',(r.saves||0).toLocaleString())+row('Save Rate',saveRate!=null?saveRate+'%':'—'))}
+    ${section('Growth', row('New Followers',(r.new_followers||0).toLocaleString()))}
+    ${section('Retention (manual)', row('Duration',r.duration_sec?r.duration_sec+'s':'—')+row('Avg Watch Time',r.watch_time_avg_sec?r.watch_time_avg_sec+'s':'—')+row('Watch Completion',watchRatio!=null?watchRatio+'%':'—')+row('Retention %',r.retention_pct!=null?r.retention_pct+'%':'—'))}
+    ${r.notes?section('Notes', `<div style="font-size:12px;color:var(--text2);">${r.notes}</div>`):''}
+  `;
+  document.getElementById('cp-insights-body').innerHTML=body;
+  document.getElementById('cp-insights-edit-btn').onclick=()=>{ closeModal('cp-insights-modal'); openContentPerfModal(id); };
+  document.getElementById('cp-insights-delete-btn').onclick=()=>{ closeModal('cp-insights-modal'); deleteContentPerfEntry(id); };
+  openModal('cp-insights-modal');
+}
+
+// ── Add/Edit modal ───────────────────────────────────────────
+var _cpEditThumb=null;
 
 function openContentPerfModal(id){
   document.getElementById('cp-alert').textContent='';
   document.getElementById('cp-edit-id').value=id||'';
+  _cpEditThumb=null;
+  document.getElementById('cp-thumb-preview-wrap').style.display='none';
+  const fields=['cp-model','cp-post-type','cp-date','cp-time','cp-url','cp-caption','cp-duration','cp-views','cp-reach','cp-likes','cp-comments','cp-shares','cp-saves','cp-followers','cp-watch-time','cp-retention','cp-notes'];
   if(id){
     const row=STATE.contentPerf.find(r=>r.id===id);
     if(!row) return;
     document.getElementById('cp-modal-title').textContent='Edit Performance Entry';
     document.getElementById('cp-model').value=row.model_id||'';
-    document.getElementById('cp-platform').value=row.platform||'instagram';
+    document.getElementById('cp-post-type').value=row.post_type||'IG reel';
     document.getElementById('cp-date').value=row.post_date||'';
     document.getElementById('cp-time').value=row.post_time?String(row.post_time).slice(0,5):'';
-    document.getElementById('cp-views').value=row.views||0;
-    document.getElementById('cp-followers').value=row.new_followers||0;
-    document.getElementById('cp-caption').value=row.caption||'';
     document.getElementById('cp-url').value=row.post_url||'';
+    document.getElementById('cp-caption').value=row.caption||'';
+    document.getElementById('cp-duration').value=row.duration_sec||'';
+    document.getElementById('cp-views').value=row.views||0;
+    document.getElementById('cp-reach').value=row.reach||0;
+    document.getElementById('cp-likes').value=row.likes||0;
+    document.getElementById('cp-comments').value=row.comments||0;
+    document.getElementById('cp-shares').value=row.shares||0;
+    document.getElementById('cp-saves').value=row.saves||0;
+    document.getElementById('cp-followers').value=row.new_followers||0;
+    document.getElementById('cp-watch-time').value=row.watch_time_avg_sec||'';
+    document.getElementById('cp-retention').value=row.retention_pct||'';
     document.getElementById('cp-notes').value=row.notes||'';
+    if(row.thumbnail_url){ _cpEditThumb=row.thumbnail_url; document.getElementById('cp-thumb-preview-img').src=row.thumbnail_url; document.getElementById('cp-thumb-preview-wrap').style.display='block'; }
   } else {
     document.getElementById('cp-modal-title').textContent='Add Performance Entry';
-    document.getElementById('cp-model').value='';
-    document.getElementById('cp-platform').value='instagram';
-    document.getElementById('cp-date').value='';
-    document.getElementById('cp-time').value='';
-    document.getElementById('cp-views').value='';
-    document.getElementById('cp-followers').value='';
-    document.getElementById('cp-caption').value='';
-    document.getElementById('cp-url').value='';
-    document.getElementById('cp-notes').value='';
+    fields.forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=fid==='cp-post-type'?'IG reel':''; });
   }
   openModal('cp-modal');
+}
+
+async function autoFetchCpThumb(){
+  const url=document.getElementById('cp-url').value.trim();
+  if(!url || _cpEditThumb) return;
+  const meta=await fetchOEmbed(url);
+  if(meta && meta.thumbnail_url){
+    _cpEditThumb=meta.thumbnail_url;
+    document.getElementById('cp-thumb-preview-img').src=_cpEditThumb;
+    document.getElementById('cp-thumb-preview-wrap').style.display='block';
+    const capEl=document.getElementById('cp-caption');
+    if(meta.title && capEl && !capEl.value.trim()) capEl.value=meta.title;
+  }
 }
 
 async function saveContentPerfEntry(){
@@ -4798,13 +4970,23 @@ async function saveContentPerfEntry(){
   const model=STATE.models.find(m=>m.id===modelId);
   const payload={
     model_id:modelId, model_name:model?model.name:null,
-    platform:document.getElementById('cp-platform').value||'instagram',
+    platform:'instagram',
+    post_type:document.getElementById('cp-post-type').value||null,
     post_date:postDate,
     post_time:document.getElementById('cp-time').value||null,
-    views:parseFloat(document.getElementById('cp-views').value)||0,
-    new_followers:parseFloat(document.getElementById('cp-followers').value)||0,
-    caption:document.getElementById('cp-caption').value.trim()||null,
     post_url:document.getElementById('cp-url').value.trim()||null,
+    thumbnail_url:_cpEditThumb||null,
+    caption:document.getElementById('cp-caption').value.trim()||null,
+    duration_sec:parseFloat(document.getElementById('cp-duration').value)||null,
+    views:parseFloat(document.getElementById('cp-views').value)||0,
+    reach:parseFloat(document.getElementById('cp-reach').value)||0,
+    likes:parseFloat(document.getElementById('cp-likes').value)||0,
+    comments:parseFloat(document.getElementById('cp-comments').value)||0,
+    shares:parseFloat(document.getElementById('cp-shares').value)||0,
+    saves:parseFloat(document.getElementById('cp-saves').value)||0,
+    new_followers:parseFloat(document.getElementById('cp-followers').value)||0,
+    watch_time_avg_sec:parseFloat(document.getElementById('cp-watch-time').value)||null,
+    retention_pct:parseFloat(document.getElementById('cp-retention').value)||null,
     notes:document.getElementById('cp-notes').value.trim()||null
   };
   if(id){
@@ -4829,76 +5011,141 @@ async function deleteContentPerfEntry(id){
   filterContentPerfEntries();
 }
 
-// Bulk CSV/XLSX upload — Instagram export column names vary by source, so headers are
-// matched loosely via getField() rather than assumed fixed; every row is editable in the
-// preview before saving so a bad guess (or unmatched model) can be fixed by hand.
+// ── Bulk CSV upload (Meta Business Suite "Content" export) ───
+// Confirmed real column set from a live export: Post ID, Account ID, Account username,
+// Account name, Description, Duration (sec), Publish time, Permalink, Post type,
+// Data comment, Date, Views, Reach, Likes, Shares, Follows, Comments, Saves.
+// Everything is still matched via getField() rather than hardcoded positions, so minor
+// header drift on Meta's side degrades gracefully instead of breaking the import outright.
 var _parsedContentPerf=null;
 
-function parseFlexDateCP(val){
-  if(val instanceof Date && !isNaN(val)) return toLocalISO(val);
-  const s=String(val==null?'':val).trim();
-  if(!s) return '';
-  const d=new Date(s);
-  return !isNaN(d) ? toLocalISO(d) : '';
+function findModelByIgHandle(username){
+  if(!username) return null;
+  const norm=String(username).trim().toLowerCase().replace(/^@/,'');
+  if(!norm) return null;
+  return STATE.models.find(m=>(m.instagram_handles||[]).map(h=>String(h).toLowerCase()).includes(norm))||null;
 }
-function parseFlexTimeCP(val){
-  if(val instanceof Date && !isNaN(val)) return val.toTimeString().slice(0,5);
-  const s=String(val==null?'':val).trim();
-  if(!s) return '';
-  const m=s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/);
-  if(!m) return '';
-  let h=parseInt(m[1],10); const min=m[2]; const ap=(m[3]||'').toUpperCase();
-  if(ap==='PM'&&h<12) h+=12; if(ap==='AM'&&h===12) h=0;
-  return String(h).padStart(2,'0')+':'+min;
+
+// RFC4180-ish parser that keeps every field as a raw string. This matters specifically for
+// Instagram's Post ID / Account ID columns (17-18 digit numbers) — routing those through
+// XLSX's automatic numeric type inference silently loses precision above 2^53, which would
+// break the ig_post_id upsert-dedupe. Used for .csv uploads; .xlsx/.xls still go through
+// XLSX.read below (same precision caveat would apply there, but Meta's actual export is CSV).
+function parseQuotedCSV(text){
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1); // strip UTF-8 BOM Meta prepends to its CSV exports
+  const rows=[]; let row=[]; let field=''; let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inQuotes=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\r'){ /* skip */ }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field+=c;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  if(!rows.length) return [];
+  const headers=rows[0];
+  return rows.slice(1).filter(r=>!(r.length===1&&r[0]==='')).map(r=>{
+    const obj={}; headers.forEach((h,i)=>{ obj[h]=r[i]!==undefined?r[i]:''; }); return obj;
+  });
 }
 
 function handleContentPerfFile(file){
+  const isCsv=/\.csv$/i.test(file.name);
   const r=new FileReader();
   r.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      let rows;
+      if(isCsv){
+        rows=parseQuotedCSV(e.target.result);
+      } else {
+        const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      }
       if(!rows.length) return alert('Could not parse file — no rows found.');
       previewContentPerfRows(rows);
     }catch(err){alert('Could not parse file: '+err.message);}
   };
-  r.readAsBinaryString(file);
+  if(isCsv) r.readAsText(file); else r.readAsBinaryString(file);
+}
+
+function parseCpPublishTime(publishRaw){
+  if(!publishRaw) return {post_date:'',post_time:''};
+  if(publishRaw instanceof Date && !isNaN(publishRaw)) return {post_date:toLocalISO(publishRaw),post_time:publishRaw.toTimeString().slice(0,5)};
+  const s=String(publishRaw).trim();
+  const d=new Date(s.replace(/^(\d{2})\/(\d{2})\/(\d{4})/,'$3-$1-$2'));
+  if(isNaN(d)) return {post_date:'',post_time:''};
+  return {post_date:toLocalISO(d),post_time:d.toTimeString().slice(0,5)};
 }
 
 function previewContentPerfRows(rows){
   _parsedContentPerf=rows.map(row=>{
-    const modelRaw=getField(row,'Model','Account','Creator','Username','Page','Name');
-    const{model}=findModelMatch(modelRaw);
+    const igPostId=String(getField(row,'Post ID','Post Id','PostID')||'').trim();
+    const accountUsername=String(getField(row,'Account username','Account Username')||'').trim();
+    const model=findModelByIgHandle(accountUsername);
+    const{post_date,post_time}=parseCpPublishTime(getField(row,'Publish time','Publish Time'));
     return{
+      ig_post_id:igPostId||null,
+      ig_account_username:accountUsername||null,
       model_id:model?model.id:null,
-      model_name:model?model.name:(modelRaw||''),
-      post_date:parseFlexDateCP(getField(row,'Date','Post Date','Publish Date','Published','Post date')),
-      post_time:parseFlexTimeCP(getField(row,'Time','Post Time','Time Posted')),
-      views:cleanAmount(getField(row,'Views','View Count','Impressions','Plays','Play Count','Reach')),
-      new_followers:cleanAmount(getField(row,'New Followers','Followers','Follows','Follower Growth','Net Follows')),
-      caption:getField(row,'Caption','Post','Description','Title')||'',
-      post_url:getField(row,'Permalink','URL','Link','Post URL')||''
+      model_name:model?model.name:(accountUsername||''),
+      post_type:getField(row,'Post type','Post Type')||'',
+      caption:getField(row,'Description')||'',
+      post_url:getField(row,'Permalink')||'',
+      duration_sec:cleanAmount(getField(row,'Duration (sec)','Duration')),
+      post_date, post_time,
+      views:cleanAmount(getField(row,'Views')),
+      reach:cleanAmount(getField(row,'Reach')),
+      likes:cleanAmount(getField(row,'Likes')),
+      shares:cleanAmount(getField(row,'Shares')),
+      comments:cleanAmount(getField(row,'Comments')),
+      saves:cleanAmount(getField(row,'Saves')),
+      new_followers:cleanAmount(getField(row,'Follows')),
+      thumbnail_url:null
     };
   });
   renderContentPerfPreview();
+  // Auto-fetch thumbnails in the background via the existing oEmbed proxy — preview renders
+  // immediately without waiting on these network calls.
+  _parsedContentPerf.forEach((row,i)=>{
+    if(!row.post_url) return;
+    fetchOEmbed(row.post_url).then(meta=>{
+      if(meta&&meta.thumbnail_url&&_parsedContentPerf&&_parsedContentPerf[i]){
+        _parsedContentPerf[i].thumbnail_url=meta.thumbnail_url;
+        const img=document.getElementById('cp-preview-thumb-'+i);
+        if(img) img.src=meta.thumbnail_url;
+      }
+    });
+  });
 }
 
 function renderContentPerfPreview(){
   const body=document.getElementById('cp-preview-body');
   const card=document.getElementById('cp-preview-card');
+  const summaryEl=document.getElementById('cp-preview-summary');
   if(!_parsedContentPerf||!_parsedContentPerf.length){if(card)card.style.display='none';return;}
   card.style.display='block';
+  const matched=_parsedContentPerf.filter(r=>r.model_id).length;
+  if(summaryEl) summaryEl.textContent=`${_parsedContentPerf.length} post(s) found — ${matched} matched to a model automatically, ${_parsedContentPerf.length-matched} need manual assignment. Link Instagram handles on Model Settings to improve auto-matching.`;
   body.innerHTML=_parsedContentPerf.map((row,i)=>`
     <tr>
+      <td><img id="cp-preview-thumb-${i}" src="${row.thumbnail_url||''}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;background:var(--surface2);"></td>
       <td><input type="date" value="${row.post_date||''}" onchange="_parsedContentPerf[${i}].post_date=this.value" style="width:130px;"></td>
-      <td><input type="time" value="${row.post_time||''}" onchange="_parsedContentPerf[${i}].post_time=this.value" style="width:100px;"></td>
       <td><select onchange="reassignContentPerfPreviewRow(${i},this.value)" style="width:150px;">
         <option value="">— Unassigned —</option>
         ${STATE.models.map(m=>`<option value="${m.id}" ${m.id===row.model_id?'selected':''}>${m.name}</option>`).join('')}
-      </select></td>
-      <td><input type="number" value="${row.views}" style="width:80px;" onchange="_parsedContentPerf[${i}].views=parseFloat(this.value)||0"></td>
-      <td><input type="number" value="${row.new_followers}" style="width:80px;" onchange="_parsedContentPerf[${i}].new_followers=parseFloat(this.value)||0"></td>
+      </select>${row.ig_account_username&&!row.model_id?`<div style="font-size:10px;color:var(--yellow);">@${row.ig_account_username} unmatched</div>`:''}</td>
+      <td>${row.post_type||'—'}</td>
+      <td><input type="number" value="${row.views}" style="width:70px;" onchange="_parsedContentPerf[${i}].views=parseFloat(this.value)||0"></td>
+      <td><input type="number" value="${row.likes}" style="width:70px;" onchange="_parsedContentPerf[${i}].likes=parseFloat(this.value)||0"></td>
+      <td><input type="number" value="${row.saves}" style="width:70px;" onchange="_parsedContentPerf[${i}].saves=parseFloat(this.value)||0"></td>
+      <td><input type="number" value="${row.new_followers}" style="width:70px;" onchange="_parsedContentPerf[${i}].new_followers=parseFloat(this.value)||0"></td>
       <td><input type="text" value="${(row.caption||'').replace(/"/g,'&quot;')}" style="width:160px;" onchange="_parsedContentPerf[${i}].caption=this.value"></td>
     </tr>`).join('');
 }
@@ -4914,22 +5161,48 @@ function cancelContentPerfPreview(){
   const card=document.getElementById('cp-preview-card'); if(card) card.style.display='none';
 }
 
+// Meta's Content export is lifetime-cumulative per post, so re-uploading a later export
+// should refresh existing rows (matched by ig_post_id) rather than create duplicates.
 async function saveContentPerfRows(){
   if(!_parsedContentPerf||!_parsedContentPerf.length) return;
   const missing=_parsedContentPerf.filter(r=>!r.post_date);
   if(missing.length) return showAlert('cp-preview-alert',`${missing.length} row(s) are missing a post date — fix or remove before saving.`,'error');
-  const inserts=_parsedContentPerf.map(r=>({
-    model_id:r.model_id, model_name:r.model_name||null, platform:'instagram',
-    post_date:r.post_date, post_time:r.post_time||null,
-    views:r.views||0, new_followers:r.new_followers||0,
-    caption:r.caption||null, post_url:r.post_url||null,
-    created_by:STATE.user.id
-  }));
-  const{data,error}=await sb.from('content_performance').insert(inserts).select();
-  if(error) return showAlert('cp-preview-alert','Could not save — check permissions. '+error.message,'error');
-  STATE.contentPerf=[...(data||[]),...STATE.contentPerf];
-  cancelContentPerfPreview();
+
+  const existingByPostId=new Map(STATE.contentPerf.filter(r=>r.ig_post_id).map(r=>[r.ig_post_id,r]));
+  const toInsert=[], toUpdate=[];
+  _parsedContentPerf.forEach(r=>{
+    const base={
+      model_id:r.model_id, model_name:r.model_name||null, platform:'instagram',
+      ig_post_id:r.ig_post_id, ig_account_username:r.ig_account_username,
+      post_type:r.post_type||null, post_date:r.post_date, post_time:r.post_time||null,
+      post_url:r.post_url||null, thumbnail_url:r.thumbnail_url||null,
+      duration_sec:r.duration_sec||null,
+      views:r.views||0, reach:r.reach||0, likes:r.likes||0, comments:r.comments||0,
+      shares:r.shares||0, saves:r.saves||0, new_followers:r.new_followers||0,
+      caption:r.caption||null
+    };
+    const existing=r.ig_post_id?existingByPostId.get(r.ig_post_id):null;
+    if(existing) toUpdate.push({id:existing.id,...base});
+    else toInsert.push({...base,created_by:STATE.user.id});
+  });
+
+  let savedCount=0, failedCount=0;
+  if(toInsert.length){
+    const{data,error}=await sb.from('content_performance').insert(toInsert).select();
+    if(error) return showAlert('cp-preview-alert','Could not save — check permissions. '+error.message,'error');
+    STATE.contentPerf=[...(data||[]),...STATE.contentPerf];
+    savedCount+=(data||[]).length;
+  }
+  for(const u of toUpdate){
+    const{id,...patch}=u;
+    const{data,error}=await sb.from('content_performance').update(patch).eq('id',id).select().single();
+    if(error){ failedCount++; continue; }
+    const idx=STATE.contentPerf.findIndex(x=>x.id===id); if(idx>-1) STATE.contentPerf[idx]=data;
+    savedCount++;
+  }
   filterContentPerfEntries();
+  showAlert('cp-preview-alert',`Saved ${savedCount} post(s)${failedCount?`, ${failedCount} failed`:''}.`,failedCount?'error':'success');
+  setTimeout(()=>{ cancelContentPerfPreview(); },1500);
 }
 
 // ── Management / KPIs ─────────────────────────────────────────
