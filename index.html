@@ -362,6 +362,12 @@
       <div id="cp-preview-card" class="card" style="display:none;">
         <div class="card-title">Preview — confirm models before saving</div>
         <div id="cp-preview-summary" style="font-size:12px;color:var(--text2);margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:rgba(30,79,255,0.06);border:1px solid rgba(30,79,255,0.2);border-radius:8px;padding:10px 12px;">
+          <span style="font-size:12px;font-weight:600;">Bulk assign model:</span>
+          <select id="cp-bulk-model" style="width:180px;"><option value="">— Select a model —</option></select>
+          <button class="btn btn-sm btn-primary" onclick="bulkAssignContentPerfModel(false)">Apply to unmatched</button>
+          <button class="btn btn-sm btn-ghost" onclick="bulkAssignContentPerfModel(true)">Apply to all rows</button>
+        </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Thumb</th><th>Date</th><th>Model</th><th>Type</th><th>Views</th><th>Likes</th><th>Saves</th><th>Follows</th><th>Caption</th></tr></thead>
           <tbody id="cp-preview-body"></tbody>
@@ -5079,7 +5085,17 @@ function parseCpPublishTime(publishRaw){
   if(!publishRaw) return {post_date:'',post_time:''};
   if(publishRaw instanceof Date && !isNaN(publishRaw)) return {post_date:toLocalISO(publishRaw),post_time:publishRaw.toTimeString().slice(0,5)};
   const s=String(publishRaw).trim();
-  const d=new Date(s.replace(/^(\d{2})\/(\d{2})\/(\d{4})/,'$3-$1-$2'));
+  // Parse Meta's "MM/DD/YYYY HH:MM" format by hand rather than handing a reformatted string
+  // to `new Date()` -- Safari returns Invalid Date for non-ISO "YYYY-MM-DD HH:MM" (space
+  // instead of "T") even though Chrome/V8 silently accepts it, which was previously causing
+  // every row to come back with a blank date on Safari.
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})/);
+  if(m){
+    const[,mo,da,yr,hh,mi]=m;
+    return {post_date:`${yr}-${mo.padStart(2,'0')}-${da.padStart(2,'0')}`, post_time:`${hh.padStart(2,'0')}:${mi}`};
+  }
+  // Fall back to native parsing for any other format (e.g. already-ISO strings).
+  const d=new Date(s);
   if(isNaN(d)) return {post_date:'',post_time:''};
   return {post_date:toLocalISO(d),post_time:d.toTimeString().slice(0,5)};
 }
@@ -5131,6 +5147,11 @@ function renderContentPerfPreview(){
   const summaryEl=document.getElementById('cp-preview-summary');
   if(!_parsedContentPerf||!_parsedContentPerf.length){if(card)card.style.display='none';return;}
   card.style.display='block';
+  const bulkSel=document.getElementById('cp-bulk-model');
+  if(bulkSel && !bulkSel.dataset.filled){
+    bulkSel.innerHTML='<option value="">— Select a model —</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+    bulkSel.dataset.filled='1';
+  }
   const matched=_parsedContentPerf.filter(r=>r.model_id).length;
   if(summaryEl) summaryEl.textContent=`${_parsedContentPerf.length} post(s) found — ${matched} matched to a model automatically, ${_parsedContentPerf.length-matched} need manual assignment. Link Instagram handles on Model Settings to improve auto-matching.`;
   body.innerHTML=_parsedContentPerf.map((row,i)=>`
@@ -5156,6 +5177,20 @@ function reassignContentPerfPreviewRow(i,modelId){
   _parsedContentPerf[i].model_name=m?m.name:_parsedContentPerf[i].model_name;
 }
 
+// A single Content export is almost always all one Instagram account, so assigning every
+// row (or just the unmatched ones) to one model in a single click beats clicking each row's
+// dropdown individually. Rows can still be overridden one at a time afterward if needed.
+function bulkAssignContentPerfModel(applyToAll){
+  const modelId=document.getElementById('cp-bulk-model')?.value;
+  if(!modelId) return alert('Pick a model from the bulk-assign dropdown first.');
+  const m=STATE.models.find(x=>x.id===modelId);
+  if(!m || !_parsedContentPerf) return;
+  _parsedContentPerf.forEach(r=>{
+    if(applyToAll || !r.model_id){ r.model_id=m.id; r.model_name=m.name; }
+  });
+  renderContentPerfPreview();
+}
+
 function cancelContentPerfPreview(){
   _parsedContentPerf=null;
   const card=document.getElementById('cp-preview-card'); if(card) card.style.display='none';
@@ -5163,14 +5198,17 @@ function cancelContentPerfPreview(){
 
 // Meta's Content export is lifetime-cumulative per post, so re-uploading a later export
 // should refresh existing rows (matched by ig_post_id) rather than create duplicates.
+// Rows with no parseable date are skipped rather than blocking the whole batch -- they stay
+// in the preview afterward so they can be fixed by hand or added manually.
 async function saveContentPerfRows(){
   if(!_parsedContentPerf||!_parsedContentPerf.length) return;
-  const missing=_parsedContentPerf.filter(r=>!r.post_date);
-  if(missing.length) return showAlert('cp-preview-alert',`${missing.length} row(s) are missing a post date — fix or remove before saving.`,'error');
+  const validRows=_parsedContentPerf.filter(r=>r.post_date);
+  const skippedCount=_parsedContentPerf.length-validRows.length;
+  if(!validRows.length) return showAlert('cp-preview-alert','No rows have a usable post date — nothing to save. Set a date on each row manually, or use + Add Entry instead.','error');
 
   const existingByPostId=new Map(STATE.contentPerf.filter(r=>r.ig_post_id).map(r=>[r.ig_post_id,r]));
   const toInsert=[], toUpdate=[];
-  _parsedContentPerf.forEach(r=>{
+  validRows.forEach(r=>{
     const base={
       model_id:r.model_id, model_name:r.model_name||null, platform:'instagram',
       ig_post_id:r.ig_post_id, ig_account_username:r.ig_account_username,
@@ -5201,8 +5239,14 @@ async function saveContentPerfRows(){
     savedCount++;
   }
   filterContentPerfEntries();
-  showAlert('cp-preview-alert',`Saved ${savedCount} post(s)${failedCount?`, ${failedCount} failed`:''}.`,failedCount?'error':'success');
-  setTimeout(()=>{ cancelContentPerfPreview(); },1500);
+  const skippedMsg=skippedCount?` ${skippedCount} row(s) skipped — no post date found for those; fix the date below or add manually via + Add Entry.`:'';
+  showAlert('cp-preview-alert',`Saved ${savedCount} post(s)${failedCount?`, ${failedCount} failed`:''}.${skippedMsg}`,(failedCount||skippedCount)?'error':'success');
+  if(!skippedCount){
+    setTimeout(()=>{ cancelContentPerfPreview(); },1500);
+  } else {
+    _parsedContentPerf=_parsedContentPerf.filter(r=>!r.post_date);
+    renderContentPerfPreview();
+  }
 }
 
 // ── Management / KPIs ─────────────────────────────────────────
