@@ -907,69 +907,31 @@
     </div><!-- close page-invoices -->
 
     <!-- Model Invoices -- kept fully separate from the chatter/traffic/VA Invoices page
-         above: own table query (always role='model'), own admin review queue, own form
-         (no salary/commission split -- that's a staff payroll concept, models just submit
-         a payout amount). Nothing here is ever mixed with chatter invoice data. -->
+         above: own table query (always role='model'). Read-only for models -- invoices are
+         auto-generated on Creator Stats upload from the model_payout figure already computed
+         there (see generateModelInvoicesFromReport()), using each model's split % from Model
+         Settings. Admin gets the same list plus mark-paid/unpaid and a manual "add invoice"
+         fallback for anything the auto-generation didn't cover (bonuses, corrections, etc). -->
     <div class="page" id="page-model-invoices">
-      <div class="page-title">My Invoices</div>
-      <div class="page-sub">Submit a payout request — admin reviews and processes it</div>
-      <div class="two-col-wide" style="margin-bottom:16px;">
-      <div class="card">
-        <div class="card-title">Submit Invoice</div>
-        <div class="form-grid">
-          <div class="form-group"><label>Week From</label><input type="date" id="minv-week-start" onchange="syncModelInvWeek()"></div>
-          <div class="form-group"><label>Week To</label><input type="date" id="minv-week-end"></div>
-          <div class="form-group full"><label>Amount ($)</label><input type="number" id="minv-amount" placeholder="0.00" step="0.01" min="0"></div>
-          <div class="form-group full"><label>What's this for? (optional)</label><input type="text" id="minv-desc" placeholder="e.g. October split payout"></div>
-          <div class="form-group full">
-            <label>Upload Invoice (PDF or image, optional)</label>
-            <div id="minv-file-preview" style="display:none;margin-bottom:8px;">
-              <span id="minv-file-name" style="font-size:13px;color:var(--green);">📎 File attached</span>
-              <button onclick="clearModelInvFile()" class="btn btn-sm btn-danger" style="margin-left:8px;">Remove</button>
-            </div>
-            <div class="file-drop" id="minv-file-drop" onclick="document.getElementById('minv-file-input').click()" style="padding:16px;">
-              <div style="font-size:24px;">📄</div>
-              <p style="font-size:12px;margin-top:4px;">Click to upload invoice PDF or image</p>
-            </div>
-            <input type="file" id="minv-file-input" accept=".pdf,image/*" style="display:none" onchange="handleModelInvFile(this.files[0])">
-          </div>
+      <div class="page-title" id="minv-page-title">My Invoices</div>
+      <div class="page-sub" id="minv-page-sub">Your weekly payouts — generated automatically each week</div>
+
+      <div id="minv-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;max-width:620px;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+        <div class="tabs" style="margin-bottom:0;">
+          <div class="tab active" id="minv-tab-unpaid" onclick="setModelInvoiceFilter('unpaid')">Unpaid</div>
+          <div class="tab" id="minv-tab-paid" onclick="setModelInvoiceFilter('paid')">Paid</div>
+          <div class="tab" id="minv-tab-all" onclick="setModelInvoiceFilter('')">All</div>
         </div>
-        <div class="btn-row"><button class="btn btn-primary" onclick="submitModelInvoice()">📤 Submit Invoice</button></div>
-        <div id="minv-alert" class="alert"></div>
-      </div>
-      <div>
-        <div id="model-invoice-admin-panel" style="display:none;">
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-title">Needs Review</div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Model payout requests only — separate from the Chatter/Traffic/VA Invoices queue.</div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Week</th><th>Amount</th><th>Invoice</th><th>Notes</th><th>Admin Notes</th><th>Status</th><th></th></tr></thead>
-            <tbody id="model-invoices-pending-body"></tbody>
-          </table></div>
-          <div id="model-invoices-pending-empty" class="empty" style="display:none;"><div class="empty-icon">🎉</div><p>Nothing waiting on review</p></div>
-        </div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-title">Processed Invoices</div>
-          <div style="margin-bottom:12px;">
-            <select id="minv-filter" onchange="filterModelInvoices()" style="width:160px;"><option value="">All</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Week</th><th>Amount</th><th>Invoice</th><th>Notes</th><th>Admin Notes</th><th>Status</th><th></th></tr></thead>
-            <tbody id="model-invoices-body"></tbody>
-          </table></div>
-          <div id="model-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>Nothing processed yet</p></div>
-        </div>
-        </div>
-        <div class="card">
-          <div class="card-title">My Invoices</div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Week</th><th>Amount</th><th>Notes</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
-            <tbody id="my-model-invoices-body"></tbody>
-          </table></div>
-          <div id="my-model-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
+        <div id="minv-admin-actions" style="display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="openManualInvoiceModal()">➕ Add Invoice Manually</button>
         </div>
       </div>
-      </div><!-- close two-col-wide -->
+
+      <div id="minv-alert" class="alert"></div>
+      <div id="minv-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
+      <div id="minv-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No invoices yet</p></div>
     </div><!-- close page-model-invoices -->
 
     <!-- Expenses -->
@@ -1478,19 +1440,23 @@
   </div>
 </div>
 
+<!-- Admin-only: doubles as "Add Invoice Manually" (id left blank, Model field shown) and
+     "Edit Invoice" (id set, Model field hidden) for the Model Invoices page above. Models
+     never see this modal -- they get a read-only paid/unpaid breakdown only. -->
 <div class="modal-overlay" id="model-inv-edit-modal">
   <div class="modal">
-    <div class="modal-title"><span>Edit Invoice</span><button class="modal-close" onclick="closeModal('model-inv-edit-modal')">✕</button></div>
+    <div class="modal-title"><span id="minv-edit-modal-title">Add Invoice Manually</span><button class="modal-close" onclick="closeModal('model-inv-edit-modal')">✕</button></div>
     <input type="hidden" id="minv-edit-id">
     <div class="form-grid">
+      <div class="form-group full" id="minv-edit-model-group"><label>Model</label><select id="minv-edit-model"></select></div>
       <div class="form-group"><label>Week From</label><input type="date" id="minv-edit-week-start" onchange="syncModelInvEditWeek()"></div>
       <div class="form-group"><label>Week To</label><input type="date" id="minv-edit-week-end"></div>
       <div class="form-group full"><label>Amount ($)</label><input type="number" id="minv-edit-amount" step="0.01" min="0"></div>
-      <div class="form-group full"><label>What's this for?</label><input type="text" id="minv-edit-desc" placeholder="e.g. October split payout"></div>
-      <div class="form-group full" id="minv-edit-notes-group" style="display:none;"><label>Admin Notes (admin only)</label><input type="text" id="minv-edit-notes" placeholder="e.g. Paid via Zelle, double-checked"></div>
+      <div class="form-group full"><label>What's this for?</label><input type="text" id="minv-edit-desc" placeholder="e.g. Bonus, correction, off-cycle payout"></div>
+      <div class="form-group full"><label>Status</label><select id="minv-edit-status"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveEditModelInvoice()">💾 Save Changes</button>
+      <button class="btn btn-primary" onclick="saveEditModelInvoice()">💾 Save</button>
       <button class="btn btn-ghost" onclick="closeModal('model-inv-edit-modal')">Cancel</button>
     </div>
     <div id="minv-edit-alert" class="alert"></div>
@@ -1562,7 +1528,7 @@ var NAV = [
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
-  { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
@@ -1675,7 +1641,7 @@ function renderModelHome(){
     { id:'contentperf',      icon:'📈', label:'Content Performance',  desc:'See how your posts are doing' },
     { id:'ideas',             icon:'💡', label:'Content Ideas',        desc:'Fresh ideas for your niche' },
     { id:'guides',            icon:'📚', label:'Guides',               desc:'Drip sets & weekly requirements' },
-    { id:'model-invoices',    icon:'💵', label:'My Invoices',          desc:'Submit & track your payouts' },
+    { id:'model-invoices',    icon:'💵', label:'My Invoices',          desc:'See your weekly payouts' },
   ];
   cardsEl.innerHTML=shortcuts.map(s=>`
     <div class="mh-card" onclick="navigate('${s.id}')">
@@ -3580,11 +3546,78 @@ async function saveReportRows(){
     const{error:dailyError}=await sb.from('creator_stats_daily').insert(dailyRows);
     msg+= dailyError ? ` (Daily breakdown did not save: ${dailyError.message})` : ` +${dailyRows.length} daily rows.`;
   }
+  // Auto-generate this week's model payout invoices straight off the numbers just saved --
+  // reuses row.model_payout (== gross earnings minus the agency's split cut) so the invoice
+  // amount always matches what was just shown in the preview table above, no separate math.
+  const invResult=await generateModelInvoicesFromReport(raw,weekOf,weekEnd);
+  if(invResult.error) msg+=` (Invoices did not auto-generate: ${invResult.error.message})`;
+  else if(invResult.generated) msg+=` · ${invResult.generated} model invoice${invResult.generated!==1?'s':''} generated${invResult.skippedPaid?`, ${invResult.skippedPaid} skipped (already paid)`:''}.`;
   showAlert('report-alert',msg,'success');
   _parsedRows=null; _parsedDailyRows=null;
   document.getElementById('csv-preview').innerHTML='';
   document.getElementById('csv-save').style.display='none';
   loadCreatorStatsSummary();
+}
+
+// ── Auto invoice generation (Creator Stats upload → model payout invoices) ──
+// See saveReportRows() above for the trigger point. Kept as its own function so it can
+// also be called for a manual "regenerate this week's invoices" action later if needed.
+function addDays(dateStr,days){
+  // Pure calendar-date math via UTC components -- deliberately avoids new Date(str+'T00:00:00')
+  // + local setDate() + toISOString(), which silently shifts the result a day off in any
+  // positive-UTC-offset timezone (e.g. AEST) because local midnight converts to the previous
+  // UTC day. The payout date must land on the same calendar day regardless of browser TZ.
+  const[y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  dt.setUTCDate(dt.getUTCDate()+days);
+  return dt.toISOString().split('T')[0];
+}
+
+async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
+  // OF-style payouts clear roughly two weeks after the earnings week starts -- the agency
+  // can only actually invoice/pay out money it has itself received. Keep this delay fixed
+  // so every week's invoice lands on the same predictable schedule (e.g. the week of Jul
+  // 20-26 becomes payable Aug 3, always the Monday two weeks after the week's own Monday).
+  const payoutDate=addDays(weekOf,14);
+  const eligible=rows.filter(r=>r.model_id && r.model_payout>0);
+  if(!eligible.length) return {generated:0, skippedPaid:0};
+
+  // Re-uploading the same week (a correction) should replace any invoice for it that's
+  // still unpaid, but must never touch one that's already been paid out.
+  const{data:existing}=await sb.from('invoices').select('id,model_id,status').eq('source','auto').eq('week_of',weekOf).eq('week_end',weekEnd);
+  const existingByModel=new Map((existing||[]).map(i=>[i.model_id,i]));
+
+  const toInsert=[], toDeleteIds=[];
+  let skippedPaid=0;
+  eligible.forEach(r=>{
+    const prior=existingByModel.get(r.model_id);
+    if(prior){
+      if(prior.status==='paid'){ skippedPaid++; return; }
+      toDeleteIds.push(prior.id);
+    }
+    const model=STATE.models.find(m=>m.id===r.model_id);
+    toInsert.push({
+      model_id:r.model_id,
+      submitted_by_email:model?.email||null,
+      submitted_by_name:r.model_name,
+      role:'model',
+      week_of:weekOf, week_end:weekEnd,
+      amount:r.model_payout,
+      gross_earnings:r.total_earnings,
+      split_pct:r.model_split,
+      source:'auto',
+      status:'unpaid',
+      payout_date:payoutDate,
+      description:'Weekly earnings payout'
+    });
+  });
+
+  if(toDeleteIds.length) await sb.from('invoices').delete().in('id',toDeleteIds);
+  if(toInsert.length){
+    const{error}=await sb.from('invoices').insert(toInsert);
+    if(error) return {generated:0, skippedPaid, error};
+  }
+  return {generated:toInsert.length, skippedPaid};
 }
 
 async function loadReportHistory(){
@@ -4615,171 +4648,139 @@ async function backfillInvoiceExpenseSync(){
 }
 
 // ── Model Invoices ───────────────────────────────────────────
-// Deliberately independent from the chatter/traffic/VA Invoices code above -- own
-// state, own queries (always role:'model'), own form, own admin queue. Nothing here
-// ever touches STATE.invoices or the chatter invoice tables, so a model's payout
-// requests can never get mixed in with (or accidentally shown alongside) staff
-// invoices. No salary/commission split (that's a staff payroll concept) and no
-// automatic Expenses sync on approval -- this just tracks submit -> review -> paid.
+// Deliberately independent from the chatter/traffic/VA Invoices code above. Models get a
+// read-only paid/unpaid breakdown -- there is no self-submit path anymore. Invoices are
+// auto-generated on Creator Stats upload (see generateModelInvoicesFromReport() near the
+// report-saving code) using each model's split % from Model Settings, landing here already
+// filled in with amount/gross/split/payout date. Admin can mark paid/unpaid and add an
+// invoice manually as a fallback (bonuses, corrections, off-cycle payouts).
 var STATE_MODEL_INVOICES=[];
-var MY_MODEL_INVOICES_DATA=[];
-var _modelInvFile=null;
+var MODEL_INVOICE_FILTER='unpaid';
 
 async function renderModelInvoicePage(){
-  const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va';
-  document.getElementById('model-invoice-admin-panel').style.display=isAdmin?'block':'none';
-  const wkStart=document.getElementById('minv-week-start');
-  const wkEnd=document.getElementById('minv-week-end');
-  if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
-  if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
-  if(isAdmin){
-    const{data,error}=await sb.from('invoices').select('*').eq('role','model').order('created_at',{ascending:false});
-    if(error){console.error('renderModelInvoicePage',error);}
-    STATE_MODEL_INVOICES=data||[];
-    renderModelInvoicesPending(); filterModelInvoices();
-  }
-  renderMyModelInvoices();
+  // Admin-only, deliberately excludes 'va' -- model payout data is more sensitive than
+  // chatter/traffic invoices, and this is also enforced at the RLS level (see
+  // restrict_va_from_model_invoices migration), so this check is a UI courtesy, not the
+  // real boundary.
+  const isAdmin=STATE.profile?.role==='admin';
+  const actionsEl=document.getElementById('minv-admin-actions');
+  if(actionsEl) actionsEl.style.display=isAdmin?'block':'none';
+  const titleEl=document.getElementById('minv-page-title');
+  const subEl=document.getElementById('minv-page-sub');
+  if(titleEl) titleEl.textContent=isAdmin?'Model Invoices':'My Invoices';
+  if(subEl) subEl.textContent=isAdmin?'Weekly payouts generated automatically from Creator Stats uploads, plus anything added manually':'Your weekly payouts — generated automatically each week';
+
+  let query=sb.from('invoices').select('*').eq('role','model').order('week_of',{ascending:false});
+  if(!isAdmin) query=query.eq('submitted_by_email',STATE.profile.email);
+  const{data,error}=await query;
+  if(error){console.error('renderModelInvoicePage',error);return;}
+  STATE_MODEL_INVOICES=data||[];
+  renderModelInvoiceSummary();
+  renderModelInvoiceCards();
 }
 
-function renderModelInvoicesPending(){
-  const tbody=document.getElementById('model-invoices-pending-body'); const empty=document.getElementById('model-invoices-pending-empty');
-  const invs=STATE_MODEL_INVOICES.filter(i=>i.status==='pending');
-  tbody.innerHTML='';
-  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
-  invs.forEach(inv=>{tbody.innerHTML+=modelInvoiceRowHtml(inv);});
+function renderModelInvoiceSummary(){
+  const el=document.getElementById('minv-summary'); if(!el)return;
+  const unpaidTotal=STATE_MODEL_INVOICES.filter(i=>i.status!=='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  const paidTotal=STATE_MODEL_INVOICES.filter(i=>i.status==='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  el.innerHTML=statCard('Unpaid','$'+fmt(unpaidTotal),'accent','red')+statCard('Paid (all time)','$'+fmt(paidTotal),'accent','green')+statCard('Invoices',STATE_MODEL_INVOICES.length,'white','purple');
 }
 
-function renderModelInvoicesTable(invs){
-  const tbody=document.getElementById('model-invoices-body'); const empty=document.getElementById('model-invoices-empty'); tbody.innerHTML='';
-  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
-  invs.forEach(inv=>{tbody.innerHTML+=modelInvoiceRowHtml(inv);});
+function setModelInvoiceFilter(status){
+  MODEL_INVOICE_FILTER=status;
+  document.getElementById('minv-tab-unpaid')?.classList.toggle('active',status==='unpaid');
+  document.getElementById('minv-tab-paid')?.classList.toggle('active',status==='paid');
+  document.getElementById('minv-tab-all')?.classList.toggle('active',status==='');
+  renderModelInvoiceCards();
 }
 
-function modelInvoiceRowHtml(inv){
-  return `<tr>
-    <td>${inv.submitted_by_name||inv.submitted_by_email||'—'}</td>
-    <td style="white-space:nowrap;">${fmtDate(inv.week_of)}</td>
-    <td><strong>$${fmt(inv.amount)}</strong></td>
-    <td>${inv.invoice_file_url?`<a href="${inv.invoice_file_url}" target="_blank" class="btn btn-sm btn-ghost">📄 View</a>`:'—'}</td>
-    <td style="font-size:12px;color:var(--text2);max-width:140px;">${inv.description||'—'}</td>
-    <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.admin_notes||'—'}</td>
-    <td><span class="badge ${inv.status}">${inv.status}</span></td>
-    <td style="display:flex;gap:4px;flex-wrap:wrap;">
-      <button class="btn btn-sm btn-green" onclick="updateModelInvoice('${inv.id}','approved')">✓</button>
-      <button class="btn btn-sm btn-ghost" onclick="updateModelInvoice('${inv.id}','processing')">⏳</button>
-      <button class="btn btn-sm btn-danger" onclick="updateModelInvoice('${inv.id}','rejected')">✕</button>
+function renderModelInvoiceCards(){
+  const isAdmin=STATE.profile?.role==='admin';
+  const wrap=document.getElementById('minv-cards'); const empty=document.getElementById('minv-empty');
+  if(!wrap)return;
+  const list=MODEL_INVOICE_FILTER?STATE_MODEL_INVOICES.filter(i=>i.status===MODEL_INVOICE_FILTER):STATE_MODEL_INVOICES;
+  wrap.innerHTML='';
+  if(!list.length){empty.style.display='block';return;} empty.style.display='none';
+  list.forEach(inv=>{wrap.innerHTML+=modelInvoiceCardHtml(inv,isAdmin);});
+}
+
+function modelInvoiceCardHtml(inv,isAdmin){
+  const period=inv.week_end?`${fmtDate(inv.week_of)} – ${fmtDate(inv.week_end)}`:fmtDate(inv.week_of);
+  const isPaid=inv.status==='paid';
+  const modelSharePct=inv.split_pct!=null?(100-parseFloat(inv.split_pct)):null;
+  return `<div class="card minv-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+      <div>
+        ${isAdmin?`<div style="font-size:13px;font-weight:700;color:#fff;">${inv.submitted_by_name||'—'}</div>`:''}
+        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">${period}</div>
+      </div>
+      <span style="background:${isPaid?'rgba(46,196,120,.15)':'rgba(230,180,40,.15)'};color:${isPaid?'var(--green)':'#e6b428'};text-transform:uppercase;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.05em;white-space:nowrap;">${inv.status}</span>
+    </div>
+    <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px;">$${fmt(inv.amount)}</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">${modelSharePct!=null?`${modelSharePct}% of $${fmt(inv.gross_earnings||0)} gross earnings`:(inv.description||'Payout')}</div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;">
+      <span>${isPaid?`Paid ${fmtDate(inv.paid_at)}`:`Payable ${fmtDate(inv.payout_date)}`}</span>
+      <span>${inv.source==='auto'?'Auto-generated':'Manual'}</span>
+    </div>
+    ${isAdmin?`<div class="btn-row" style="margin-top:12px;">
+      ${isPaid?`<button class="btn btn-sm btn-ghost" onclick="markModelInvoiceUnpaid('${inv.id}')">↺ Mark Unpaid</button>`:`<button class="btn btn-sm btn-green" onclick="markModelInvoicePaid('${inv.id}')">✓ Mark Paid</button>`}
       <button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>
       <button class="btn btn-sm btn-danger" onclick="delModelInvoice('${inv.id}')" title="Delete permanently">🗑</button>
-    </td></tr>`;
+    </div>`:''}
+  </div>`;
 }
 
-function filterModelInvoices(){
-  const s=document.getElementById('minv-filter').value;
-  const processed=STATE_MODEL_INVOICES.filter(i=>i.status!=='pending');
-  renderModelInvoicesTable(s?processed.filter(i=>i.status===s):processed);
-}
-
-async function renderMyModelInvoices(){
-  const{data}=await sb.from('invoices').select('*').eq('submitted_by_email',STATE.profile.email).eq('role','model').order('created_at',{ascending:false});
-  MY_MODEL_INVOICES_DATA=data||[];
-  const tbody=document.getElementById('my-model-invoices-body'); const empty=document.getElementById('my-model-invoices-empty'); tbody.innerHTML='';
-  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
-  data.forEach(inv=>{tbody.innerHTML+=`<tr><td>${fmtDate(inv.week_of)}</td><td>$${fmt(inv.amount)}</td><td>${inv.description||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(inv.created_at)}</td><td>${inv.status==='pending'?`<button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>`:''}</td></tr>`;});
-}
-
-function handleModelInvFile(file){
-  if(!file)return;
-  _modelInvFile=file;
-  document.getElementById('minv-file-name').textContent=`📎 ${file.name}`;
-  document.getElementById('minv-file-preview').style.display='block';
-  document.getElementById('minv-file-drop').style.display='none';
-}
-function clearModelInvFile(){_modelInvFile=null;document.getElementById('minv-file-preview').style.display='none';document.getElementById('minv-file-drop').style.display='block';document.getElementById('minv-file-input').value='';}
-
-async function uploadModelInvFile(){
-  if(!_modelInvFile)return null;
-  try{
-    const path=`model-invoices/${STATE.profile.email}_${Date.now()}_${_modelInvFile.name}`;
-    const{error}=await sb.storage.from('invoice-files').upload(path,_modelInvFile,{upsert:true});
-    if(error){console.error(error);return null;}
-    const{data}=sb.storage.from('invoice-files').getPublicUrl(path);
-    return data.publicUrl;
-  }catch(e){console.error(e);return null;}
-}
-
-function syncModelInvWeek(){
-  const start=document.getElementById('minv-week-start').value;
-  if(!start)return;
-  const d=new Date(start); d.setDate(d.getDate()+6);
-  document.getElementById('minv-week-end').value=d.toISOString().split('T')[0];
-}
-function syncModelInvEditWeek(){
-  const start=document.getElementById('minv-edit-week-start').value;
-  if(!start)return;
-  const d=new Date(start); d.setDate(d.getDate()+6);
-  document.getElementById('minv-edit-week-end').value=d.toISOString().split('T')[0];
-}
-
-async function submitModelInvoice(){
-  const amount=parseFloat(document.getElementById('minv-amount').value||0);
-  const weekStart=document.getElementById('minv-week-start').value;
-  const weekEnd=document.getElementById('minv-week-end').value;
-  const weekOf=weekStart||weekEnd||'';
-  if(!weekOf||!amount)return showAlert('minv-alert','Fill in week dates and an amount.','error');
-  const fileUrl=await uploadModelInvFile();
-  const inv={
-    submitted_by_email:STATE.profile.email,
-    submitted_by_name:STATE.profile.name,
-    role:'model',
-    week_of:weekOf,
-    week_end:weekEnd||null,
-    amount:amount,
-    salary_amount:0,
-    commission_amount:0,
-    description:document.getElementById('minv-desc').value.trim(),
-    invoice_file_url:fileUrl,
-    status:'pending'
-  };
-  const{error}=await sb.from('invoices').insert(inv);
-  if(error)return showAlert('minv-alert',error.message,'error');
-  showAlert('minv-alert','Invoice submitted! 🎉','success');
-  document.getElementById('minv-amount').value='';
-  document.getElementById('minv-desc').value='';
-  clearModelInvFile();
-  renderMyModelInvoices();
-}
-
-async function updateModelInvoice(id,status){
-  const{error}=await sb.from('invoices').update({status}).eq('id',id);
+async function markModelInvoicePaid(id){
+  const paidAt=new Date().toISOString();
+  const{error}=await sb.from('invoices').update({status:'paid',paid_at:paidAt}).eq('id',id);
   if(error) return alert(error.message);
-  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv)inv.status=status;
-  renderModelInvoicesPending(); filterModelInvoices();
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='paid';inv.paid_at=paidAt;}
+  renderModelInvoiceSummary(); renderModelInvoiceCards();
+}
+
+async function markModelInvoiceUnpaid(id){
+  const{error}=await sb.from('invoices').update({status:'unpaid',paid_at:null}).eq('id',id);
+  if(error) return alert(error.message);
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='unpaid';inv.paid_at=null;}
+  renderModelInvoiceSummary(); renderModelInvoiceCards();
 }
 
 async function delModelInvoice(id){
-  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id)||MY_MODEL_INVOICES_DATA.find(x=>x.id===id);
-  if(!inv)return;
   if(!confirm('Delete this invoice permanently?'))return;
   const{error,data}=await sb.from('invoices').delete().eq('id',id).select();
   if(error||!data||!data.length){alert('Could not delete this invoice — you may be missing delete permission.');return;}
   STATE_MODEL_INVOICES=STATE_MODEL_INVOICES.filter(i=>i.id!==id);
-  MY_MODEL_INVOICES_DATA=MY_MODEL_INVOICES_DATA.filter(i=>i.id!==id);
-  renderModelInvoicesPending(); filterModelInvoices(); renderMyModelInvoices();
+  renderModelInvoiceSummary(); renderModelInvoiceCards();
+}
+
+function openManualInvoiceModal(){
+  document.getElementById('minv-edit-id').value='';
+  document.getElementById('minv-edit-modal-title').textContent='Add Invoice Manually';
+  document.getElementById('minv-edit-model-group').style.display='block';
+  const sel=document.getElementById('minv-edit-model');
+  sel.innerHTML='<option value="">Select model…</option>'+STATE.models.filter(Boolean).map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  sel.value='';
+  document.getElementById('minv-edit-week-start').value='';
+  document.getElementById('minv-edit-week-end').value='';
+  document.getElementById('minv-edit-amount').value='';
+  document.getElementById('minv-edit-desc').value='';
+  document.getElementById('minv-edit-status').value='unpaid';
+  document.getElementById('minv-edit-alert').innerHTML='';
+  openModal('model-inv-edit-modal');
 }
 
 function editModelInvoice(id){
-  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id)||MY_MODEL_INVOICES_DATA.find(x=>x.id===id);
+  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id);
   if(!inv)return;
   document.getElementById('minv-edit-id').value=inv.id;
+  document.getElementById('minv-edit-modal-title').textContent='Edit Invoice';
+  document.getElementById('minv-edit-model-group').style.display='none';
   document.getElementById('minv-edit-week-start').value=inv.week_of||'';
   document.getElementById('minv-edit-week-end').value=inv.week_end||'';
   document.getElementById('minv-edit-amount').value=inv.amount||0;
   document.getElementById('minv-edit-desc').value=inv.description||'';
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const notesGroup=document.getElementById('minv-edit-notes-group');
-  notesGroup.style.display=isAdmin?'block':'none';
-  document.getElementById('minv-edit-notes').value=inv.admin_notes||'';
-  document.getElementById('minv-edit-alert').style.display='none';
+  document.getElementById('minv-edit-status').value=inv.status||'unpaid';
+  document.getElementById('minv-edit-alert').innerHTML='';
   openModal('model-inv-edit-modal');
 }
 
@@ -4788,18 +4789,34 @@ async function saveEditModelInvoice(){
   const amount=parseFloat(document.getElementById('minv-edit-amount').value||0);
   const weekStart=document.getElementById('minv-edit-week-start').value;
   const weekEnd=document.getElementById('minv-edit-week-end').value;
+  const status=document.getElementById('minv-edit-status').value;
+  const desc=document.getElementById('minv-edit-desc').value.trim();
   if(!weekStart||!amount) return showAlert('minv-edit-alert','Fill in a week start and an amount.','error');
-  const updates={
-    week_of:weekStart, week_end:weekEnd||null,
-    amount:amount,
-    description:document.getElementById('minv-edit-desc').value.trim()
-  };
-  if(['admin','va'].includes(STATE.profile?.role)) updates.admin_notes=document.getElementById('minv-edit-notes').value.trim();
-  const{data,error}=await sb.from('invoices').update(updates).eq('id',id).select().single();
-  if(error) return showAlert('minv-edit-alert',error.message,'error');
-  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
-  const myInv=MY_MODEL_INVOICES_DATA.find(i=>i.id===id); if(myInv) Object.assign(myInv,updates);
-  renderModelInvoicesPending(); filterModelInvoices(); renderMyModelInvoices();
+
+  if(!id){
+    const modelId=document.getElementById('minv-edit-model').value;
+    if(!modelId) return showAlert('minv-edit-alert','Select a model.','error');
+    const model=STATE.models.find(m=>m.id===modelId);
+    const payload={
+      model_id:modelId, submitted_by_email:model?.email||null, submitted_by_name:model?.name||null,
+      role:'model', week_of:weekStart, week_end:weekEnd||null, amount:amount,
+      description:desc, source:'manual', status:status,
+      payout_date:status==='paid'?null:weekStart,
+      paid_at:status==='paid'?new Date().toISOString():null
+    };
+    const{data,error}=await sb.from('invoices').insert(payload).select().single();
+    if(error) return showAlert('minv-edit-alert',error.message,'error');
+    STATE_MODEL_INVOICES.unshift(data);
+  } else {
+    const updates={
+      week_of:weekStart, week_end:weekEnd||null, amount:amount, description:desc, status:status,
+      paid_at:status==='paid'?new Date().toISOString():null
+    };
+    const{error}=await sb.from('invoices').update(updates).eq('id',id);
+    if(error) return showAlert('minv-edit-alert',error.message,'error');
+    const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
+  }
+  renderModelInvoiceSummary(); renderModelInvoiceCards();
   closeModal('model-inv-edit-modal');
 }
 
