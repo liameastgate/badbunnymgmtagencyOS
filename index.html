@@ -155,6 +155,30 @@
   .guide-hub-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
   .guide-hub-desc { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
   .guide-hub-cta { font-size: 12px; font-weight: 700; color: var(--accent2); }
+
+  /* ── Drawing Board (workspaces / notes / goals / to-do) ──────── */
+  .mgmt-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .mgmt-tab-body { display: none; }
+  .mgmt-tab-body.active { display: block; }
+  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 14px; margin-bottom: 6px; }
+  .ws-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+  .ws-card:hover { transform: translateY(-2px); border-color: rgba(30,79,255,0.5); }
+  .ws-card-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .ws-card-preview { font-size: 11px; color: var(--text2); line-height: 1.5; max-height: 48px; overflow: hidden; white-space: pre-wrap; }
+  .ws-cat-header { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 8px; }
+  .note-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .note-text { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.5; }
+  .note-time { font-size: 10px; color: var(--text2); margin-top: 4px; }
+  .goal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .goal-bar-track { background: var(--border); border-radius: 4px; height: 6px; margin-top: 8px; }
+  .goal-bar-fill { border-radius: 4px; height: 6px; }
+  .todo-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+  .todo-row.done { opacity: 0.5; }
+  .todo-row.done .todo-text { text-decoration: line-through; }
+  .priority-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+  .priority-tag.high { background: #2a0f0f; color: var(--red); }
+  .priority-tag.med { background: #2a2010; color: var(--yellow); }
+  .priority-tag.low { background: #0f2a1a; color: var(--green); }
   .guide-back { font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; margin-bottom: 16px; display: inline-block; }
   .guide-back:hover { color: var(--accent2); }
 
@@ -1244,51 +1268,119 @@
     <!-- Management -->
     <div class="page" id="page-management">
       <div class="page-title">Drawing Board</div>
-      <div class="page-sub">Agency goals and KPI tracking</div>
-      <div class="two-col">
-        <div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-            <div class="stat-card accent">
-              <div class="stat-label">Revenue Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Model Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">models</span>
-              </div>
-            </div>
-            <div class="stat-card accent">
-              <div class="stat-label">Agency Net Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Renewal Rate Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">%</span>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title">Agency Notes</div>
-            <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:180px;background:var(--surface2);" onchange="saveKPI()"></textarea>
-          </div>
+      <div class="page-sub">Workspaces, notes, goals & to-dos — your planning hub</div>
+
+      <div class="card">
+        <div class="card-title">Latest Week Actuals</div>
+        <div id="kpi-comparison"></div>
+      </div>
+
+      <div class="mgmt-tabs">
+        <button class="btn btn-sm btn-primary" id="mgmt-tab-btn-workspaces" onclick="setManagementTab('workspaces')">🗂️ Workspaces</button>
+        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-notes" onclick="setManagementTab('notes')">📝 Quick Notes</button>
+        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-goals" onclick="setManagementTab('goals')">🎯 Goals</button>
+        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-todos" onclick="setManagementTab('todos')">✅ To-Do</button>
+      </div>
+
+      <!-- Workspaces -->
+      <div class="mgmt-tab-body active" id="mgmt-tab-workspaces">
+        <div class="btn-row" style="margin-top:0;margin-bottom:16px;">
+          <button class="btn btn-sm btn-primary" onclick="openAddWorkspaceModal()">+ Add Workspace</button>
         </div>
+        <div id="ws-container"></div>
+      </div>
+
+      <!-- Quick Notes -->
+      <div class="mgmt-tab-body" id="mgmt-tab-notes">
         <div class="card">
-          <div class="card-title">KPI vs Actuals — Latest Week</div>
-          <div id="kpi-comparison"></div>
+          <div class="card-title">Add Note</div>
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <textarea id="qn-input" placeholder="Jot something down..." rows="2" style="flex:1;background:var(--surface2);min-height:44px;"></textarea>
+            <button class="btn btn-sm btn-primary" onclick="addQuickNote()">Add</button>
+          </div>
         </div>
+        <div id="qn-container"></div>
+      </div>
+
+      <!-- Goals -->
+      <div class="mgmt-tab-body" id="mgmt-tab-goals">
+        <div class="btn-row" style="margin-top:0;margin-bottom:16px;">
+          <button class="btn btn-sm btn-primary" onclick="openAddGoalModal()">+ Add Goal</button>
+        </div>
+        <div id="goals-container"></div>
+      </div>
+
+      <!-- To-Do -->
+      <div class="mgmt-tab-body" id="mgmt-tab-todos">
+        <div class="card">
+          <div class="card-title">Add Task</div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">
+            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Task</label><input type="text" id="td-text" placeholder="What needs doing?" onkeydown="if(event.key==='Enter')addTodo()"></div>
+            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Priority</label>
+              <select id="td-priority"><option value="high">High</option><option value="med" selected>Medium</option><option value="low">Low</option></select>
+            </div>
+            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Due (optional)</label><input type="date" id="td-due"></div>
+            <button class="btn btn-sm btn-primary" onclick="addTodo()">Add</button>
+          </div>
+        </div>
+        <div id="todos-container"></div>
       </div>
     </div>
 
+    <!-- Workspace detail — generic template populated per-workspace, deliberately not in NAV so it never shows in the sidebar -->
+    <div class="page" id="page-workspace">
+      <div class="guide-back" onclick="navigate('management')">← Back to Drawing Board</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;min-width:240px;">
+          <input type="text" id="ws-detail-name" class="page-title" style="background:none;border:none;color:#fff;width:100%;padding:0;margin-bottom:4px;" onchange="saveWorkspaceDetail()">
+          <input type="text" id="ws-detail-category" class="page-sub" style="background:none;border:none;width:100%;padding:0;text-transform:none;letter-spacing:normal;" placeholder="Category (e.g. Traffic, Chatting, Content)" onchange="saveWorkspaceDetail()">
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="deleteWorkspace()" style="color:var(--red);">🗑️ Delete Workspace</button>
+      </div>
+      <div class="card">
+        <textarea id="ws-detail-body" placeholder="Write anything here..." style="width:100%;min-height:420px;background:var(--surface2);" onchange="saveWorkspaceDetail()"></textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Add/Edit Workspace Modal -->
+<div class="modal-overlay" id="ws-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Add Workspace</span><button class="modal-close" onclick="closeModal('ws-modal')">✕</button></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Name</label><input type="text" id="ws-modal-name" placeholder="e.g. Traffic"></div>
+      <div class="form-group full"><label>Category (optional — used to group workspaces)</label><input type="text" id="ws-modal-category" placeholder="e.g. Traffic, Chatting, Content" list="ws-category-suggestions"></div>
+      <datalist id="ws-category-suggestions"></datalist>
+    </div>
+    <div id="ws-modal-alert" class="alert"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveNewWorkspace()">💾 Create Workspace</button>
+      <button class="btn btn-ghost" onclick="closeModal('ws-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Goal Modal -->
+<div class="modal-overlay" id="goal-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="goal-modal-title">Add Goal</span><button class="modal-close" onclick="closeModal('goal-modal')">✕</button></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Goal Name</label><input type="text" id="goal-name" placeholder="e.g. Hit 10 models by Q4"></div>
+      <div class="form-group"><label>Target</label><input type="number" id="goal-target" placeholder="0"></div>
+      <div class="form-group"><label>Current</label><input type="number" id="goal-current" placeholder="0"></div>
+      <div class="form-group"><label>Unit</label>
+        <select id="goal-unit"><option value="$">$ (dollars)</option><option value="%">% (percent)</option><option value="">Plain number</option></select>
+      </div>
+      <div class="form-group"><label>Deadline (optional)</label><input type="date" id="goal-deadline"></div>
+      <div class="form-group full"><label>Notes (optional)</label><textarea id="goal-notes" rows="2" placeholder="Any context..."></textarea></div>
+    </div>
+    <div id="goal-alert" class="alert"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveGoal()">💾 Save Goal</button>
+      <button class="btn btn-ghost" onclick="closeModal('goal-modal')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -6143,18 +6235,43 @@ async function saveContentPerfRows(){
   }
 }
 
-// ── Management / KPIs ─────────────────────────────────────────
+// ── Drawing Board: workspaces / quick notes / goals / to-do ────
+// All four datasets live as separate rows in the existing generic agency_settings
+// key-value table (key='workspaces'|'quicknotes'|'goals'|'todos') -- no new tables
+// needed. MGMT holds the in-memory working copy; persistMgmt(key) writes it back.
+var MGMT = { workspaces:[], quicknotes:[], goals:[], todos:[], currentTab:'workspaces', currentWorkspaceId:null, editingGoalId:null };
+
 async function loadManagement(){
-  const{data}=await sb.from('agency_settings').select('*').eq('key','kpis').single();
-  if(data){
-    const kpis=data.value||{};
-    document.getElementById('kpi-revenue-target').value=kpis.revenue||'';
-    document.getElementById('kpi-model-target').value=kpis.models||'';
-    document.getElementById('kpi-net-target').value=kpis.net||'';
-    document.getElementById('kpi-renew-target').value=kpis.renew||'';
-    document.getElementById('agency-notes').value=kpis.notes||'';
+  const{data}=await sb.from('agency_settings').select('*').in('key',['kpis','workspaces','quicknotes','goals','todos']);
+  const byKey={}; (data||[]).forEach(r=>byKey[r.key]=r.value);
+  const legacyKpis=byKey.kpis||{};
+  MGMT.workspaces=byKey.workspaces||[];
+  MGMT.quicknotes=byKey.quicknotes||[];
+  MGMT.goals=byKey.goals||null; // null = old fixed-KPI board, not migrated to custom goals yet
+  MGMT.todos=byKey.todos||[];
+
+  // One-time migration from the old fixed-target Drawing Board so nothing set previously is lost.
+  if(MGMT.goals===null){
+    MGMT.goals=[];
+    const seed=[
+      {name:'Revenue Target (weekly)', target:legacyKpis.revenue, unit:'$'},
+      {name:'Model Target', target:legacyKpis.models, unit:''},
+      {name:'Agency Net Target (weekly)', target:legacyKpis.net, unit:'$'},
+      {name:'Renewal Rate Target', target:legacyKpis.renew, unit:'%'},
+    ];
+    seed.forEach(s=>{ if(s.target){ MGMT.goals.push({id:uid(),name:s.name,target:parseFloat(s.target),current:0,unit:s.unit,deadline:null,notes:'',createdAt:new Date().toISOString()}); } });
+    await persistMgmt('goals');
   }
-  // Load latest week actuals for comparison
+  if(MGMT.quicknotes.length===0 && legacyKpis.notes && legacyKpis.notes.trim()){
+    MGMT.quicknotes.push({id:uid(),text:legacyKpis.notes.trim(),createdAt:new Date().toISOString()});
+    await persistMgmt('quicknotes');
+  }
+
+  renderWorkspaces(); renderQuickNotes(); renderGoals(); renderTodos();
+  setManagementTab(MGMT.currentTab||'workspaces');
+
+  // Latest week actuals -- same source/definitions as before, just no fixed-target comparison anymore
+  // (targets now live as freeform Goals, tracked separately/manually).
   const{data:reports}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
   if(reports&&reports.length){
     const weeks=[...new Set(reports.map(r=>r.week_of))];
@@ -6163,7 +6280,6 @@ async function loadManagement(){
     const totalE=week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
     const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
     const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
-    const kpis=data?.value||{};
 
     // Chatter-side actuals for the same latest week -- same source/definitions as the
     // Chatter Performance summary tab, just rolled into one number each rather than per-chatter.
@@ -6182,10 +6298,10 @@ async function loadManagement(){
 
     document.getElementById('kpi-comparison').innerHTML=`
       <div class="stats-grid" style="margin-top:0;">
-        ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
-        ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
-        ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
-        ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
+        ${statCard('Revenue','$'+fmt(totalE),'','')}
+        ${statCard('Agency Net','$'+fmt(totalN),'','')}
+        ${statCard('Active Models',week.length,'','')}
+        ${statCard('Avg Renew %',(avgRenew*100).toFixed(1)+'%','','')}
         ${statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'—','','green')}
         ${statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'—','','blue')}
         ${statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'—','','')}
@@ -6196,26 +6312,252 @@ async function loadManagement(){
   }
 }
 
-function kpiCard(label,actual,target,prefix,isPct=false){
-  const fmt2=v=>isPct?v.toFixed(1):fmt(v);
-  const hit=target>0&&actual>=target;
-  const pct=target>0?Math.min(100,(actual/target)*100):0;
-  return`<div class="stat-card">
-    <div class="stat-label">${label}</div>
-    <div style="font-size:20px;font-weight:800;color:${hit?'var(--green)':'var(--text)'};">${prefix}${fmt2(actual)}</div>
-    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Target: ${prefix}${fmt2(target)}</div>
-    <div style="background:var(--border);border-radius:4px;height:4px;margin-top:8px;"><div style="background:${hit?'var(--green)':'var(--accent)'};width:${pct}%;height:4px;border-radius:4px;"></div></div>
-  </div>`;
+async function persistMgmt(key){
+  await sb.from('agency_settings').upsert({key,value:MGMT[key]},{onConflict:'key'});
 }
 
-async function saveKPI(){
-  const kpis={revenue:document.getElementById('kpi-revenue-target').value,models:document.getElementById('kpi-model-target').value,net:document.getElementById('kpi-net-target').value,renew:document.getElementById('kpi-renew-target').value,notes:document.getElementById('agency-notes').value};
-  await sb.from('agency_settings').upsert({key:'kpis',value:kpis},{onConflict:'key'});
+function setManagementTab(tab){
+  MGMT.currentTab=tab;
+  ['workspaces','notes','goals','todos'].forEach(t=>{
+    const body=document.getElementById('mgmt-tab-'+t); if(body) body.classList.toggle('active',t===tab);
+    const btn=document.getElementById('mgmt-tab-btn-'+t); if(btn) btn.className='btn btn-sm '+(t===tab?'btn-primary':'btn-ghost');
+  });
+}
+
+// ── Workspaces ───────────────────────────────────────────────
+function renderWorkspaces(){
+  const el=document.getElementById('ws-container'); if(!el) return;
+  if(!MGMT.workspaces.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No workspaces yet — add one to get started.</div>'; return; }
+  const groups={};
+  MGMT.workspaces.forEach(w=>{ const cat=(w.category||'').trim()||'Uncategorized'; (groups[cat]=groups[cat]||[]).push(w); });
+  let html='';
+  Object.keys(groups).sort().forEach(cat=>{
+    html+=`<div class="ws-cat-header">${cat}</div><div class="ws-grid">`;
+    groups[cat].forEach(w=>{
+      const preview=(w.body||'').slice(0,90).replace(/</g,'&lt;');
+      html+=`<div class="ws-card" onclick="openWorkspace('${w.id}')">
+        <div class="ws-card-title">${(w.name||'Untitled').replace(/</g,'&lt;')}</div>
+        <div class="ws-card-preview">${preview||'No notes yet'}</div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function openAddWorkspaceModal(){
+  document.getElementById('ws-modal-alert').style.display='none';
+  document.getElementById('ws-modal-name').value='';
+  document.getElementById('ws-modal-category').value='';
+  const dl=document.getElementById('ws-category-suggestions');
+  if(dl) dl.innerHTML=[...new Set(MGMT.workspaces.map(w=>w.category).filter(Boolean))].map(c=>`<option value="${c}">`).join('');
+  openModal('ws-modal');
+}
+
+async function saveNewWorkspace(){
+  const name=document.getElementById('ws-modal-name').value.trim();
+  if(!name){ showAlert('ws-modal-alert','Name is required','error'); return; }
+  const category=document.getElementById('ws-modal-category').value.trim();
+  const w={id:uid(),name,category,body:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  MGMT.workspaces.push(w);
+  await persistMgmt('workspaces');
+  closeModal('ws-modal');
+  renderWorkspaces();
+  openWorkspace(w.id);
+}
+
+function openWorkspace(id){
+  const w=MGMT.workspaces.find(x=>x.id===id); if(!w) return;
+  MGMT.currentWorkspaceId=id;
+  document.getElementById('ws-detail-name').value=w.name||'';
+  document.getElementById('ws-detail-category').value=w.category||'';
+  document.getElementById('ws-detail-body').value=w.body||'';
+  navigate('workspace');
+}
+
+async function saveWorkspaceDetail(){
+  const w=MGMT.workspaces.find(x=>x.id===MGMT.currentWorkspaceId); if(!w) return;
+  w.name=document.getElementById('ws-detail-name').value.trim()||'Untitled';
+  w.category=document.getElementById('ws-detail-category').value.trim();
+  w.body=document.getElementById('ws-detail-body').value;
+  w.updatedAt=new Date().toISOString();
+  document.getElementById('ws-detail-name').value=w.name;
+  await persistMgmt('workspaces');
+}
+
+async function deleteWorkspace(){
+  if(!confirm('Delete this workspace? This cannot be undone.')) return;
+  MGMT.workspaces=MGMT.workspaces.filter(x=>x.id!==MGMT.currentWorkspaceId);
+  await persistMgmt('workspaces');
+  MGMT.currentWorkspaceId=null;
+  renderWorkspaces();
+  navigate('management');
+}
+
+// ── Quick Notes ──────────────────────────────────────────────
+function renderQuickNotes(){
+  const el=document.getElementById('qn-container'); if(!el) return;
+  if(!MGMT.quicknotes.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:10px 0;">No notes yet.</div>'; return; }
+  const sorted=[...MGMT.quicknotes].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  el.innerHTML=sorted.map(n=>`<div class="note-card">
+    <div><div class="note-text">${(n.text||'').replace(/</g,'&lt;')}</div><div class="note-time">${fmtDateTime(n.createdAt)}</div></div>
+    <button onclick="deleteQuickNote('${n.id}')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
+  </div>`).join('');
+}
+
+async function addQuickNote(){
+  const val=document.getElementById('qn-input').value.trim();
+  if(!val) return;
+  MGMT.quicknotes.push({id:uid(),text:val,createdAt:new Date().toISOString()});
+  await persistMgmt('quicknotes');
+  document.getElementById('qn-input').value='';
+  renderQuickNotes();
+}
+
+async function deleteQuickNote(id){
+  MGMT.quicknotes=MGMT.quicknotes.filter(n=>n.id!==id);
+  await persistMgmt('quicknotes');
+  renderQuickNotes();
+}
+
+// ── Goals ────────────────────────────────────────────────────
+function renderGoals(){
+  const el=document.getElementById('goals-container'); if(!el) return;
+  if(!MGMT.goals.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No goals yet — add one to start tracking.</div>'; return; }
+  el.innerHTML=MGMT.goals.map(g=>{
+    const target=parseFloat(g.target||0), current=parseFloat(g.current||0);
+    const pct=target>0?Math.min(100,(current/target)*100):0;
+    const hit=target>0&&current>=target;
+    const unit=g.unit||'';
+    const fmtVal=v=>unit==='$'?'$'+fmt(v):unit==='%'?v+'%':fmt(v);
+    return `<div class="goal-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#fff;">${(g.name||'Untitled Goal').replace(/</g,'&lt;')}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${fmtVal(current)} of ${fmtVal(target)}${g.deadline?' · due '+fmtDate(g.deadline):''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm btn-ghost" onclick="openEditGoalModal('${g.id}')">Edit</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteGoal('${g.id}')" style="color:var(--red);">Delete</button>
+        </div>
+      </div>
+      <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${hit?'var(--green)':'var(--accent)'};"></div></div>
+      ${g.notes?`<div style="font-size:12px;color:var(--text2);margin-top:8px;">${g.notes.replace(/</g,'&lt;')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openAddGoalModal(){
+  MGMT.editingGoalId=null;
+  document.getElementById('goal-alert').style.display='none';
+  document.getElementById('goal-modal-title').textContent='Add Goal';
+  document.getElementById('goal-name').value='';
+  document.getElementById('goal-target').value='';
+  document.getElementById('goal-current').value='';
+  document.getElementById('goal-unit').value='$';
+  document.getElementById('goal-deadline').value='';
+  document.getElementById('goal-notes').value='';
+  openModal('goal-modal');
+}
+
+function openEditGoalModal(id){
+  const g=MGMT.goals.find(x=>x.id===id); if(!g) return;
+  MGMT.editingGoalId=id;
+  document.getElementById('goal-alert').style.display='none';
+  document.getElementById('goal-modal-title').textContent='Edit Goal';
+  document.getElementById('goal-name').value=g.name||'';
+  document.getElementById('goal-target').value=g.target||'';
+  document.getElementById('goal-current').value=g.current||'';
+  document.getElementById('goal-unit').value=g.unit||'$';
+  document.getElementById('goal-deadline').value=g.deadline||'';
+  document.getElementById('goal-notes').value=g.notes||'';
+  openModal('goal-modal');
+}
+
+async function saveGoal(){
+  const name=document.getElementById('goal-name').value.trim();
+  if(!name){ showAlert('goal-alert','Name is required','error'); return; }
+  const payload={name,target:parseFloat(document.getElementById('goal-target').value)||0,current:parseFloat(document.getElementById('goal-current').value)||0,unit:document.getElementById('goal-unit').value,deadline:document.getElementById('goal-deadline').value||null,notes:document.getElementById('goal-notes').value.trim()};
+  if(MGMT.editingGoalId){
+    const g=MGMT.goals.find(x=>x.id===MGMT.editingGoalId);
+    if(g) Object.assign(g,payload);
+  } else {
+    MGMT.goals.push({id:uid(),...payload,createdAt:new Date().toISOString()});
+  }
+  await persistMgmt('goals');
+  closeModal('goal-modal');
+  renderGoals();
+}
+
+async function deleteGoal(id){
+  if(!confirm('Delete this goal?')) return;
+  MGMT.goals=MGMT.goals.filter(g=>g.id!==id);
+  await persistMgmt('goals');
+  renderGoals();
+}
+
+// ── To-Do (priority-sorted) ──────────────────────────────────
+function sortedTodos(){
+  const rank={high:0,med:1,low:2};
+  return [...MGMT.todos].sort((a,b)=>{
+    if(!!a.done!==!!b.done) return a.done?1:-1; // active tasks first, completed sink to bottom
+    if(a.done&&b.done) return new Date(b.completedAt||0)-new Date(a.completedAt||0);
+    const pr=(rank[a.priority]??1)-(rank[b.priority]??1);
+    if(pr!==0) return pr; // High > Medium > Low
+    if(a.due&&b.due) return new Date(a.due)-new Date(b.due); // soonest due date first within the same priority
+    if(a.due) return -1;
+    if(b.due) return 1;
+    return new Date(a.createdAt)-new Date(b.createdAt);
+  });
+}
+
+function renderTodos(){
+  const el=document.getElementById('todos-container'); if(!el) return;
+  if(!MGMT.todos.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No tasks yet — add one above.</div>'; return; }
+  const rows=sortedTodos();
+  const todayStr=new Date().toISOString().slice(0,10);
+  el.innerHTML=rows.map(t=>{
+    const dueStr=t.due?fmtDate(t.due):'';
+    const overdue=t.due&&!t.done&&t.due<todayStr;
+    return `<div class="todo-row ${t.done?'done':''}">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+      <span class="priority-tag ${t.priority}">${t.priority}</span>
+      <span class="todo-text" style="flex:1;font-size:13px;">${(t.text||'').replace(/</g,'&lt;')}</span>
+      ${dueStr?`<span style="font-size:11px;color:${overdue?'var(--red)':'var(--text2)'};flex-shrink:0;">${overdue?'⚠️ ':''}${dueStr}</span>`:''}
+      <button onclick="deleteTodo('${t.id}')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function addTodo(){
+  const text=document.getElementById('td-text').value.trim();
+  if(!text) return;
+  const priority=document.getElementById('td-priority').value;
+  const due=document.getElementById('td-due').value||null;
+  MGMT.todos.push({id:uid(),text,priority,due,done:false,createdAt:new Date().toISOString()});
+  await persistMgmt('todos');
+  document.getElementById('td-text').value=''; document.getElementById('td-due').value=''; document.getElementById('td-priority').value='med';
+  renderTodos();
+}
+
+async function toggleTodo(id){
+  const t=MGMT.todos.find(x=>x.id===id); if(!t) return;
+  t.done=!t.done; t.completedAt=t.done?new Date().toISOString():null;
+  await persistMgmt('todos');
+  renderTodos();
+}
+
+async function deleteTodo(id){
+  MGMT.todos=MGMT.todos.filter(x=>x.id!==id);
+  await persistMgmt('todos');
+  renderTodos();
 }
 
 // ── Utils ────────────────────────────────────────────────────
 function fmt(n){return parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function fmtDateTime(d){if(!d)return'—';try{return new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(e){return d;}}
+function uid(){return crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2));}
 function showAlert(id,msg,type){const el=document.getElementById(id);if(!el)return;el.className='alert alert-'+(type==='success'?'success':'error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',4000);}
 function show(id){const el=document.getElementById(id);if(el)el.style.display='flex';}
 function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
