@@ -401,6 +401,12 @@
       <div id="cp-summary" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>
       <div id="cp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
       <div id="cp-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No content performance entries yet</p></div>
+
+      <div style="margin-top:28px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
+      <div style="font-size:11px;color:var(--text2);margin:2px 0 12px;">Every Meta Content Export you've uploaded, grouped by import. Delete a whole import (or a single post) if something was uploaded by mistake.</div>
+      <div id="cp-history-alert" class="alert" style="margin-bottom:12px;"></div>
+      <div id="cp-history-groups" style="margin-top:10px;"></div>
+      <div id="cp-history-empty" class="empty" style="display:none;"><div class="empty-icon">📤</div><p>No CSV imports yet — uploaded Meta exports will show up here</p></div>
     </div>
 
     <!-- Leaderboard -->
@@ -4733,6 +4739,79 @@ async function loadContentPerformance(){
     startEl.value=start; endEl.value=end;
   }
   filterContentPerfEntries();
+  loadContentPerfHistory();
+}
+
+// ── Content Performance: Upload History ─────────────────────
+// Groups content_performance rows by upload_batch_id so a whole Meta Content Export
+// can be reviewed and deleted as one unit, instead of hunting down individual posts.
+// Rows added manually (via + Add Entry) never get a batch id, so they simply don't
+// show up here -- this section is specifically "imports", not "everything".
+function loadContentPerfHistory(){
+  const container=document.getElementById('cp-history-groups'), empty=document.getElementById('cp-history-empty');
+  if(!container) return;
+  const rows=(STATE.contentPerf||[]).filter(r=>r.upload_batch_id);
+  container.innerHTML='';
+  if(!rows.length){ if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+
+  const groups=new Map();
+  rows.forEach(r=>{
+    if(!groups.has(r.upload_batch_id)) groups.set(r.upload_batch_id,[]);
+    groups.get(r.upload_batch_id).push(r);
+  });
+
+  const sorted=[...groups.entries()].sort((a,b)=>{
+    const at=Math.max(...a[1].map(r=>new Date(r.created_at||0).getTime()||0));
+    const bt=Math.max(...b[1].map(r=>new Date(r.created_at||0).getTime()||0));
+    return bt-at;
+  });
+
+  sorted.forEach(([batchId,groupRows])=>{
+    const uploadedAt=Math.max(...groupRows.map(r=>new Date(r.created_at||0).getTime()||0));
+    const dates=groupRows.map(r=>r.post_date).filter(Boolean).sort();
+    const dateRange=dates.length?(dates[0]===dates[dates.length-1]?fmtDate(dates[0]):`${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])}`):'—';
+    const accounts=[...new Set(groupRows.map(r=>r.ig_account_username).filter(Boolean))];
+    const totalViews=groupRows.reduce((s,r)=>s+(parseFloat(r.views)||0),0);
+    const gid='cphist-'+String(batchId).replace(/[^a-z0-9]/gi,'_');
+    const idsAttr=JSON.stringify(groupRows.map(r=>r.id)).replace(/"/g,"'");
+    const label=(accounts[0]?`@${accounts[0]}`:'this import').replace(/'/g,"\\'");
+
+    const wrap=document.createElement('div');
+    wrap.className='card'; wrap.style.marginBottom='10px';
+    wrap.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div onclick="toggleHistoryGroup('${gid}')" style="cursor:pointer;user-select:none;flex:1;min-width:220px;">
+          <span style="font-weight:700;font-size:14px;color:#fff;">${uploadedAt?new Date(uploadedAt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Import'}</span>
+          ${accounts.length?`<span style="margin-left:12px;font-size:12px;color:var(--text2);">${accounts.map(a=>'@'+a).join(', ')}</span>`:''}
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">${groupRows.length} post${groupRows.length!==1?'s':''}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Posted: ${dateRange}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Views: <strong style="color:#fff;">${fmt(totalViews)}</strong></span>
+        </div>
+        <button class="btn btn-sm btn-danger" style="margin-left:12px;" onclick="event.stopPropagation();deleteContentPerfGroup(${idsAttr},'${label}')">✕ Delete Import</button>
+        <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;margin-left:12px;">▼</span>
+      </div>
+      <div id="${gid}" style="display:none;margin-top:14px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Thumb</th><th>Date</th><th>Model</th><th>Views</th><th>Likes</th><th>Saves</th><th>Follows</th><th></th></tr></thead>
+          <tbody>${groupRows.map(r=>`<tr><td>${r.thumbnail_url?`<img src="${r.thumbnail_url}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--border);">`:'—'}</td><td>${fmtDate(r.post_date)}</td><td>${r.model_name||'—'}</td><td>${fmt(r.views)}</td><td>${fmt(r.likes)}</td><td>${fmt(r.saves)}</td><td>${fmt(r.new_followers)}</td><td><button class="btn btn-sm btn-danger" onclick="deleteContentPerfEntry('${r.id}').then(loadContentPerfHistory)">✕</button></td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    container.appendChild(wrap);
+  });
+}
+
+async function deleteContentPerfGroup(ids,label){
+  if(!ids||!ids.length) return;
+  if(!confirm(`Delete all ${ids.length} post${ids.length!==1?'s':''} from ${label||'this import'}? This cannot be undone.`)) return;
+  const{data,error}=await sb.from('content_performance').delete().in('id',ids).select();
+  if(error) return showAlert('cp-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('cp-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the content_performance table.','error');
+  const deletedIds=new Set(data.map(r=>r.id));
+  STATE.contentPerf=STATE.contentPerf.filter(r=>!deletedIds.has(r.id));
+  showAlert('cp-history-alert',`Deleted ${data.length} post${data.length!==1?'s':''}.`,'success');
+  filterContentPerfEntries();
+  loadContentPerfHistory();
 }
 
 function filterContentPerfEntries(){
@@ -5015,6 +5094,7 @@ async function deleteContentPerfEntry(id){
   if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_performance table.');return;}
   STATE.contentPerf=STATE.contentPerf.filter(r=>r.id!==id);
   filterContentPerfEntries();
+  loadContentPerfHistory();
 }
 
 // ── Bulk CSV upload (Meta Business Suite "Content" export) ───
@@ -5206,6 +5286,11 @@ async function saveContentPerfRows(){
   const skippedCount=_parsedContentPerf.length-validRows.length;
   if(!validRows.length) return showAlert('cp-preview-alert','No rows have a usable post date — nothing to save. Set a date on each row manually, or use + Add Entry instead.','error');
 
+  // Tag every row from this save with a shared batch id -- this is what makes the
+  // Upload History section possible (group + bulk-delete an entire import at once).
+  // Applied to both new inserts and refreshed existing rows, so a re-upload correctly
+  // "moves" a post into the newest import it was touched by.
+  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
   const existingByPostId=new Map(STATE.contentPerf.filter(r=>r.ig_post_id).map(r=>[r.ig_post_id,r]));
   const toInsert=[], toUpdate=[];
   validRows.forEach(r=>{
@@ -5217,7 +5302,7 @@ async function saveContentPerfRows(){
       duration_sec:r.duration_sec||null,
       views:r.views||0, reach:r.reach||0, likes:r.likes||0, comments:r.comments||0,
       shares:r.shares||0, saves:r.saves||0, new_followers:r.new_followers||0,
-      caption:r.caption||null
+      caption:r.caption||null, upload_batch_id:batchId
     };
     const existing=r.ig_post_id?existingByPostId.get(r.ig_post_id):null;
     if(existing) toUpdate.push({id:existing.id,...base});
@@ -5239,6 +5324,7 @@ async function saveContentPerfRows(){
     savedCount++;
   }
   filterContentPerfEntries();
+  loadContentPerfHistory();
   const skippedMsg=skippedCount?` ${skippedCount} row(s) skipped — no post date found for those; fix the date below or add manually via + Add Entry.`:'';
   showAlert('cp-preview-alert',`Saved ${savedCount} post(s)${failedCount?`, ${failedCount} failed`:''}.${skippedMsg}`,(failedCount||skippedCount)?'error':'success');
   if(!skippedCount){
