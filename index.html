@@ -147,6 +147,17 @@
   .mh-card-label { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; }
   .mh-card-desc { font-size: 11px; color: var(--text2); line-height: 1.4; }
 
+  /* ── Guides hub (selection screen under Models) ─────────────── */
+  .guide-hub-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 16px; max-width: 760px; }
+  .guide-hub-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px 24px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
+  .guide-hub-card:hover { transform: translateY(-3px); border-color: rgba(30,79,255,0.5); box-shadow: 0 8px 32px rgba(30,79,255,0.22); }
+  .guide-hub-icon { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 21px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(30,79,255,0.35); }
+  .guide-hub-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .guide-hub-desc { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
+  .guide-hub-cta { font-size: 12px; font-weight: 700; color: var(--accent2); }
+  .guide-back { font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; margin-bottom: 16px; display: inline-block; }
+  .guide-back:hover { color: var(--accent2); }
+
   /* ── Guides pages (Drip Set Guide / Weekly Requirements) ───── */
   .guide-hero { background: linear-gradient(135deg, rgba(30,79,255,0.12), rgba(107,143,255,0.05)); border: 1px solid rgba(30,79,255,0.25); border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
   .guide-hero p { color: var(--text2); font-size: 13px; line-height: 1.6; margin-top: 6px; }
@@ -154,10 +165,15 @@
   .guide-rule { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--text2); line-height: 1.5; }
   .guide-batch { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }
   .guide-batch.optional { border-left-color: var(--text2); opacity: 0.9; }
-  .guide-batch-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .guide-batch-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .guide-batch-meta { font-size: 11px; font-weight: 700; color: var(--accent2); background: rgba(30,79,255,0.1); border: 1px solid rgba(30,79,255,0.25); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.02em; }
   .guide-batch-line { font-size: 13px; color: var(--accent2); font-style: italic; margin-bottom: 8px; }
   .guide-batch-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
   .guide-batch-body strong { color: var(--text); }
+  .guide-ladder-note { background: rgba(30,79,255,0.08); border: 1px solid rgba(30,79,255,0.25); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 18px; }
+  .guide-ladder-note strong { color: #fff; }
+  .guide-upsell { margin-top: 12px; background: var(--surface2); border: 1px dashed rgba(30,79,255,0.4); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); font-style: italic; line-height: 1.6; }
+  .guide-upsell-tag { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent2); font-style: normal; margin-bottom: 4px; }
   .guide-summary { background: linear-gradient(135deg, rgba(30,79,255,0.14), rgba(107,143,255,0.06)); border: 1px solid rgba(30,79,255,0.3); border-radius: 12px; padding: 22px 24px; margin-top: 24px; box-shadow: 0 0 40px rgba(30,79,255,0.15); }
   .guide-summary-title { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent2); margin-bottom: 12px; }
   .guide-summary ul { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; line-height: 1.9; }
@@ -1075,13 +1091,36 @@
       </div>
     </div>
 
+    <!-- Guides hub -- a selection screen under Models. Clicking a card opens that guide's
+         own dedicated full page; more guides can be added here later without touching the
+         sidebar again. -->
+    <div class="page" id="page-guides">
+      <div class="page-title">Guides</div>
+      <div class="page-sub">Everything you need to shoot and sell content, in one place</div>
+      <div class="guide-hub-grid">
+        <div class="guide-hub-card" onclick="navigate('guide-dripsets')">
+          <div class="guide-hub-icon">🔥</div>
+          <div class="guide-hub-title">Drip Set Guide</div>
+          <div class="guide-hub-desc">Shot-by-shot instructions for a full sexting drip sequence — plus the exact lines to use to upsell it.</div>
+          <div class="guide-hub-cta">Open guide →</div>
+        </div>
+        <div class="guide-hub-card" onclick="navigate('guide-weekly')">
+          <div class="guide-hub-icon">📅</div>
+          <div class="guide-hub-title">Weekly Requirements</div>
+          <div class="guide-hub-desc">Your minimum weekly output across sext sets, PPVs, feed posts, Twitter, and traffic content.</div>
+          <div class="guide-hub-cta">Open guide →</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Guides: Drip Set Guide -->
     <div class="page" id="page-guide-dripsets">
+      <div class="guide-back" onclick="navigate('guides')">← Back to Guides</div>
       <div class="page-title">Drip Set Guide</div>
-      <div class="page-sub">How to shoot a full sexting drip sequence, batch by batch</div>
+      <div class="page-sub">How to shoot AND sell a full sexting drip sequence, batch by batch</div>
       <div class="guide-hero">
         <strong style="color:#fff;font-size:13px;">Bed Netflix Drip Sequence</strong>
-        <p>Consider this sequence a guide to the flow of a particular sexting session — the default for selling PPVs to fans. It's accompanied by a script, and the videos should match the script. Keep the points below in mind throughout, and follow them as closely as possible so it keeps the impression of being "live" and stays exclusive.</p>
+        <p>Consider this sequence a guide to the flow of a particular sexting session — the default for selling PPVs to fans. Every batch below now has its own video (each one slightly longer than the last, so the escalation is felt, not just seen) plus a chatter script for exactly how to pitch it. Keep the points below in mind throughout, and follow them as closely as possible so it keeps the impression of being "live" and stays exclusive.</p>
       </div>
       <div class="guide-rules">
         <div class="guide-rule">💡 Shoot in a well lit room, no sunlight — use a ring light ONLY if necessary.</div>
@@ -1089,47 +1128,57 @@
         <div class="guide-rule">📅 Shoot the whole sequence on the same day.</div>
         <div class="guide-rule">🎭 Show emotion — make it feel like you're talking to or doing this for someone.</div>
         <div class="guide-rule">🔴 Record each video at the exact duration stated below (not a full-length video cut down) — this is what keeps it feeling "live."</div>
+        <div class="guide-rule">📈 Every video is slightly longer than the one before it — that climb is what sells the next unlock. Never send a shorter clip than the last one.</div>
       </div>
 
+      <div class="guide-ladder-note">💰 <strong>Price ladder:</strong> the suggested prices below start cheap to get the fan hooked and climb as the content escalates — the exact same ladder as the video lengths. Treat these as a floor, not a script — read the fan and go higher if they're spending easily.</div>
+
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 1 — Laying on the Bed</div>
+        <div class="guide-batch-title">Batch 1 — Laying on the Bed <span class="guide-batch-meta">🎥 10–15 sec · 💵 Free / included</span></div>
         <div class="guide-batch-line">"…" — casual smiling photos, a little teasing</div>
-        <div class="guide-batch-body">The first photos sent to the fan should look very casual — clothed, smiling, a little bit of a teasing smile, showing what you're wearing at the moment.<br><strong>Photos:</strong> 5–7 photos (clothed, very casual)</div>
+        <div class="guide-batch-body">The first send should look very casual — clothed, smiling, a little bit of a teasing smile, showing what you're wearing at the moment.<br><strong>Video:</strong> 10–15 sec, casual — you on the bed, smiling at the camera, a little playful, fully clothed. This is the hook, not the sell — keep it light and low-pressure.<br><strong>Photos:</strong> 5–7 photos (clothed, very casual)</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"Hey you… I'm bored and thinking about you 🙈 wanna keep me company for a bit?"</div>
       </div>
       <div class="guide-batch optional">
         <div class="guide-batch-title">Optional — If the Fan Is Skeptical</div>
-        <div class="guide-batch-line">"Oh, you don't believe me?" / "What makes you think I have time to play and do you dirty like that baby?" / "Come on baby you know it's me"</div>
+        <div class="guide-batch-line">"You gonna leave me hanging all horny by myself man?" / "I wanna make you explode man"</div>
         <div class="guide-batch-body">A voice note proving you're doing this for them in real time — some fans ask if you're really the one sending/talking to them.<br><strong>Photos:</strong> different poses (peace sign, 3 fingers up, 1 finger up, middle finger up, holding your chin, pinching your nose, tongue out, 4 fingers on forehead)</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 2</div>
+        <div class="guide-batch-title">Batch 2 <span class="guide-batch-meta">🎥 20–30 sec · 💵 $5–8</span></div>
         <div class="guide-batch-line">"This one is better I think 😉"</div>
-        <div class="guide-batch-body">Second batch — half naked, teasing the fan but not showing everything yet.<br><strong>Photos:</strong> 5–7, taken from below and angled to show abs/chest (not the bulge yet)</div>
+        <div class="guide-batch-body">Half naked, teasing the fan but not showing everything yet.<br><strong>Video:</strong> 20–30 sec — sitting up or shifting position, shirt coming off or lifted, playful teasing energy, still no bulge on camera.<br><strong>Photos:</strong> 5–7, taken from below and angled to show abs/chest (not the bulge yet)</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"Mmm okay fine, got a lil something for you… but you have to unlock it, I don't show this to just anyone 😏"</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 3</div>
+        <div class="guide-batch-title">Batch 3 <span class="guide-batch-meta">🎥 1 min · 💵 $10–15</span></div>
         <div class="guide-batch-line">"Do you think I need to do some stroking right now? Be honest, I'm feeling a bit worked up lol 🙈😈"</div>
         <div class="guide-batch-body"><strong>Video:</strong> 1 min &nbsp;•&nbsp; <strong>Photos:</strong> 5–7, holding/squeezing your bulge, exposing the upper half of your body naked.<br><strong>Start:</strong> laying on the bed, playing with your bulge over your boxers — one hand recording, one hand touching yourself, alternating between bulge and chest/abs. Tease the fan: "is this how you like it?" / "man I'm feeling so horny.." (or any dirty talk you're comfortable with).</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"You're getting me so worked up rn… I need to touch myself just a little, unlock this and watch 🥵"</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 4</div>
+        <div class="guide-batch-title">Batch 4 <span class="guide-batch-meta">🎥 1–2 min · 💵 $15–20</span></div>
         <div class="guide-batch-line">"Is that good enough for you? Good enough to make you throb like I am right now?"</div>
         <div class="guide-batch-body"><strong>Video:</strong> 1–2 mins &nbsp;•&nbsp; <strong>Photos:</strong> 5–8, showing your hard cock with a small amount of lube on the tip to fake precum.<br><strong>Before recording:</strong> a little lube on the tip so it looks like you already had precum.<br><strong>Start:</strong> play with your cock over your boxers, then remove them to reveal it fully. Gentle touches, caress your body, play with your balls, tease them. Some dirty talk. Smother the "precum" over the tip.</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"Look what you did to me… it's so hard right now, I need you to see this 🍆💦"</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 5</div>
+        <div class="guide-batch-title">Batch 5 <span class="guide-batch-meta">🎥 2–3 min · 💵 $20–25</span></div>
         <div class="guide-batch-line">"No one has ever made my veins pop too soon, can you see it?? 😨" / "This is crazy man you got me touching myself all over.. 🥵"</div>
         <div class="guide-batch-body"><strong>Video:</strong> 2–3 mins &nbsp;•&nbsp; <strong>Start:</strong> fully naked.<br><strong>If you have a dildo &amp; are comfortable with it:</strong> show it, start stroking/sucking it a bit to get it ready, tease your asshole by rubbing the dildo (don't insert yet) while stroking — moan, multiple positions, show how eager you are. <strong>Photos:</strong> 5–8, showing your asshole (some spread, some with the dildo in if possible), closeups of your cock with precum.<br><strong>If you don't have one / aren't comfortable:</strong> same energy using your fingers instead — tease, don't insert, stroke and moan. <strong>Photos:</strong> 5–8, same idea without the dildo.</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"I'm so close already and we're not even done… I want you to see me lose it, this next one is the best part 😈"</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 6</div>
+        <div class="guide-batch-title">Batch 6 — Grand Finale <span class="guide-batch-meta">🎥 3–5 min · 💵 $25–35</span></div>
         <div class="guide-batch-line">"Omg!! I came so hard I can't believe this"</div>
         <div class="guide-batch-body"><strong>Video:</strong> 3–5 mins &nbsp;•&nbsp; <strong>Start:</strong> fully naked — this time go all out, moan hard, slowly put the dildo inside you if comfortable (skip if not), narrate how it feels, more dirty talk. Make sure you finish, shake your body to sell an intense orgasm. Cum on your abdomen is a nice touch to close out the session.<br><strong>Photos:</strong> 5–8 — showing your cum, holding the dildo, your cock hard/red after finishing, naughty or peace poses, genuine enjoyment.</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"This is it baby, I'm gonna finish for you right now… don't miss this, I never go this hard for anyone 🔥"</div>
       </div>
       <div class="guide-batch">
-        <div class="guide-batch-title">Batch 7 — Thank You (10 sec video)</div>
+        <div class="guide-batch-title">Batch 7 — Thank You <span class="guide-batch-meta">🎥 10 sec · 💵 Free (aftercare)</span></div>
         <div class="guide-batch-line">"I enjoyed that a lot.. I hope you did too!" / "How are you so good at this? No one ever made me burst like that!"</div>
-        <div class="guide-batch-body">Only send this <strong>if the fan finishes the whole session</strong> — a short (10 sec+) thank-you clip that makes the aftercare feel genuine.</div>
+        <div class="guide-batch-body">Only send this <strong>if the fan finishes the whole session</strong> — a short 10 sec+ thank-you clip. This is the one moment in the sequence that isn't for sale — it's what makes them come back and pay full price next time.</div>
+        <div class="guide-upsell"><span class="guide-upsell-tag">💬 Chatter Script</span>"That was so hot omg… thank you for that, seriously. Same time next week? 🥰"</div>
       </div>
       <div class="guide-summary">
         <div class="guide-summary-title">Full drip sets can be sold as mass PPVs too</div>
@@ -1139,6 +1188,7 @@
 
     <!-- Guides: Weekly Content Requirements -->
     <div class="page" id="page-guide-weekly">
+      <div class="guide-back" onclick="navigate('guides')">← Back to Guides</div>
       <div class="page-title">Weekly Content Requirements</div>
       <div class="page-sub">Your minimum weekly output — what to shoot, how much, and where it goes</div>
       <div class="guide-hero">
@@ -1270,6 +1320,7 @@
       <div class="form-group full"><label>Google Drive Link</label><input type="url" id="model-drive" placeholder="https://drive.google.com/..."></div>
       <div class="form-group full"><label>Instagram Handles (comma separated, no @ — used to auto-match Content Performance uploads)</label><input type="text" id="model-ig-handles" placeholder="e.g. handle1, handle2"></div>
     </div>
+    <div id="model-alert" class="alert"></div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
       <button class="btn btn-ghost" onclick="closeModal('model-modal')">Cancel</button>
@@ -1510,11 +1561,9 @@ var NAV = [
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
-
-  { id: 'guide-dripsets', icon: '🔥', label: 'Drip Set Guide',              roles: ['admin','va','model'],         section: 'Guides' },
-  { id: 'guide-weekly',   icon: '📅', label: 'Weekly Requirements',        roles: ['admin','va','model'],          section: 'Guides' },
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
   { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
@@ -1625,8 +1674,7 @@ function renderModelHome(){
     { id:'content',          icon:'📹', label:'Content Orders',       desc:'Submit & track your content' },
     { id:'contentperf',      icon:'📈', label:'Content Performance',  desc:'See how your posts are doing' },
     { id:'ideas',             icon:'💡', label:'Content Ideas',        desc:'Fresh ideas for your niche' },
-    { id:'guide-dripsets',   icon:'🔥', label:'Drip Set Guide',       desc:'How to shoot a sexting sequence' },
-    { id:'guide-weekly',     icon:'📅', label:'Weekly Requirements',  desc:'Your weekly content checklist' },
+    { id:'guides',            icon:'📚', label:'Guides',               desc:'Drip sets & weekly requirements' },
     { id:'model-invoices',    icon:'💵', label:'My Invoices',          desc:'Submit & track your payouts' },
   ];
   cardsEl.innerHTML=shortcuts.map(s=>`
@@ -3835,6 +3883,9 @@ function toggleHistoryGroup(gid){
 // ── Models ───────────────────────────────────────────────────
 function renderModels(){
   const tbody=document.getElementById('models-body'); const empty=document.getElementById('models-empty'); tbody.innerHTML='';
+  // Defensive filter: STATE.models should never contain null/undefined, but this guards
+  // against a crash-on-render if it ever does (a failed insert used to push exactly that).
+  STATE.models=STATE.models.filter(Boolean);
   if(!STATE.models.length){empty.style.display='block';return;} empty.style.display='none';
   STATE.models.forEach(m=>{const pdfUrl=STATE.modelSheetPdfs?.[m.id];tbody.innerHTML+=`<tr><td><strong>${m.name}</strong></td><td>${m.of_account||'—'}</td><td>${m.platform||'—'}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:20px;background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'}">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span></td><td style="color:var(--text2);font-size:12px;">${m.niche||'—'}</td><td>${m.split||20}%</td><td style="color:var(--text2);font-size:12px;">${m.chatters||'—'}</td><td>${pdfUrl?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(pdfUrl)}'))" class="btn btn-sm btn-ghost" title="View Info Sheet PDF">📄</button>`:'—'}</td><td><button class="btn btn-sm btn-ghost" onclick="editModel('${m.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">✕</button></td></tr>`;});
   // Quick stats panel
@@ -3868,12 +3919,43 @@ function editModel(id){
   document.getElementById('model-drive').value=m.drive_link||''; document.getElementById('model-ig-handles').value=(m.instagram_handles||[]).join(', '); openModal('model-modal');
 }
 
+// Root cause of "I can't click Save Model" (confirmed via live repro): Model Split % is a
+// bare <input type="number" placeholder="20"> with no default value -- if left untouched,
+// its .value is an empty string, which used to be sent straight through as split:''. Postgres
+// rejects '' for a numeric column, so the insert/update silently failed. This function used
+// to never check the returned `error` at all, so on that failure it happily pushed `data`
+// (null, since the insert failed) into STATE.models and called renderModels() -- which then
+// threw trying to read `.id` off that null entry, and because that throw happened *before*
+// closeModal() ran, the modal just sat there looking frozen with zero feedback. Fixed by:
+// (1) coercing an empty split field to null instead of '', (2) actually checking `error` and
+// showing it in the modal instead of proceeding, (3) never pushing anything but a real row
+// into STATE.models.
 async function saveModel(){
   const id=document.getElementById('model-id').value;
-  const p={name:document.getElementById('model-name').value.trim(),of_account:document.getElementById('model-of').value.trim(),platform:document.getElementById('model-platform').value,mgmt_type:document.getElementById('model-mgmt-type').value,split:document.getElementById('model-split').value,chatters:document.getElementById('model-chatters').value.trim(),email:document.getElementById('model-email').value.trim(),drive_link:document.getElementById('model-drive').value.trim()||null,niche:document.getElementById('model-niche').value.trim()||null,instagram_handles:document.getElementById('model-ig-handles').value.split(',').map(s=>s.trim().replace(/^@/,'').toLowerCase()).filter(Boolean)};
-  if(!p.name)return alert('Name required');
-  if(id){await sb.from('models').update(p).eq('id',id);const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
-  else{const{data}=await sb.from('models').insert(p).select().single();STATE.models.push(data);}
+  const splitRaw=document.getElementById('model-split').value;
+  const p={
+    name:document.getElementById('model-name').value.trim(),
+    of_account:document.getElementById('model-of').value.trim(),
+    platform:document.getElementById('model-platform').value,
+    mgmt_type:document.getElementById('model-mgmt-type').value,
+    split: splitRaw===''?null:parseFloat(splitRaw),
+    chatters:document.getElementById('model-chatters').value.trim(),
+    email:document.getElementById('model-email').value.trim(),
+    drive_link:document.getElementById('model-drive').value.trim()||null,
+    niche:document.getElementById('model-niche').value.trim()||null,
+    instagram_handles:document.getElementById('model-ig-handles').value.split(',').map(s=>s.trim().replace(/^@/,'').toLowerCase()).filter(Boolean)
+  };
+  if(!p.name)return showAlert('model-alert','Name required.','error');
+  let error;
+  if(id){
+    ({error}=await sb.from('models').update(p).eq('id',id));
+    if(!error){const i=STATE.models.findIndex(m=>m.id===id);if(i>-1)STATE.models[i]={...STATE.models[i],...p};}
+  } else {
+    let data;
+    ({data,error}=await sb.from('models').insert(p).select().single());
+    if(!error && data) STATE.models.push(data);
+  }
+  if(error){ showAlert('model-alert','Could not save — '+error.message,'error'); return; }
   renderModels();populateModelDropdowns();closeModal('model-modal');
   document.getElementById('model-id').value=''; document.getElementById('model-modal-title').textContent='Add Model';
   // Model Sheets lists STATE.models directly, so a model added there needs an immediate
