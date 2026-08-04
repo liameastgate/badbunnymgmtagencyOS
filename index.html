@@ -1348,8 +1348,13 @@
       <div class="form-group"><label>Post Type</label><select id="cp-post-type"><option value="IG reel">Reel</option><option value="IG image">Image</option><option value="IG carousel">Carousel</option><option value="IG video">Video</option></select></div>
       <div class="form-group"><label>Post Date</label><input type="date" id="cp-date"></div>
       <div class="form-group"><label>Post Time</label><input type="time" id="cp-time"></div>
-      <div class="form-group full"><label>Permalink (optional — auto-fetches thumbnail)</label><input type="url" id="cp-url" placeholder="https://instagram.com/reel/..." onblur="autoFetchCpThumb()"></div>
+      <div class="form-group full"><label>Permalink (optional)</label><input type="url" id="cp-url" placeholder="https://instagram.com/reel/..."></div>
       <div class="form-group full"><label>Caption (optional)</label><input type="text" id="cp-caption" placeholder="e.g. GRWM reel"></div>
+      <div class="form-group full" style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="btn btn-sm btn-ghost" onclick="document.getElementById('cp-thumb-file').click()">📷 Upload Thumbnail</button>
+        <input type="file" id="cp-thumb-file" accept="image/*" style="display:none" onchange="if(this.files[0])handleCpModalThumbFile(this.files[0]);this.value='';">
+        <span style="font-size:11px;color:var(--text2);">Instagram blocks auto-fetching thumbnails — drop in a screenshot instead.</span>
+      </div>
       <div id="cp-thumb-preview-wrap" style="display:none;" class="form-group full">
         <img id="cp-thumb-preview-img" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
       </div>
@@ -5683,10 +5688,60 @@ function renderContentPerfSummary(rows){
     statCard('Avg Rating',avgRating==null?'—':avgRating,'accent');
 }
 
+// Instagram blocks both the official oEmbed thumbnail field and og:image scraping (confirmed
+// live against real post URLs -- returns "no_preview_available" every time as of Aug 2026), and
+// Meta's Graph API is off the table here since connecting accounts would link them under a
+// shared Facebook app/admin -- not acceptable for these accounts. So thumbnails are manual only:
+// the small camera button on every card lets you drop in a screenshot, resized+compressed
+// client-side and stored directly on the row (same data-URI pattern Content Orders already uses).
 function cpThumbHtml(r){
-  if(r.thumbnail_url) return `<img src="${r.thumbnail_url}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px 8px 0 0;">`;
-  const icon=(r.post_type==='IG reel'||r.post_type==='IG video')?'🎬':(r.post_type==='IG carousel'?'🖼️':'📷');
-  return `<div style="width:100%;aspect-ratio:1/1;border-radius:8px 8px 0 0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:32px;">${icon}</div>`;
+  const inner=r.thumbnail_url
+    ? `<img id="cp-thumb-${r.id}" src="${r.thumbnail_url}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;">`
+    : `<div id="cp-thumb-${r.id}" style="width:100%;aspect-ratio:1/1;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:32px;">${(r.post_type==='IG reel'||r.post_type==='IG video')?'🎬':(r.post_type==='IG carousel'?'🖼️':'📷')}</div>`;
+  return `<div style="position:relative;border-radius:8px 8px 0 0;overflow:hidden;">
+    ${inner}
+    <label style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;" title="Upload thumbnail">
+      📷<input type="file" accept="image/*" style="display:none;" onchange="if(this.files[0])handleGridThumbUpload('${r.id}',this.files[0]);this.value='';">
+    </label>
+  </div>`;
+}
+
+// Resizes+compresses a picked image client-side before it's stored as a data URI, so a phone
+// screenshot doesn't bloat content_performance rows (and every select('*') against that table).
+function resizeImageToDataUrl(file,maxDim,quality){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        let{width,height}=img;
+        if(width>height){ if(width>maxDim){ height=Math.round(height*maxDim/width); width=maxDim; } }
+        else if(height>maxDim){ width=Math.round(width*maxDim/height); height=maxDim; }
+        const canvas=document.createElement('canvas'); canvas.width=width; canvas.height=height;
+        canvas.getContext('2d').drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=()=>reject(new Error('Could not read image'));
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads + persists a thumbnail directly from the grid card, for an already-saved row --
+// covers correcting bulk imports (which never have a thumbnail) without reopening Edit.
+async function handleGridThumbUpload(rowId,file){
+  let dataUrl;
+  try{ dataUrl=await resizeImageToDataUrl(file,480,0.75); }catch(e){ return alert('Could not read that image: '+e.message); }
+  const row=STATE.contentPerf.find(r=>r.id===rowId);
+  if(!row) return;
+  row.thumbnail_url=dataUrl;
+  const el=document.getElementById('cp-thumb-'+rowId);
+  if(el&&el.tagName==='IMG') el.src=dataUrl;
+  else if(el){ const img=document.createElement('img'); img.id=el.id; img.src=dataUrl; img.style.cssText='width:100%;aspect-ratio:1/1;object-fit:cover;display:block;'; el.replaceWith(img); }
+  const{error}=await sb.from('content_performance').update({thumbnail_url:dataUrl}).eq('id',rowId);
+  if(error) alert('Thumbnail shown but not saved -- '+error.message);
 }
 
 function renderContentPerfGrid(rows){
@@ -5790,17 +5845,14 @@ function openContentPerfModal(id){
   openModal('cp-modal');
 }
 
-async function autoFetchCpThumb(){
-  const url=document.getElementById('cp-url').value.trim();
-  if(!url || _cpEditThumb) return;
-  const meta=await fetchOEmbed(url);
-  if(meta && meta.thumbnail_url){
-    _cpEditThumb=meta.thumbnail_url;
-    document.getElementById('cp-thumb-preview-img').src=_cpEditThumb;
-    document.getElementById('cp-thumb-preview-wrap').style.display='block';
-    const capEl=document.getElementById('cp-caption');
-    if(meta.title && capEl && !capEl.value.trim()) capEl.value=meta.title;
-  }
+// Manual thumbnail upload for the Add/Edit modal -- see cpThumbHtml comment for why this
+// replaced the old auto-fetch-on-blur (Instagram blocks the endpoint it relied on).
+async function handleCpModalThumbFile(file){
+  let dataUrl;
+  try{ dataUrl=await resizeImageToDataUrl(file,480,0.75); }catch(e){ return alert('Could not read that image: '+e.message); }
+  _cpEditThumb=dataUrl;
+  document.getElementById('cp-thumb-preview-img').src=dataUrl;
+  document.getElementById('cp-thumb-preview-wrap').style.display='block';
 }
 
 async function saveContentPerfEntry(){
