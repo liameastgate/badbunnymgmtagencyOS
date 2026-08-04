@@ -123,6 +123,45 @@
   .platform-ig { color: #e1306c; font-weight: 700; }
   .platform-tt { color: #69c9d0; font-weight: 700; }
   #loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; font-size: 14px; color: var(--text2); }
+
+  /* ── Model welcome page ("Overview") ─────────────────────────
+     Deep-blue glow aesthetic, distinct from the rest of the (mostly flat) app --
+     this is the one "landing" moment a model sees, so it gets a bit of showmanship. */
+  .mh-wrap { position: relative; min-height: calc(100vh - 140px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; padding: 40px 20px; }
+  .mh-glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
+  .mh-glow-1 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(30,79,255,0.35), transparent 70%); top: -120px; left: 50%; transform: translateX(-50%); animation: mh-pulse 6s ease-in-out infinite; }
+  .mh-glow-2 { width: 320px; height: 320px; background: radial-gradient(circle, rgba(107,143,255,0.22), transparent 70%); bottom: -100px; right: 5%; animation: mh-pulse 7s ease-in-out infinite 1s; }
+  @keyframes mh-pulse { 0%,100% { opacity: 0.7; transform: translateX(-50%) scale(1); } 50% { opacity: 1; transform: translateX(-50%) scale(1.08); } }
+  .mh-glow-2 { animation-name: mh-pulse2; }
+  @keyframes mh-pulse2 { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
+  .mh-eyebrow { position: relative; z-index: 1; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent2); margin-bottom: 14px; }
+  .mh-title { position: relative; z-index: 1; font-size: clamp(28px,4vw,42px); font-weight: 800; letter-spacing: -0.02em; color: #fff; margin-bottom: 10px; }
+  .mh-title .accent { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mh-sub { position: relative; z-index: 1; font-size: 14px; color: var(--text2); max-width: 460px; margin: 0 auto 40px; line-height: 1.6; }
+  .mh-cards { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 760px; }
+  .mh-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; width: 168px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; animation: mh-float 4s ease-in-out infinite; }
+  .mh-card:nth-child(2) { animation-delay: 0.4s; } .mh-card:nth-child(3) { animation-delay: 0.8s; } .mh-card:nth-child(4) { animation-delay: 1.2s; } .mh-card:nth-child(5) { animation-delay: 1.6s; } .mh-card:nth-child(6) { animation-delay: 2s; }
+  @keyframes mh-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .mh-card:hover { transform: translateY(-4px); border-color: rgba(30,79,255,0.5); box-shadow: 0 8px 32px rgba(30,79,255,0.28); }
+  .mh-card-icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 18px; margin: 0 auto 12px; box-shadow: 0 4px 16px rgba(30,79,255,0.4); }
+  .mh-card-label { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .mh-card-desc { font-size: 11px; color: var(--text2); line-height: 1.4; }
+
+  /* ── Guides pages (Drip Set Guide / Weekly Requirements) ───── */
+  .guide-hero { background: linear-gradient(135deg, rgba(30,79,255,0.12), rgba(107,143,255,0.05)); border: 1px solid rgba(30,79,255,0.25); border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+  .guide-hero p { color: var(--text2); font-size: 13px; line-height: 1.6; margin-top: 6px; }
+  .guide-rules { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 10px; margin-bottom: 22px; }
+  .guide-rule { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .guide-batch { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }
+  .guide-batch.optional { border-left-color: var(--text2); opacity: 0.9; }
+  .guide-batch-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .guide-batch-line { font-size: 13px; color: var(--accent2); font-style: italic; margin-bottom: 8px; }
+  .guide-batch-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .guide-batch-body strong { color: var(--text); }
+  .guide-summary { background: linear-gradient(135deg, rgba(30,79,255,0.14), rgba(107,143,255,0.06)); border: 1px solid rgba(30,79,255,0.3); border-radius: 12px; padding: 22px 24px; margin-top: 24px; box-shadow: 0 0 40px rgba(30,79,255,0.15); }
+  .guide-summary-title { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent2); margin-bottom: 12px; }
+  .guide-summary ul { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; line-height: 1.9; }
+  .guide-summary .guide-note { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(30,79,255,0.25); font-size: 12px; color: var(--text2); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -169,6 +208,18 @@
     </div>
   </div>
   <div id="main">
+
+    <!-- Model Overview / Welcome (landing page for the 'model' role) -->
+    <div class="page" id="page-model-home">
+      <div class="mh-wrap">
+        <div class="mh-glow mh-glow-1"></div>
+        <div class="mh-glow mh-glow-2"></div>
+        <div class="mh-eyebrow">Your Dashboard</div>
+        <div class="mh-title" id="mh-welcome">Welcome</div>
+        <div class="mh-sub">Everything you need to submit content, check your numbers, and stay on top of what's due this week — all in one place.</div>
+        <div class="mh-cards" id="mh-cards"></div>
+      </div>
+    </div>
 
     <!-- Overview -->
     <div class="page" id="page-overview">
@@ -306,6 +357,7 @@
       <div class="card">
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
           <select id="co-filter-model" onchange="filterContentOrders()" style="width:180px;"><option value="">All Models</option></select>
+          <span id="co-model-badge" style="display:none;font-size:13px;font-weight:700;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;"></span>
           <select id="co-filter-status" onchange="filterContentOrders()" style="width:140px;"><option value="">All Statuses</option><option value="pending">Pending</option><option value="done">Done</option></select>
           <select id="co-sort" onchange="filterContentOrders()" style="width:170px;">
             <option value="date_desc">Date: Newest first</option>
@@ -382,6 +434,7 @@
         <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="cp-start" onchange="filterContentPerfEntries()"></div>
         <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="cp-end" onchange="filterContentPerfEntries()"></div>
         <select id="cp-filter-model" onchange="filterContentPerfEntries()" style="width:170px;"><option value="">All Models</option></select>
+        <span id="cp-model-badge" style="display:none;font-size:13px;font-weight:700;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;"></span>
         <select id="cp-sort" onchange="filterContentPerfEntries()" style="width:180px;">
           <option value="rating_desc">Rating: Best first</option>
           <option value="date_desc">Date: Newest first</option>
@@ -837,6 +890,72 @@
     </div><!-- close two-col-wide -->
     </div><!-- close page-invoices -->
 
+    <!-- Model Invoices -- kept fully separate from the chatter/traffic/VA Invoices page
+         above: own table query (always role='model'), own admin review queue, own form
+         (no salary/commission split -- that's a staff payroll concept, models just submit
+         a payout amount). Nothing here is ever mixed with chatter invoice data. -->
+    <div class="page" id="page-model-invoices">
+      <div class="page-title">My Invoices</div>
+      <div class="page-sub">Submit a payout request — admin reviews and processes it</div>
+      <div class="two-col-wide" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-title">Submit Invoice</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Week From</label><input type="date" id="minv-week-start" onchange="syncModelInvWeek()"></div>
+          <div class="form-group"><label>Week To</label><input type="date" id="minv-week-end"></div>
+          <div class="form-group full"><label>Amount ($)</label><input type="number" id="minv-amount" placeholder="0.00" step="0.01" min="0"></div>
+          <div class="form-group full"><label>What's this for? (optional)</label><input type="text" id="minv-desc" placeholder="e.g. October split payout"></div>
+          <div class="form-group full">
+            <label>Upload Invoice (PDF or image, optional)</label>
+            <div id="minv-file-preview" style="display:none;margin-bottom:8px;">
+              <span id="minv-file-name" style="font-size:13px;color:var(--green);">📎 File attached</span>
+              <button onclick="clearModelInvFile()" class="btn btn-sm btn-danger" style="margin-left:8px;">Remove</button>
+            </div>
+            <div class="file-drop" id="minv-file-drop" onclick="document.getElementById('minv-file-input').click()" style="padding:16px;">
+              <div style="font-size:24px;">📄</div>
+              <p style="font-size:12px;margin-top:4px;">Click to upload invoice PDF or image</p>
+            </div>
+            <input type="file" id="minv-file-input" accept=".pdf,image/*" style="display:none" onchange="handleModelInvFile(this.files[0])">
+          </div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="submitModelInvoice()">📤 Submit Invoice</button></div>
+        <div id="minv-alert" class="alert"></div>
+      </div>
+      <div>
+        <div id="model-invoice-admin-panel" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">Needs Review</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Model payout requests only — separate from the Chatter/Traffic/VA Invoices queue.</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>From</th><th>Week</th><th>Amount</th><th>Invoice</th><th>Notes</th><th>Admin Notes</th><th>Status</th><th></th></tr></thead>
+            <tbody id="model-invoices-pending-body"></tbody>
+          </table></div>
+          <div id="model-invoices-pending-empty" class="empty" style="display:none;"><div class="empty-icon">🎉</div><p>Nothing waiting on review</p></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">Processed Invoices</div>
+          <div style="margin-bottom:12px;">
+            <select id="minv-filter" onchange="filterModelInvoices()" style="width:160px;"><option value="">All</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="rejected">Rejected</option></select>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>From</th><th>Week</th><th>Amount</th><th>Invoice</th><th>Notes</th><th>Admin Notes</th><th>Status</th><th></th></tr></thead>
+            <tbody id="model-invoices-body"></tbody>
+          </table></div>
+          <div id="model-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>Nothing processed yet</p></div>
+        </div>
+        </div>
+        <div class="card">
+          <div class="card-title">My Invoices</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Week</th><th>Amount</th><th>Notes</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+            <tbody id="my-model-invoices-body"></tbody>
+          </table></div>
+          <div id="my-model-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
+        </div>
+      </div>
+      </div><!-- close two-col-wide -->
+    </div><!-- close page-model-invoices -->
+
     <!-- Expenses -->
     <div class="page" id="page-expenses">
       <div class="page-title">Expenses</div>
@@ -953,6 +1072,132 @@
         <div style="flex:1;overflow-y:auto;padding:32px 40px;" id="sops-content-area">
           <div class="empty" style="margin-top:80px;"><div class="empty-icon">📖</div><p>Select a SOP from the list</p></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Guides: Drip Set Guide -->
+    <div class="page" id="page-guide-dripsets">
+      <div class="page-title">Drip Set Guide</div>
+      <div class="page-sub">How to shoot a full sexting drip sequence, batch by batch</div>
+      <div class="guide-hero">
+        <strong style="color:#fff;font-size:13px;">Bed Netflix Drip Sequence</strong>
+        <p>Consider this sequence a guide to the flow of a particular sexting session — the default for selling PPVs to fans. It's accompanied by a script, and the videos should match the script. Keep the points below in mind throughout, and follow them as closely as possible so it keeps the impression of being "live" and stays exclusive.</p>
+      </div>
+      <div class="guide-rules">
+        <div class="guide-rule">💡 Shoot in a well lit room, no sunlight — use a ring light ONLY if necessary.</div>
+        <div class="guide-rule">💄 Light makeup if needed, but keep it natural — don't make it look like you prepped a lot to record it.</div>
+        <div class="guide-rule">📅 Shoot the whole sequence on the same day.</div>
+        <div class="guide-rule">🎭 Show emotion — make it feel like you're talking to or doing this for someone.</div>
+        <div class="guide-rule">🔴 Record each video at the exact duration stated below (not a full-length video cut down) — this is what keeps it feeling "live."</div>
+      </div>
+
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 1 — Laying on the Bed</div>
+        <div class="guide-batch-line">"…" — casual smiling photos, a little teasing</div>
+        <div class="guide-batch-body">The first photos sent to the fan should look very casual — clothed, smiling, a little bit of a teasing smile, showing what you're wearing at the moment.<br><strong>Photos:</strong> 5–7 photos (clothed, very casual)</div>
+      </div>
+      <div class="guide-batch optional">
+        <div class="guide-batch-title">Optional — If the Fan Is Skeptical</div>
+        <div class="guide-batch-line">"Oh, you don't believe me?" / "What makes you think I have time to play and do you dirty like that baby?" / "Come on baby you know it's me"</div>
+        <div class="guide-batch-body">A voice note proving you're doing this for them in real time — some fans ask if you're really the one sending/talking to them.<br><strong>Photos:</strong> different poses (peace sign, 3 fingers up, 1 finger up, middle finger up, holding your chin, pinching your nose, tongue out, 4 fingers on forehead)</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 2</div>
+        <div class="guide-batch-line">"This one is better I think 😉"</div>
+        <div class="guide-batch-body">Second batch — half naked, teasing the fan but not showing everything yet.<br><strong>Photos:</strong> 5–7, taken from below and angled to show abs/chest (not the bulge yet)</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 3</div>
+        <div class="guide-batch-line">"Do you think I need to do some stroking right now? Be honest, I'm feeling a bit worked up lol 🙈😈"</div>
+        <div class="guide-batch-body"><strong>Video:</strong> 1 min &nbsp;•&nbsp; <strong>Photos:</strong> 5–7, holding/squeezing your bulge, exposing the upper half of your body naked.<br><strong>Start:</strong> laying on the bed, playing with your bulge over your boxers — one hand recording, one hand touching yourself, alternating between bulge and chest/abs. Tease the fan: "is this how you like it?" / "man I'm feeling so horny.." (or any dirty talk you're comfortable with).</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 4</div>
+        <div class="guide-batch-line">"Is that good enough for you? Good enough to make you throb like I am right now?"</div>
+        <div class="guide-batch-body"><strong>Video:</strong> 1–2 mins &nbsp;•&nbsp; <strong>Photos:</strong> 5–8, showing your hard cock with a small amount of lube on the tip to fake precum.<br><strong>Before recording:</strong> a little lube on the tip so it looks like you already had precum.<br><strong>Start:</strong> play with your cock over your boxers, then remove them to reveal it fully. Gentle touches, caress your body, play with your balls, tease them. Some dirty talk. Smother the "precum" over the tip.</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 5</div>
+        <div class="guide-batch-line">"No one has ever made my veins pop too soon, can you see it?? 😨" / "This is crazy man you got me touching myself all over.. 🥵"</div>
+        <div class="guide-batch-body"><strong>Video:</strong> 2–3 mins &nbsp;•&nbsp; <strong>Start:</strong> fully naked.<br><strong>If you have a dildo &amp; are comfortable with it:</strong> show it, start stroking/sucking it a bit to get it ready, tease your asshole by rubbing the dildo (don't insert yet) while stroking — moan, multiple positions, show how eager you are. <strong>Photos:</strong> 5–8, showing your asshole (some spread, some with the dildo in if possible), closeups of your cock with precum.<br><strong>If you don't have one / aren't comfortable:</strong> same energy using your fingers instead — tease, don't insert, stroke and moan. <strong>Photos:</strong> 5–8, same idea without the dildo.</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 6</div>
+        <div class="guide-batch-line">"Omg!! I came so hard I can't believe this"</div>
+        <div class="guide-batch-body"><strong>Video:</strong> 3–5 mins &nbsp;•&nbsp; <strong>Start:</strong> fully naked — this time go all out, moan hard, slowly put the dildo inside you if comfortable (skip if not), narrate how it feels, more dirty talk. Make sure you finish, shake your body to sell an intense orgasm. Cum on your abdomen is a nice touch to close out the session.<br><strong>Photos:</strong> 5–8 — showing your cum, holding the dildo, your cock hard/red after finishing, naughty or peace poses, genuine enjoyment.</div>
+      </div>
+      <div class="guide-batch">
+        <div class="guide-batch-title">Batch 7 — Thank You (10 sec video)</div>
+        <div class="guide-batch-line">"I enjoyed that a lot.. I hope you did too!" / "How are you so good at this? No one ever made me burst like that!"</div>
+        <div class="guide-batch-body">Only send this <strong>if the fan finishes the whole session</strong> — a short (10 sec+) thank-you clip that makes the aftercare feel genuine.</div>
+      </div>
+      <div class="guide-summary">
+        <div class="guide-summary-title">Full drip sets can be sold as mass PPVs too</div>
+        <div class="guide-note" style="margin-top:0;border-top:none;padding-top:0;">Clip all the batches together in CapCut and it becomes a Big PPV drop — see the <a href="#" onclick="navigate('guide-weekly');return false;" style="color:var(--accent2);font-weight:700;">Weekly Requirements guide</a> for how that fits into your weekly output.</div>
+      </div>
+    </div>
+
+    <!-- Guides: Weekly Content Requirements -->
+    <div class="page" id="page-guide-weekly">
+      <div class="page-title">Weekly Content Requirements</div>
+      <div class="page-sub">Your minimum weekly output — what to shoot, how much, and where it goes</div>
+      <div class="guide-hero">
+        <p>When uploading content to Drive, folders are labelled to match these categories — please upload into the right one. Tip: mirror the same folder structure in your camera roll as you film, so you're not sorting it all at once later. <strong style="color:#fff;">Don't let content build up over multiple days.</strong> Once a video or photo is edited/trimmed/cut, upload it ready to publish — we don't have time to edit everything you send.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">1. Sext Sets — Auto-Messages + Sexting Flow</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:700;margin-bottom:8px;">1–2 per week</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+          Each set should feel like a mini storyline — tease → escalation → climax. Each part contains one video and two photos taken from that video, slowly easing in and revealing more as you progress. Always save the cumshot for last.
+        </div>
+        <div class="btn-row"><button class="btn btn-sm btn-primary" onclick="navigate('guide-dripsets')">🔥 Open the Drip Set Guide</button></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. PPV Videos — Full Videos for DMs</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:700;margin-bottom:8px;">1–2 drops per week (one big, one small)</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+          <strong style="color:var(--text);">Small PPV ($8–15):</strong> shower video, underwear strip, edging — short, nudity but no cumshot.<br>
+          <strong style="color:var(--text);">Big PPV ($20–40):</strong> full solo cum video, toy play, fetish-specific content, roleplay — longer, essentially the full-length version of a sexting set.<br><br>
+          A full drip set can be clipped together in CapCut and sold as a mass PPV. Rotate themes — dominant top, submissive bottom, boyfriend experience, fetish niches.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3. Public OF Feed Posts</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:700;margin-bottom:8px;">7 posts per week</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+          A mix of free photos and short clips — teasing but not fully nude. Get as close to the full thing as possible while leaving fans wanting more. Short suggestive videos with half-reveals, dick slips etc. Mix hard and soft teasing — both work well. Purpose: give fans enough to crave more and upsell the PPV.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">4. Twitter — Promotion + Funnel</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:700;margin-bottom:8px;">Daily — 5–7 per week</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+          A mix of teasers — cropped nudes, 10-sec preview clips, gym thirst traps, mirror selfies. 1–2 full-length teaser clips per week (10-sec highlight edit). Photos with the top half of your dick showing, tip hidden, tend to work best.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">5. Insta / TikTok / Snap Traffic Content</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:700;margin-bottom:8px;">21 short-form (7–10 sec) SFW videos</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+          Same videos reused across all three platforms. Filmed as normal, personality/lifestyle-oriented content — refrain from filming in underwear and <strong style="color:var(--text);">no touching your bulge</strong>. Sweatpants or shorts with a subtle bulge work best. If it doesn't pass our SFW filtering, we may not be able to use it, so keep it TikTok-safe. Dancing, lip sync, even just face angles all work — see <a href="https://www.tiktok.com/@itsjamespits" target="_blank" style="color:var(--accent2);">@itsjamespits</a> for good examples of simple content to film.
+        </div>
+      </div>
+
+      <div class="guide-summary">
+        <div class="guide-summary-title">🎯 Weekly Output Summary</div>
+        <ul>
+          <li>1–2 sext drip sets</li>
+          <li>1–2 PPV videos (1 small, 1 big)</li>
+          <li>7 OF feed posts</li>
+          <li>7 Twitter posts (1 per day, 1–2 video teasers)</li>
+          <li>21 promo posts per week (covers the week across Insta/TikTok/Snapchat)</li>
+        </ul>
+        <div class="guide-note">Please remember — you only earn as much as your work ethic. This is the bare minimum for us to be able to promote you well. If you exceed this output, you'll get more traffic → subs → sales. LFG 🚀</div>
       </div>
     </div>
 
@@ -1182,6 +1427,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="model-inv-edit-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Edit Invoice</span><button class="modal-close" onclick="closeModal('model-inv-edit-modal')">✕</button></div>
+    <input type="hidden" id="minv-edit-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Week From</label><input type="date" id="minv-edit-week-start" onchange="syncModelInvEditWeek()"></div>
+      <div class="form-group"><label>Week To</label><input type="date" id="minv-edit-week-end"></div>
+      <div class="form-group full"><label>Amount ($)</label><input type="number" id="minv-edit-amount" step="0.01" min="0"></div>
+      <div class="form-group full"><label>What's this for?</label><input type="text" id="minv-edit-desc" placeholder="e.g. October split payout"></div>
+      <div class="form-group full" id="minv-edit-notes-group" style="display:none;"><label>Admin Notes (admin only)</label><input type="text" id="minv-edit-notes" placeholder="e.g. Paid via Zelle, double-checked"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEditModelInvoice()">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal('model-inv-edit-modal')">Cancel</button>
+    </div>
+    <div id="minv-edit-alert" class="alert"></div>
+  </div>
+</div>
+
 <!-- Expense Edit Modal -->
 <div class="modal-overlay" id="exp-edit-modal">
   <div class="modal">
@@ -1233,6 +1497,7 @@ var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-
 // item happens to come first in that group -- e.g. a 'chatter' role can't see Chatter
 // Mgmt, but still needs the "Chatting" header to appear above Chatting SOPs.
 var NAV = [
+  { id: 'model-home', icon: '🏠', label: 'Overview',            roles: ['model'],                                  section: 'General' },
   { id: 'overview',   icon: '🏠', label: 'Dashboard',           roles: ['admin','va','chatter','traffic'],         section: 'General' },
   { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',         roles: ['admin','va','chatter','traffic'],         section: 'General' },
   { id: 'reports',    icon: '📊', label: 'Weekly Reports',      roles: ['admin','va'],                             section: 'General' },
@@ -1240,12 +1505,16 @@ var NAV = [
   { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',        roles: ['admin','va'],                             section: 'Chatting' },
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',       roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
   { id: 'sheets',     icon: '📋', label: 'Model Sheets',        roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
-  { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
+  { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
+
+  { id: 'guide-dripsets', icon: '🔥', label: 'Drip Set Guide',              roles: ['admin','va','model'],         section: 'Guides' },
+  { id: 'guide-weekly',   icon: '📅', label: 'Weekly Requirements',        roles: ['admin','va','model'],          section: 'Guides' },
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
   { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
@@ -1281,7 +1550,7 @@ async function initApp(user) {
   buildNav(profile.role);
   await loadAllData();
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
-  const defaultPage = profile.role === 'model' ? 'content' : 'overview';
+  const defaultPage = profile.role === 'model' ? 'model-home' : 'overview';
   let savedPage=null;
   try{ savedPage=localStorage.getItem('agencyos_page'); }catch(e){}
   navigate(savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage);
@@ -1335,6 +1604,37 @@ function navigate(page) {
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
   if (page === 'contentperf') loadContentPerformance();
+  if (page === 'model-home') renderModelHome();
+  if (page === 'model-invoices') renderModelInvoicePage();
+}
+
+// The first thing a model sees when they log in. Personalizes the greeting using their
+// linked models.name (same email-match used everywhere else for model identity), and
+// renders a shortcut card per model-facing NAV item so it doubles as a mini sitemap --
+// "aesthetic" per Liam's spec, but also genuinely useful as a landing page.
+function renderModelHome(){
+  const welcomeEl=document.getElementById('mh-welcome');
+  if(welcomeEl){
+    const mine=STATE.models.find(m=>(m.email||'').toLowerCase()===(STATE.profile?.email||'').toLowerCase());
+    const firstName=mine?.name ? String(mine.name).trim().split(/\s+/)[0] : '';
+    welcomeEl.innerHTML = firstName ? `Welcome, <span class="accent">${firstName}</span>` : 'Welcome';
+  }
+  const cardsEl=document.getElementById('mh-cards');
+  if(!cardsEl) return;
+  const shortcuts=[
+    { id:'content',          icon:'📹', label:'Content Orders',       desc:'Submit & track your content' },
+    { id:'contentperf',      icon:'📈', label:'Content Performance',  desc:'See how your posts are doing' },
+    { id:'ideas',             icon:'💡', label:'Content Ideas',        desc:'Fresh ideas for your niche' },
+    { id:'guide-dripsets',   icon:'🔥', label:'Drip Set Guide',       desc:'How to shoot a sexting sequence' },
+    { id:'guide-weekly',     icon:'📅', label:'Weekly Requirements',  desc:'Your weekly content checklist' },
+    { id:'model-invoices',    icon:'💵', label:'My Invoices',          desc:'Submit & track your payouts' },
+  ];
+  cardsEl.innerHTML=shortcuts.map(s=>`
+    <div class="mh-card" onclick="navigate('${s.id}')">
+      <div class="mh-card-icon">${s.icon}</div>
+      <div class="mh-card-label">${s.label}</div>
+      <div class="mh-card-desc">${s.desc}</div>
+    </div>`).join('');
 }
 
 function switchAuthTab(tab) {
@@ -1594,13 +1894,20 @@ function populateModelDropdowns() {
       <input type="checkbox" value="${m.id}" onchange="syncBulkModelSelect()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
       ${m.name}
     </label>`).join('');
+  // A model only ever has one "model" to filter by (themselves), so the "All Models"
+  // dropdown is meaningless noise for that role -- swap it for a plain name badge
+  // instead. Falls back to "N/A" if this login isn't linked to a models row by email.
+  const myDisplayName = isModel ? (visibleModels[0]?.name || 'N/A') : null;
   const fsel=document.getElementById('co-filter-model');
+  const fBadge=document.getElementById('co-model-badge');
   if(fsel){
     const prevFilterVal=fsel.value;
     fsel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
     // Preserve the previously selected filter (e.g. after a model add/edit/delete elsewhere) unless that model no longer exists
     if(prevFilterVal && [...fsel.options].some(o=>o.value===prevFilterVal)) fsel.value=prevFilterVal;
+    fsel.style.display=isModel?'none':'';
   }
+  if(fBadge){ fBadge.textContent=myDisplayName||''; fBadge.style.display=isModel?'':'none'; }
   if(['admin','va'].includes(STATE.profile?.role)) document.getElementById('content-admin-panel').style.display='block';
   // Drive link banners
   const bannerEl=document.getElementById('co-drive-banners');
@@ -1621,11 +1928,14 @@ function populateModelDropdowns() {
   const cpModelSel=document.getElementById('cp-model');
   if(cpModelSel) cpModelSel.innerHTML=visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   const cpFilterSel=document.getElementById('cp-filter-model');
+  const cpBadge=document.getElementById('cp-model-badge');
   if(cpFilterSel){
     const prevVal=cpFilterSel.value;
     cpFilterSel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
     if(prevVal && [...cpFilterSel.options].some(o=>o.value===prevVal)) cpFilterSel.value=prevVal;
+    cpFilterSel.style.display=isModel?'none':'';
   }
+  if(cpBadge){ cpBadge.textContent=myDisplayName||''; cpBadge.style.display=isModel?'':'none'; }
 }
 
 function toggleModelDropdown(){
@@ -4222,6 +4532,195 @@ async function backfillInvoiceExpenseSync(){
   if(created&&document.getElementById('page-expenses')?.classList.contains('active')) loadExpenses();
 }
 
+// ── Model Invoices ───────────────────────────────────────────
+// Deliberately independent from the chatter/traffic/VA Invoices code above -- own
+// state, own queries (always role:'model'), own form, own admin queue. Nothing here
+// ever touches STATE.invoices or the chatter invoice tables, so a model's payout
+// requests can never get mixed in with (or accidentally shown alongside) staff
+// invoices. No salary/commission split (that's a staff payroll concept) and no
+// automatic Expenses sync on approval -- this just tracks submit -> review -> paid.
+var STATE_MODEL_INVOICES=[];
+var MY_MODEL_INVOICES_DATA=[];
+var _modelInvFile=null;
+
+async function renderModelInvoicePage(){
+  const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va';
+  document.getElementById('model-invoice-admin-panel').style.display=isAdmin?'block':'none';
+  const wkStart=document.getElementById('minv-week-start');
+  const wkEnd=document.getElementById('minv-week-end');
+  if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
+  if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
+  if(isAdmin){
+    const{data,error}=await sb.from('invoices').select('*').eq('role','model').order('created_at',{ascending:false});
+    if(error){console.error('renderModelInvoicePage',error);}
+    STATE_MODEL_INVOICES=data||[];
+    renderModelInvoicesPending(); filterModelInvoices();
+  }
+  renderMyModelInvoices();
+}
+
+function renderModelInvoicesPending(){
+  const tbody=document.getElementById('model-invoices-pending-body'); const empty=document.getElementById('model-invoices-pending-empty');
+  const invs=STATE_MODEL_INVOICES.filter(i=>i.status==='pending');
+  tbody.innerHTML='';
+  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
+  invs.forEach(inv=>{tbody.innerHTML+=modelInvoiceRowHtml(inv);});
+}
+
+function renderModelInvoicesTable(invs){
+  const tbody=document.getElementById('model-invoices-body'); const empty=document.getElementById('model-invoices-empty'); tbody.innerHTML='';
+  if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
+  invs.forEach(inv=>{tbody.innerHTML+=modelInvoiceRowHtml(inv);});
+}
+
+function modelInvoiceRowHtml(inv){
+  return `<tr>
+    <td>${inv.submitted_by_name||inv.submitted_by_email||'—'}</td>
+    <td style="white-space:nowrap;">${fmtDate(inv.week_of)}</td>
+    <td><strong>$${fmt(inv.amount)}</strong></td>
+    <td>${inv.invoice_file_url?`<a href="${inv.invoice_file_url}" target="_blank" class="btn btn-sm btn-ghost">📄 View</a>`:'—'}</td>
+    <td style="font-size:12px;color:var(--text2);max-width:140px;">${inv.description||'—'}</td>
+    <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.admin_notes||'—'}</td>
+    <td><span class="badge ${inv.status}">${inv.status}</span></td>
+    <td style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-green" onclick="updateModelInvoice('${inv.id}','approved')">✓</button>
+      <button class="btn btn-sm btn-ghost" onclick="updateModelInvoice('${inv.id}','processing')">⏳</button>
+      <button class="btn btn-sm btn-danger" onclick="updateModelInvoice('${inv.id}','rejected')">✕</button>
+      <button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>
+      <button class="btn btn-sm btn-danger" onclick="delModelInvoice('${inv.id}')" title="Delete permanently">🗑</button>
+    </td></tr>`;
+}
+
+function filterModelInvoices(){
+  const s=document.getElementById('minv-filter').value;
+  const processed=STATE_MODEL_INVOICES.filter(i=>i.status!=='pending');
+  renderModelInvoicesTable(s?processed.filter(i=>i.status===s):processed);
+}
+
+async function renderMyModelInvoices(){
+  const{data}=await sb.from('invoices').select('*').eq('submitted_by_email',STATE.profile.email).eq('role','model').order('created_at',{ascending:false});
+  MY_MODEL_INVOICES_DATA=data||[];
+  const tbody=document.getElementById('my-model-invoices-body'); const empty=document.getElementById('my-model-invoices-empty'); tbody.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+  data.forEach(inv=>{tbody.innerHTML+=`<tr><td>${fmtDate(inv.week_of)}</td><td>$${fmt(inv.amount)}</td><td>${inv.description||'—'}</td><td><span class="badge ${inv.status}">${inv.status}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(inv.created_at)}</td><td>${inv.status==='pending'?`<button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>`:''}</td></tr>`;});
+}
+
+function handleModelInvFile(file){
+  if(!file)return;
+  _modelInvFile=file;
+  document.getElementById('minv-file-name').textContent=`📎 ${file.name}`;
+  document.getElementById('minv-file-preview').style.display='block';
+  document.getElementById('minv-file-drop').style.display='none';
+}
+function clearModelInvFile(){_modelInvFile=null;document.getElementById('minv-file-preview').style.display='none';document.getElementById('minv-file-drop').style.display='block';document.getElementById('minv-file-input').value='';}
+
+async function uploadModelInvFile(){
+  if(!_modelInvFile)return null;
+  try{
+    const path=`model-invoices/${STATE.profile.email}_${Date.now()}_${_modelInvFile.name}`;
+    const{error}=await sb.storage.from('invoice-files').upload(path,_modelInvFile,{upsert:true});
+    if(error){console.error(error);return null;}
+    const{data}=sb.storage.from('invoice-files').getPublicUrl(path);
+    return data.publicUrl;
+  }catch(e){console.error(e);return null;}
+}
+
+function syncModelInvWeek(){
+  const start=document.getElementById('minv-week-start').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('minv-week-end').value=d.toISOString().split('T')[0];
+}
+function syncModelInvEditWeek(){
+  const start=document.getElementById('minv-edit-week-start').value;
+  if(!start)return;
+  const d=new Date(start); d.setDate(d.getDate()+6);
+  document.getElementById('minv-edit-week-end').value=d.toISOString().split('T')[0];
+}
+
+async function submitModelInvoice(){
+  const amount=parseFloat(document.getElementById('minv-amount').value||0);
+  const weekStart=document.getElementById('minv-week-start').value;
+  const weekEnd=document.getElementById('minv-week-end').value;
+  const weekOf=weekStart||weekEnd||'';
+  if(!weekOf||!amount)return showAlert('minv-alert','Fill in week dates and an amount.','error');
+  const fileUrl=await uploadModelInvFile();
+  const inv={
+    submitted_by_email:STATE.profile.email,
+    submitted_by_name:STATE.profile.name,
+    role:'model',
+    week_of:weekOf,
+    week_end:weekEnd||null,
+    amount:amount,
+    salary_amount:0,
+    commission_amount:0,
+    description:document.getElementById('minv-desc').value.trim(),
+    invoice_file_url:fileUrl,
+    status:'pending'
+  };
+  const{error}=await sb.from('invoices').insert(inv);
+  if(error)return showAlert('minv-alert',error.message,'error');
+  showAlert('minv-alert','Invoice submitted! 🎉','success');
+  document.getElementById('minv-amount').value='';
+  document.getElementById('minv-desc').value='';
+  clearModelInvFile();
+  renderMyModelInvoices();
+}
+
+async function updateModelInvoice(id,status){
+  const{error}=await sb.from('invoices').update({status}).eq('id',id);
+  if(error) return alert(error.message);
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv)inv.status=status;
+  renderModelInvoicesPending(); filterModelInvoices();
+}
+
+async function delModelInvoice(id){
+  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id)||MY_MODEL_INVOICES_DATA.find(x=>x.id===id);
+  if(!inv)return;
+  if(!confirm('Delete this invoice permanently?'))return;
+  const{error,data}=await sb.from('invoices').delete().eq('id',id).select();
+  if(error||!data||!data.length){alert('Could not delete this invoice — you may be missing delete permission.');return;}
+  STATE_MODEL_INVOICES=STATE_MODEL_INVOICES.filter(i=>i.id!==id);
+  MY_MODEL_INVOICES_DATA=MY_MODEL_INVOICES_DATA.filter(i=>i.id!==id);
+  renderModelInvoicesPending(); filterModelInvoices(); renderMyModelInvoices();
+}
+
+function editModelInvoice(id){
+  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id)||MY_MODEL_INVOICES_DATA.find(x=>x.id===id);
+  if(!inv)return;
+  document.getElementById('minv-edit-id').value=inv.id;
+  document.getElementById('minv-edit-week-start').value=inv.week_of||'';
+  document.getElementById('minv-edit-week-end').value=inv.week_end||'';
+  document.getElementById('minv-edit-amount').value=inv.amount||0;
+  document.getElementById('minv-edit-desc').value=inv.description||'';
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  const notesGroup=document.getElementById('minv-edit-notes-group');
+  notesGroup.style.display=isAdmin?'block':'none';
+  document.getElementById('minv-edit-notes').value=inv.admin_notes||'';
+  document.getElementById('minv-edit-alert').style.display='none';
+  openModal('model-inv-edit-modal');
+}
+
+async function saveEditModelInvoice(){
+  const id=document.getElementById('minv-edit-id').value;
+  const amount=parseFloat(document.getElementById('minv-edit-amount').value||0);
+  const weekStart=document.getElementById('minv-edit-week-start').value;
+  const weekEnd=document.getElementById('minv-edit-week-end').value;
+  if(!weekStart||!amount) return showAlert('minv-edit-alert','Fill in a week start and an amount.','error');
+  const updates={
+    week_of:weekStart, week_end:weekEnd||null,
+    amount:amount,
+    description:document.getElementById('minv-edit-desc').value.trim()
+  };
+  if(['admin','va'].includes(STATE.profile?.role)) updates.admin_notes=document.getElementById('minv-edit-notes').value.trim();
+  const{data,error}=await sb.from('invoices').update(updates).eq('id',id).select().single();
+  if(error) return showAlert('minv-edit-alert',error.message,'error');
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
+  const myInv=MY_MODEL_INVOICES_DATA.find(i=>i.id===id); if(myInv) Object.assign(myInv,updates);
+  renderModelInvoicesPending(); filterModelInvoices(); renderMyModelInvoices();
+  closeModal('model-inv-edit-modal');
+}
+
 // ── Team ─────────────────────────────────────────────────────
 async function loadTeam(){
   const{data}=await sb.from('profiles').select('*').order('created_at');
@@ -4789,8 +5288,9 @@ function applyContentPerfDashboardMode(){
     :'Instagram post performance — views, retention, saves, and follower growth per video';
   const actionsRow=document.getElementById('cp-actions-row');
   if(actionsRow) actionsRow.style.display=isModelRole?'none':'';
-  const filterModelSel=document.getElementById('cp-filter-model');
-  if(filterModelSel) filterModelSel.style.display=isModelRole?'none':'';
+  // cp-filter-model's own show/hide (and its name-badge swap) is owned by
+  // populateModelDropdowns() -- it already has visibleModels computed there, no need
+  // to duplicate that logic here.
   const historySection=document.getElementById('cp-history-section');
   if(historySection) historySection.style.display=isModelRole?'none':'';
 }
