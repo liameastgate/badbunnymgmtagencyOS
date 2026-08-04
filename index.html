@@ -956,7 +956,7 @@
 
     <!-- Management -->
     <div class="page" id="page-management">
-      <div class="page-title">Management</div>
+      <div class="page-title">Drawing Board</div>
       <div class="page-sub">Agency goals and KPI tracking</div>
       <div class="two-col">
         <div>
@@ -1021,7 +1021,7 @@
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
       <div class="form-group full"><label>Model Email</label><input type="email" id="model-email" placeholder="model@gmail.com"></div>
       <div class="form-group full"><label>Google Drive Link</label><input type="url" id="model-drive" placeholder="https://drive.google.com/..."></div>
-      <div class="form-group full"><label>Instagram Handles (comma separated, no @ — used to auto-match Content Performance uploads)</label><input type="text" id="model-ig-handles" placeholder="liamshellahung, liam_backup"></div>
+      <div class="form-group full"><label>Instagram Handles (comma separated, no @ — used to auto-match Content Performance uploads)</label><input type="text" id="model-ig-handles" placeholder="e.g. handle1, handle2"></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
@@ -1225,21 +1225,29 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [] };
 var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
+// Grouped into General / Chatting / Models / Management per Liam's requested layout.
+// Every item in a group carries the same `section` value (not just the first) so the
+// header still renders correctly even when a lower-permission role can't see whichever
+// item happens to come first in that group -- e.g. a 'chatter' role can't see Chatter
+// Mgmt, but still needs the "Chatting" header to appear above Chatting SOPs.
 var NAV = [
-  { id: 'overview',   icon: '🏠', label: 'Dashboard',       roles: ['admin','va','chatter','traffic'], section: 'Workspace' },
-  { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',     roles: ['admin','va','chatter','traffic'],         section: null },
-  { id: 'sheets',     icon: '📋', label: 'Model Sheets',    roles: ['admin','va','chatter','traffic'],         section: null },
-  { id: 'sops',       icon: '📖', label: 'Chatting SOPs',   roles: ['admin','va','chatter','traffic'],         section: null },
-  { id: 'management', icon: '🎯', label: 'Management',      roles: ['admin','va'],                             section: null },
-  { id: 'content',    icon: '📹', label: 'Content Orders',  roles: ['admin','va','model'],                     section: 'Operations' },
-  { id: 'ideas',      icon: '💡', label: 'Content Ideas',   roles: ['admin','va','model'],                     section: null },
-  { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va'],                        section: null },
-  { id: 'reports',    icon: '📊', label: 'Weekly Reports',  roles: ['admin','va'],                             section: null },
-  { id: 'models',     icon: '👤', label: 'Model Settings',  roles: ['admin','va'],                             section: null },
-  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',    roles: ['admin','va'],                             section: null },
-  { id: 'expenses',   icon: '💸', label: 'Expenses',        roles: ['admin','va'],                             section: 'Finance' },
-  { id: 'invoices',   icon: '🧾', label: 'Invoices',        roles: ['admin','va','chatter','traffic','model'], section: null },
-  { id: 'team',       icon: '🔑', label: 'Team Access',     roles: ['admin'],                                  section: 'Admin' }
+  { id: 'overview',   icon: '🏠', label: 'Dashboard',           roles: ['admin','va','chatter','traffic'],         section: 'General' },
+  { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',         roles: ['admin','va','chatter','traffic'],         section: 'General' },
+  { id: 'reports',    icon: '📊', label: 'Weekly Reports',      roles: ['admin','va'],                             section: 'General' },
+
+  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',        roles: ['admin','va'],                             section: 'Chatting' },
+  { id: 'sops',       icon: '📖', label: 'Chatting SOPs',       roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
+  { id: 'sheets',     icon: '📋', label: 'Model Sheets',        roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
+  { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
+
+  { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va'],                             section: 'Models' },
+  { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
+
+  { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
+  { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
+  { id: 'team',       icon: '🔑', label: 'Team Access',         roles: ['admin'],                                  section: 'Management' }
 ];
 
 // ── Init ─────────────────────────────────────────────────────
