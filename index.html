@@ -519,6 +519,7 @@
         <div class="tab" onclick="switchReportTab('upload')">Creator Stats</div>
         <div class="tab" onclick="switchReportTab('chatters')">Chatter Performance</div>
         <div class="tab" onclick="switchReportTab('sales')">Sales Records</div>
+        <div class="tab" onclick="switchReportTab('reconcile')">Reconcile</div>
         <div class="tab" onclick="switchReportTab('history')">History</div>
       </div>
 
@@ -731,6 +732,31 @@
         <div id="sales-history-alert" class="alert" style="margin-bottom:12px;"></div>
         <div id="sales-history-groups" style="margin-top:10px;"></div>
         <div id="sales-history-empty" class="empty" style="display:none;"><div class="empty-icon">💰</div><p>No sales records uploaded yet</p></div>
+      </div>
+
+      <!-- Reconcile: Sales Records (source of truth) vs Employee Performance -->
+      <div id="report-tab-reconcile" style="display:none;">
+        <div class="card">
+          <div class="card-title">⚖️ Sales Records vs Employee Reports</div>
+          <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">For each chatter, compares the Sales total on their Employee Performance report against their earnings summed from Sales Records (treated as source of truth). Rows outside the threshold are flagged.</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="rec-start" onchange="loadReconciliation()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="rec-end" onchange="loadReconciliation()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setReconcilePeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setReconcilePeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setReconcilePeriod('month')">This Month</button>
+            </div>
+            <div class="form-group" style="max-width:110px;"><label>Flag if over</label><input type="number" id="rec-threshold" value="5" min="0" step="1" onchange="loadReconciliation()"></div>
+            <div class="form-group" style="max-width:90px;"><label>&nbsp;</label><select id="rec-threshold-unit" onchange="loadReconciliation()"><option value="dollar">$</option><option value="pct">%</option></select></div>
+          </div>
+          <div class="stats-grid" id="rec-stats" style="margin-bottom:14px;"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Chatter</th><th>Employee Report Sales</th><th>Sales Records Earnings</th><th>Delta $</th><th>Delta %</th><th>Status</th></tr></thead>
+            <tbody id="rec-table"></tbody>
+          </table></div>
+          <div id="rec-empty" class="empty" style="display:none;"><div class="empty-icon">⚖️</div><p>No chatter performance or sales records data for this period yet</p></div>
+        </div>
       </div>
 
       <!-- History -->
@@ -2429,18 +2455,20 @@ function renderLeaderboard(){
 
 // ── Reports ──────────────────────────────────────────────────
 function switchReportTab(tab) {
-  const order=['overview','upload','chatters','sales','history'];
+  const order=['overview','upload','chatters','sales','reconcile','history'];
   document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('report-tab-overview').style.display=tab==='overview'?'block':'none';
   document.getElementById('report-tab-upload').style.display=tab==='upload'?'block':'none';
   document.getElementById('report-tab-chatters').style.display=tab==='chatters'?'block':'none';
   document.getElementById('report-tab-sales').style.display=tab==='sales'?'block':'none';
+  document.getElementById('report-tab-reconcile').style.display=tab==='reconcile'?'block':'none';
   document.getElementById('report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='overview') loadReportsOverview();
   if(tab==='upload') loadCreatorStatsSummary();
   if(tab==='history') loadReportHistory();
   if(tab==='chatters'){ loadChatterPerfSummary(); loadChatterPerfHistory(); }
   if(tab==='sales'){ loadSalesSummary(); loadSalesHistory(); }
+  if(tab==='reconcile') loadReconciliation();
 }
 
 // ── Weekly Reports Overview (dashboard tab) ────────────────────
@@ -2682,6 +2710,80 @@ function setSalesSummaryPeriod(kind){
   document.getElementById('ss-sum-start').value=start;
   document.getElementById('ss-sum-end').value=end;
   loadSalesSummary();
+}
+
+// ── Reconciliation: Sales Records (source of truth) vs Employee Performance ──
+// Per chatter, compares chatter_performance.sales (self-reported on the Infloww Employee
+// Performance export) against sales_records.earnings summed for the same chatter/period
+// (built from the Infloww Sales record export, one row per sale -- the more granular and
+// therefore more trustworthy of the two). Flags any chatter whose two totals diverge by
+// more than the chosen threshold so a mismatch can be chased down before payout.
+async function loadReconciliation(){
+  const startEl=document.getElementById('rec-start'); const endEl=document.getElementById('rec-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const thresholdVal=parseFloat(document.getElementById('rec-threshold').value)||0;
+  const thresholdUnit=document.getElementById('rec-threshold-unit').value;
+
+  const[{data:perfData},{data:salesData}]=await Promise.all([
+    sb.from('chatter_performance').select('*'),
+    sb.from('sales_records').select('*')
+  ]);
+  const perfRows=(perfData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+  const salesRows=(salesData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  // Key by chatter_id where matched, otherwise fall back to the normalized name so
+  // unmatched/manually-typed names from both sides can still be lined up against each other.
+  const keyOf=r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+  const map=new Map();
+  perfRows.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=keyOf(r);
+    if(!map.has(key)) map.set(key,{name:r.chatter_name,perfSales:0,salesEarnings:0,hasPerf:false,hasSales:false});
+    const g=map.get(key); g.perfSales+=cleanAmount(r.sales); g.hasPerf=true;
+  });
+  salesRows.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=keyOf(r);
+    if(!map.has(key)) map.set(key,{name:r.chatter_name,perfSales:0,salesEarnings:0,hasPerf:false,hasSales:false});
+    const g=map.get(key); g.salesEarnings+=parseFloat(r.earnings||0); g.hasSales=true;
+  });
+
+  const rows=[...map.values()].map(g=>{
+    const delta=g.perfSales-g.salesEarnings;
+    const deltaPct=g.salesEarnings?(delta/g.salesEarnings*100):(g.perfSales?100:0);
+    const flagged=!g.hasPerf||!g.hasSales||(thresholdUnit==='pct'?Math.abs(deltaPct)>thresholdVal:Math.abs(delta)>thresholdVal);
+    return{...g,delta,deltaPct,flagged};
+  }).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+
+  const flaggedCount=rows.filter(r=>r.flagged).length;
+  const totalDelta=rows.reduce((s,r)=>s+Math.abs(r.delta),0);
+  document.getElementById('rec-stats').innerHTML=
+    statCard('Chatters Compared',rows.length,'','')+
+    statCard('Flagged',flaggedCount,flaggedCount?'red':'','red')+
+    statCard('Total Absolute Delta','$'+fmt(totalDelta),'','')+
+    statCard('Source of Truth','Sales Records','accent','green');
+
+  document.getElementById('rec-empty').style.display=rows.length?'none':'block';
+  document.getElementById('rec-table').innerHTML=rows.length?rows.map(r=>{
+    const missing=!r.hasPerf?' <span style="color:var(--red);font-size:10px;font-weight:700;">no employee report</span>'
+      :!r.hasSales?' <span style="color:var(--red);font-size:10px;font-weight:700;">no sales records</span>':'';
+    return`<tr${r.flagged?' style="background:rgba(255,70,70,0.06);"':''}>
+      <td><strong>${r.name}</strong>${missing}</td>
+      <td>$${fmt(r.perfSales)}</td>
+      <td>$${fmt(r.salesEarnings)}</td>
+      <td class="${r.delta>0?'':r.delta<0?'profit':''}">${r.delta>=0?'+':'-'}$${fmt(Math.abs(r.delta))}</td>
+      <td>${isFinite(r.deltaPct)?(r.deltaPct>=0?'+':'')+r.deltaPct.toFixed(1)+'%':'—'}</td>
+      <td>${r.flagged?'<span style="color:var(--red);font-weight:700;">⚠ Flagged</span>':'<span style="color:var(--accent2);">✓ Match</span>'}</td>
+    </tr>`;
+  }).join(''):'';
+}
+function setReconcilePeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('rec-start').value=start;
+  document.getElementById('rec-end').value=end;
+  loadReconciliation();
 }
 
 // ── Chatter Performance Summary (standalone tab, own week range) ─
