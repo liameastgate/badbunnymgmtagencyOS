@@ -459,6 +459,8 @@
           <option value="likes_desc">Likes: High to low</option>
           <option value="follows_desc">Follows: High to low</option>
           <option value="saves_desc">Saves: High to low</option>
+          <option value="comments_desc">Comments: High to low</option>
+          <option value="shares_desc">Shares: High to low</option>
         </select>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-sm btn-ghost" onclick="setContentPerfPeriod('last')">Last Week</button>
@@ -5465,11 +5467,9 @@ async function loadContentPerformance(){
   const{data,error}=await query;
   if(error){console.error('loadContentPerformance',error);return;}
   STATE.contentPerf=data||[];
-  const startEl=document.getElementById('cp-start'), endEl=document.getElementById('cp-end');
-  if(startEl && endEl && !startEl.value && !endEl.value){
-    const{start,end}=computePeriodRange('month');
-    startEl.value=start; endEl.value=end;
-  }
+  // Defaults to All Time (blank start/end) rather than This-Month-to-date -- a calendar-month
+  // default made a healthy 32-post history look like "only 3 videos" broken on day 2 of a new
+  // month, since only that month's posts had landed yet. Still fully filterable/sortable below.
   filterContentPerfEntries();
   if(!isModelRole) loadContentPerfHistory(); // history is a cross-model import log -- staff only
 }
@@ -5591,6 +5591,8 @@ function filterContentPerfEntries(){
     likes_desc:(a,b)=>(b.likes||0)-(a.likes||0),
     follows_desc:(a,b)=>(b.new_followers||0)-(a.new_followers||0),
     saves_desc:(a,b)=>(b.saves||0)-(a.saves||0),
+    comments_desc:(a,b)=>(b.comments||0)-(a.comments||0),
+    shares_desc:(a,b)=>(b.shares||0)-(a.shares||0),
   };
   rows.sort(sorters[sortKey]||sorters.rating_desc);
 
