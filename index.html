@@ -354,7 +354,7 @@
     <div class="page" id="page-contentperf">
       <div class="page-title">Content Performance</div>
       <div class="page-sub">Instagram post performance — views, retention, saves, and follower growth per video</div>
-      <div class="btn-row" style="margin-bottom:12px;">
+      <div class="btn-row" id="cp-actions-row" style="margin-bottom:12px;">
         <button class="btn btn-primary" onclick="openContentPerfModal()">➕ Add Entry</button>
         <button class="btn btn-ghost" onclick="document.getElementById('cp-csv-input').click()">📤 Upload Meta Content Export</button>
         <input type="file" id="cp-csv-input" accept=".csv,.xlsx,.xls" style="display:none;" onchange="if(this.files[0])handleContentPerfFile(this.files[0]);this.value='';">
@@ -402,11 +402,13 @@
       <div id="cp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
       <div id="cp-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No content performance entries yet</p></div>
 
-      <div style="margin-top:28px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
-      <div style="font-size:11px;color:var(--text2);margin:2px 0 12px;">Every Meta Content Export you've uploaded, grouped by import. Delete a whole import (or a single post) if something was uploaded by mistake.</div>
-      <div id="cp-history-alert" class="alert" style="margin-bottom:12px;"></div>
-      <div id="cp-history-groups" style="margin-top:10px;"></div>
-      <div id="cp-history-empty" class="empty" style="display:none;"><div class="empty-icon">📤</div><p>No CSV imports yet — uploaded Meta exports will show up here</p></div>
+      <div id="cp-history-section">
+        <div style="margin-top:28px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
+        <div style="font-size:11px;color:var(--text2);margin:2px 0 12px;">Every Meta Content Export you've uploaded, grouped by import. Delete a whole import (or a single post) if something was uploaded by mistake.</div>
+        <div id="cp-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div id="cp-history-groups" style="margin-top:10px;"></div>
+        <div id="cp-history-empty" class="empty" style="display:none;"><div class="empty-icon">📤</div><p>No CSV imports yet — uploaded Meta exports will show up here</p></div>
+      </div>
     </div>
 
     <!-- Leaderboard -->
@@ -1241,7 +1243,7 @@ var NAV = [
   { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
-  { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va'],                             section: 'Models' },
+  { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
@@ -1612,13 +1614,16 @@ function populateModelDropdowns() {
         <a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;">📁 Google Drive ↗</a>
       </div>`).join('');
   }
-  // Content Performance model pickers
+  // Content Performance model pickers -- reuse the same visibleModels list computed
+  // above so a model-role user never sees another model's name in either dropdown,
+  // even though the page itself hides these controls for that role anyway (belt and
+  // braces -- if Add Entry is ever re-shown for models, it still only lists themselves).
   const cpModelSel=document.getElementById('cp-model');
-  if(cpModelSel) cpModelSel.innerHTML=STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  if(cpModelSel) cpModelSel.innerHTML=visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   const cpFilterSel=document.getElementById('cp-filter-model');
   if(cpFilterSel){
     const prevVal=cpFilterSel.value;
-    cpFilterSel.innerHTML='<option value="">All Models</option>'+STATE.models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+    cpFilterSel.innerHTML='<option value="">All Models</option>'+visibleModels.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
     if(prevVal && [...cpFilterSel.options].some(o=>o.value===prevVal)) cpFilterSel.value=prevVal;
   }
 }
@@ -4737,8 +4742,27 @@ async function deleteContentIdea(id){
 }
 
 // ── Content Performance ─────────────────────────────────────
+// Model-role users get a personal, exclusive dashboard: the query below is scoped to
+// their own model_id (resolved the same way populateModelDropdowns() resolves "my
+// model" -- matching STATE.profile.email against models.email), the Upload History /
+// CSV-import UI is hidden (that's inherently agency-wide data), and a matching RLS
+// policy on content_performance enforces the same restriction server-side so a model
+// account can't just call the Supabase API directly to see everyone else's numbers.
+function myOwnModel(){
+  if(STATE.profile?.role!=='model') return null;
+  return STATE.models.find(m=>(m.email||'').toLowerCase()===(STATE.profile.email||'').toLowerCase())||null;
+}
+
 async function loadContentPerformance(){
-  const{data,error}=await sb.from('content_performance').select('*').order('post_date',{ascending:false});
+  const isModelRole=STATE.profile?.role==='model';
+  applyContentPerfDashboardMode();
+  let query=sb.from('content_performance').select('*').order('post_date',{ascending:false});
+  if(isModelRole){
+    const mine=myOwnModel();
+    if(!mine){ STATE.contentPerf=[]; filterContentPerfEntries(); return; } // no linked model row -- show empty state, not an error
+    query=query.eq('model_id',mine.id);
+  }
+  const{data,error}=await query;
   if(error){console.error('loadContentPerformance',error);return;}
   STATE.contentPerf=data||[];
   const startEl=document.getElementById('cp-start'), endEl=document.getElementById('cp-end');
@@ -4747,7 +4771,28 @@ async function loadContentPerformance(){
     startEl.value=start; endEl.value=end;
   }
   filterContentPerfEntries();
-  loadContentPerfHistory();
+  if(!isModelRole) loadContentPerfHistory(); // history is a cross-model import log -- staff only
+}
+
+// Toggles the page between the full staff view and a model's read-only personal
+// dashboard: retitles the header and hides every control that either exposes other
+// models (the model filter) or manages agency-wide import data (Add Entry, CSV
+// upload, Upload History). content_performance INSERT/UPDATE/DELETE already require
+// admin/va at the RLS layer, so this is UX cleanup on top of a real permission floor.
+function applyContentPerfDashboardMode(){
+  const isModelRole=STATE.profile?.role==='model';
+  const titleEl=document.querySelector('#page-contentperf .page-title');
+  const subEl=document.querySelector('#page-contentperf .page-sub');
+  if(titleEl) titleEl.textContent=isModelRole?'Your Content Performance':'Content Performance';
+  if(subEl) subEl.textContent=isModelRole
+    ?'Your personal dashboard — views, retention, saves, and follower growth per video'
+    :'Instagram post performance — views, retention, saves, and follower growth per video';
+  const actionsRow=document.getElementById('cp-actions-row');
+  if(actionsRow) actionsRow.style.display=isModelRole?'none':'';
+  const filterModelSel=document.getElementById('cp-filter-model');
+  if(filterModelSel) filterModelSel.style.display=isModelRole?'none':'';
+  const historySection=document.getElementById('cp-history-section');
+  if(historySection) historySection.style.display=isModelRole?'none':'';
 }
 
 // ── Content Performance: Upload History ─────────────────────
