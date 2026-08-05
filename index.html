@@ -805,10 +805,14 @@
       <div class="page-sub">Upload the Infloww export for Liam Free / Liam VIP — private to you, never shared with the main agency data</div>
       <div class="tabs">
         <div class="tab active" onclick="switchPersonalReportTab('overview')">Overview</div>
-        <div class="tab" onclick="switchPersonalReportTab('upload')">Upload</div>
+        <div class="tab" onclick="switchPersonalReportTab('upload')">Creator Stats</div>
+        <div class="tab" onclick="switchPersonalReportTab('chatters')">Chatter Performance</div>
+        <div class="tab" onclick="switchPersonalReportTab('sales')">Sales Records</div>
+        <div class="tab" onclick="switchPersonalReportTab('reconcile')">Reconcile</div>
         <div class="tab" onclick="switchPersonalReportTab('history')">History</div>
       </div>
 
+      <!-- Overview Dashboard -->
       <div id="p-report-tab-overview">
         <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
           <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-wro-week-start" onchange="loadPersonalReportsOverview()"></div>
@@ -820,16 +824,70 @@
           </div>
         </div>
         <div class="stats-grid" id="p-wro-stats" style="margin-bottom:16px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">🏆 Chatter Leaderboard</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>#</th><th>Chatter</th><th>Sales</th><th>Earnings</th><th>Gross</th></tr></thead>
+              <tbody id="p-wro-chatter-leaderboard"></tbody>
+            </table></div>
+          </div>
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">Account Earnings</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>#</th><th>Account</th><th>Earnings</th><th>Renew %</th><th>Active Fans</th></tr></thead>
+              <tbody id="p-wro-accounts"></tbody>
+            </table></div>
+          </div>
+        </div>
         <div class="card">
-          <div class="card-title">Account Earnings</div>
+          <div class="card-title">Chatter Performance</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Account</th><th>Earnings</th><th>Renew %</th><th>Active Fans</th></tr></thead>
-            <tbody id="p-wro-accounts"></tbody>
+            <thead><tr><th>Chatter</th><th>Accounts</th><th>Sales</th><th>DMs Sent</th><th>Fan CVR</th><th>Golden Ratio</th><th>Unlock Ratio</th><th>Sales/Hr</th></tr></thead>
+            <tbody id="p-wro-chatter-performance"></tbody>
           </table></div>
+          <div id="p-wro-perf-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No chatter performance data for this period yet</p></div>
         </div>
       </div>
 
+      <!-- Creator Stats Upload -->
       <div id="p-report-tab-upload" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-cs-sum-start" onchange="loadPersonalCreatorStatsSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-cs-sum-end" onchange="loadPersonalCreatorStatsSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalCreatorStatsSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalCreatorStatsSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalCreatorStatsSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="p-cs-sum-stats" style="margin-bottom:14px;"></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Revenue Mix</div>
+              <div id="p-cs-sum-revenue-mix"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Fan Funnel</div>
+              <div id="p-cs-sum-funnel"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Earnings by Day of Week</div>
+            <div id="p-cs-sum-daychart"></div>
+          </div>
+
+          <div class="stats-grid" id="p-cs-sum-quality" style="margin-bottom:14px;"></div>
+
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Account</th><th>Earnings</th><th>Renew %</th></tr></thead>
+            <tbody id="p-cs-sum-table"></tbody>
+          </table></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="color:var(--accent2);">Creator Statistics — Infloww Export</div>
           <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
@@ -846,6 +904,147 @@
         <div id="p-csv-preview" style="margin-top:14px;"></div>
         <div id="p-csv-save" style="display:none;margin-top:8px;">
           <button class="btn btn-primary" onclick="savePersonalReportRows()">💾 Save Report</button>
+        </div>
+      </div>
+
+      <!-- Chatter Performance Upload (tab) -->
+      <div id="p-report-tab-chatters" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-emp-sum-start" onchange="loadPersonalEmpSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-emp-sum-end" onchange="loadPersonalEmpSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalEmpSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalEmpSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalEmpSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="p-emp-sum-stats" style="margin-bottom:14px;"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Chatter</th><th>Accounts</th><th>Sales</th><th>DMs Sent</th><th>Fan CVR</th><th>Golden Ratio</th><th>Unlock Ratio</th><th>Sales/Hr</th></tr></thead>
+            <tbody id="p-emp-sum-table"></tbody>
+          </table></div>
+          <div id="p-emp-sum-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No chatter performance data for this period yet</p></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Sales Mix</div>
+              <div id="p-emp-sum-revenue-mix"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Engagement Funnel</div>
+              <div id="p-emp-sum-funnel"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Sales by Chatter</div>
+            <div id="p-emp-sum-chatterchart"></div>
+          </div>
+
+          <div class="stats-grid" id="p-emp-sum-quality"></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Employee Performance</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-emp-week-start"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-emp-week-end"></div>
+          </div>
+          <div class="file-drop" onclick="document.getElementById('p-emp-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handlePersonalEmpCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Employee Performance CSV/XLSX</p>
+          </div>
+          <input type="file" id="p-emp-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handlePersonalEmpCsvFile(this.files[0])">
+        </div>
+        <div id="p-emp-report-alert" class="alert"></div>
+        <div id="p-emp-csv-preview" style="margin-top:14px;"></div>
+        <div id="p-emp-save" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="savePersonalEmpPerformance()">💾 Save Chatter Performance</button>
+        </div>
+        <div style="margin-top:24px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
+        <div id="p-emp-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div id="p-emp-history-groups" style="margin-top:10px;"></div>
+        <div id="p-emp-history-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No chatter performance uploaded yet</p></div>
+      </div>
+
+      <!-- Sales Records Upload (tab) -->
+      <div id="p-report-tab-sales" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 Summary</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-ss-sum-start" onchange="loadPersonalSalesSummary()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-ss-sum-end" onchange="loadPersonalSalesSummary()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalSalesSummaryPeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalSalesSummaryPeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalSalesSummaryPeriod('month')">This Month</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="p-ss-sum-stats" style="margin-bottom:14px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">🏆 Chatter Leaderboard</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>#</th><th>Chatter</th><th>Sales</th><th>Earnings</th><th>Gross</th></tr></thead>
+              <tbody id="p-ss-sum-leaderboard"></tbody>
+            </table></div>
+          </div>
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">Sales by Account</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>#</th><th>Account</th><th>Sales</th><th>Gross</th><th>Net</th></tr></thead>
+              <tbody id="p-ss-sum-models"></tbody>
+            </table></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Sales Records</div>
+          <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">Upload the Infloww "Sales record" export — every individual sale for the period, with the chatter who earned it where attributed</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-sales-week-start"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-sales-week-end"></div>
+          </div>
+          <div class="file-drop" onclick="document.getElementById('p-sales-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handlePersonalSalesCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Sales Record CSV/XLSX</p>
+          </div>
+          <input type="file" id="p-sales-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handlePersonalSalesCsvFile(this.files[0])">
+        </div>
+        <div id="p-sales-alert" class="alert"></div>
+        <div id="p-sales-preview" style="margin-top:14px;"></div>
+        <div id="p-sales-save" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="savePersonalSalesRecords()">💾 Save Sales Records</button>
+        </div>
+        <div style="margin-top:24px;font-size:13px;font-weight:700;color:var(--text2);">Upload History</div>
+        <div id="p-sales-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div id="p-sales-history-groups" style="margin-top:10px;"></div>
+        <div id="p-sales-history-empty" class="empty" style="display:none;"><div class="empty-icon">💰</div><p>No sales records uploaded yet</p></div>
+      </div>
+
+      <!-- Reconcile: Sales Records (source of truth) vs Employee Performance -->
+      <div id="p-report-tab-reconcile" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">⚖️ Sales Records vs Employee Reports</div>
+          <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">For each chatter, compares the Sales total on their Employee Performance report against their earnings summed from Sales Records (treated as source of truth). Rows outside the threshold are flagged.</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-rec-start" onchange="loadPersonalReconciliation()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-rec-end" onchange="loadPersonalReconciliation()"></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalReconcilePeriod('last')">Last Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalReconcilePeriod('week')">This Week</button>
+              <button class="btn btn-sm btn-ghost" onclick="setPersonalReconcilePeriod('month')">This Month</button>
+            </div>
+            <div class="form-group" style="max-width:110px;"><label>Flag if over</label><input type="number" id="p-rec-threshold" value="5" min="0" step="1" onchange="loadPersonalReconciliation()"></div>
+            <div class="form-group" style="max-width:90px;"><label>&nbsp;</label><select id="p-rec-threshold-unit" onchange="loadPersonalReconciliation()"><option value="dollar">$</option><option value="pct">%</option></select></div>
+          </div>
+          <div class="stats-grid" id="p-rec-stats" style="margin-bottom:14px;"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Chatter</th><th>Employee Report Sales</th><th>Sales Records Earnings</th><th>Delta $</th><th>Delta %</th><th>Status</th></tr></thead>
+            <tbody id="p-rec-table"></tbody>
+          </table></div>
+          <div id="p-rec-empty" class="empty" style="display:none;"><div class="empty-icon">⚖️</div><p>No data for this period yet</p></div>
         </div>
       </div>
 
@@ -1694,7 +1893,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [], personalModels: [], personalReports: [], personalContentPerf: [] };
+var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [], personalModels: [], personalReports: [], personalContentPerf: [], personalChatterPerformance: [], personalSalesRecords: [] };
 var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
 // Grouped into General / Chatting / Models / Management per Liam's requested layout.
@@ -6433,12 +6632,19 @@ function populatePersonalDropdowns(){
 
 // ── Weekly Reports ───────────────────────────────────────────
 function switchPersonalReportTab(tab){
-  const order=['overview','upload','history'];
+  const order=['overview','upload','chatters','sales','reconcile','history'];
   document.querySelectorAll('#page-personal-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('p-report-tab-overview').style.display=tab==='overview'?'block':'none';
   document.getElementById('p-report-tab-upload').style.display=tab==='upload'?'block':'none';
+  document.getElementById('p-report-tab-chatters').style.display=tab==='chatters'?'block':'none';
+  document.getElementById('p-report-tab-sales').style.display=tab==='sales'?'block':'none';
+  document.getElementById('p-report-tab-reconcile').style.display=tab==='reconcile'?'block':'none';
   document.getElementById('p-report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='overview') loadPersonalReportsOverview();
+  if(tab==='upload') loadPersonalCreatorStatsSummary();
+  if(tab==='chatters'){ loadPersonalEmpSummary(); loadPersonalEmpHistory(); }
+  if(tab==='sales'){ loadPersonalSalesSummary(); loadPersonalSalesHistory(); }
+  if(tab==='reconcile') loadPersonalReconciliation();
   if(tab==='history') loadPersonalReportHistory();
 }
 
@@ -6604,26 +6810,101 @@ async function deletePersonalReportGroup(ids,label){
 async function loadPersonalReportsOverview(){
   await loadPersonalModels();
   const startEl=document.getElementById('p-wro-week-start'), endEl=document.getElementById('p-wro-week-end');
-  const {data:reports}=await sb.from('personal_weekly_reports').select('*').order('week_of',{ascending:false});
+  const [{data:reports},{data:salesData},{data:perfData}]=await Promise.all([
+    sb.from('personal_weekly_reports').select('*').order('week_of',{ascending:false}),
+    sb.from('personal_sales_records').select('*'),
+    sb.from('personal_chatter_performance').select('*')
+  ]);
   const all=reports||[];
   STATE.personalReports=all;
+  STATE.personalSalesRecords=salesData||[];
+  STATE.personalChatterPerformance=perfData||[];
   if(startEl && !startEl.value && all.length){ startEl.value=all[0].week_of; endEl.value=all[0].week_end||all[0].week_of; }
   const start=startEl?startEl.value:'', end=(endEl&&endEl.value)||start;
   const rows=start ? all.filter(r=>overlaps(r.week_of,r.week_end,start,end)) : all.filter(r=>r.week_of===all[0]?.week_of);
+  const salesRows=start ? (salesData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end)) : [];
+  const perfRows=start ? (perfData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end)) : [];
   const totalE=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
   const totalFans=rows.reduce((s,r)=>s+parseInt(r.active_fans||0),0);
   const avgRenew=rows.length?rows.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/rows.length*100:0;
+  const totalChatterEarnings=salesRows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+  const activeChatters=new Set(salesRows.filter(r=>r.chatter_id).map(r=>r.chatter_id)).size;
   const statsEl=document.getElementById('p-wro-stats');
   if(statsEl) statsEl.innerHTML=[
     {label:'Total Earnings',val:'$'+fmt(totalE)},
     {label:'Active Fans (combined)',val:totalFans},
     {label:'Avg Renew %',val:avgRenew.toFixed(1)+'%'},
     {label:'Accounts Reporting',val:rows.length},
+    {label:'Chatter Earnings',val:'$'+fmt(totalChatterEarnings)},
+    {label:'Active Chatters',val:activeChatters},
   ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.val}</div></div>`).join('');
   const accEl=document.getElementById('p-wro-accounts');
   if(accEl) accEl.innerHTML = rows.length
     ? rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.model_name||'—'}</td><td>$${fmt(r.total_earnings)}</td><td>${((r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||0}</td></tr>`).join('')
     : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No data — upload a weekly report first</td></tr>';
+
+  // Chatter Leaderboard — grouped from personal_sales_records, ranked by attributed earnings
+  const chatterMap=new Map();
+  salesRows.forEach(r=>{
+    if(!r.chatter_id) return;
+    if(!chatterMap.has(r.chatter_id)) chatterMap.set(r.chatter_id,{name:r.chatter_name,count:0,earnings:0,gross:0});
+    const g=chatterMap.get(r.chatter_id); g.count++; g.earnings+=parseFloat(r.earnings||0); g.gross+=parseFloat(r.gross_revenue||0);
+  });
+  const chatterLeaderboard=[...chatterMap.values()].sort((a,b)=>b.earnings-a.earnings);
+  const clBody=document.getElementById('p-wro-chatter-leaderboard');
+  if(clBody) clBody.innerHTML = chatterLeaderboard.length
+    ? chatterLeaderboard.map((g,i)=>`<tr><td>${i+1}</td><td><strong>${g.name}</strong></td><td>${g.count}</td><td class="profit">$${fmt(g.earnings)}</td><td>$${fmt(g.gross)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No attributed sales for this period</td></tr>';
+
+  // Chatter Performance breakdown — rolled up one row per chatter, from personal_chatter_performance
+  const perfBody=document.getElementById('p-wro-chatter-performance');
+  const perfEmpty=document.getElementById('p-wro-perf-empty');
+  if(perfBody){
+    const perfMap=new Map();
+    perfRows.forEach(r=>{
+      const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+      if(!perfMap.has(key)) perfMap.set(key,{name:r.chatter_name||'(unknown)', models:new Set(), entries:0, sales:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, unlockSum:0, unlockCount:0, hoursSum:0});
+      const g=perfMap.get(key);
+      g.entries++;
+      g.sales+=parseFloat(r.sales||0);
+      const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);
+      if(!isNaN(dmsNum)) g.dms+=dmsNum;
+      const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+      if(!isNaN(cvrNum)){ g.cvrSum+=cvrNum; g.cvrCount++; }
+      const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+      if(!isNaN(goldenNum)){ g.goldenSum+=goldenNum; g.goldenCount++; }
+      const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim());
+      if(!isNaN(unlockNum)){ g.unlockSum+=unlockNum; g.unlockCount++; }
+      const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());
+      if(!isNaN(hoursNum)) g.hoursSum+=hoursNum;
+      (r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[]).forEach(m=>g.models.add(m));
+    });
+    const perfList=[...perfMap.values()].sort((a,b)=>b.sales-a.sales);
+    if(perfList.length){
+      if(perfEmpty) perfEmpty.style.display='none';
+      perfBody.innerHTML=perfList.map(g=>{
+        const modelsLabel=g.models.size?`${g.models.size} model${g.models.size>1?'s':''}`:'—';
+        const avgCvr=g.cvrCount?(g.cvrSum/g.cvrCount):null;
+        const avgGolden=g.goldenCount?(g.goldenSum/g.goldenCount):null;
+        const avgUnlock=g.unlockCount?(g.unlockSum/g.unlockCount):null;
+        const salesPerHr=g.hoursSum>0?(g.sales/g.hoursSum):0;
+        return `<tr>
+          <td><strong>${g.name}</strong> <span style="color:var(--text2);font-size:11px;">(${g.entries} entr${g.entries!==1?'ies':'y'})</span></td>
+          <td>${modelsLabel}</td>
+          <td class="profit">$${fmt(g.sales)}</td>
+          <td>${g.dms||'—'}</td>
+          <td>${avgCvr!==null?avgCvr.toFixed(2)+'%':'—'}</td>
+          <td>${avgGolden!==null?avgGolden.toFixed(2)+'%':'—'}</td>
+          <td>${avgUnlock!==null?avgUnlock.toFixed(2)+'%':'—'}</td>
+          <td>$${fmt(salesPerHr)}</td>
+        </tr>`;
+      }).join('');
+    } else {
+      perfBody.innerHTML='';
+      if(perfEmpty) perfEmpty.style.display='block';
+    }
+  }
+
   renderPersonalDashboard();
 }
 
@@ -6859,6 +7140,826 @@ async function deletePersonalCpEntryFromModal(){
   closeModal('pcp-modal');
   filterPersonalContentPerf();
 }
+
+
+
+// ── My Accounts: Chatter Performance / Sales Records / Reconcile / Creator Stats Summary ──
+async function loadPersonalCreatorStatsSummary(){
+  const startEl=document.getElementById('p-cs-sum-start'); const endEl=document.getElementById('p-cs-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const[{data},{data:dailyData}]=await Promise.all([
+    sb.from('personal_weekly_reports').select('*'),
+    sb.from('personal_creator_stats_daily').select('stat_date,total_earnings').gte('stat_date',start).lte('stat_date',end)
+  ]);
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const activeModels=new Set(rows.map(r=>r.model_id||r.model_name)).size;
+  const avgRenew=rows.length?(rows.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/rows.length*100):0;
+
+  document.getElementById('p-cs-sum-stats').innerHTML=
+    statCard('Total Earnings','$'+fmt(totalEarnings),'white','purple')+
+    statCard('Active Accounts',activeModels,'','')+
+    statCard('Avg Renew %',avgRenew.toFixed(1)+'%','accent','green');
+
+  renderPersonalRevenueMixBar(rows);
+  renderPersonalFanFunnel(rows);
+  renderPersonalDayOfWeekChart(dailyData||[]);
+  renderPersonalQualityStats(rows);
+
+  const sorted=rows.slice().sort((a,b)=>parseFloat(b.total_earnings||0)-parseFloat(a.total_earnings||0));
+  document.getElementById('p-cs-sum-table').innerHTML=sorted.length
+    ? sorted.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.model_name}</strong></td><td class="profit">$${fmt(r.total_earnings)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--text2);">No creator stats for this period</td></tr>';
+}
+
+// Aggregate revenue-source breakdown across whatever rows are passed (already filtered to the
+// selected week range) -- pure CSS stacked bar, no charting library needed.
+function setPersonalCreatorStatsSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('p-cs-sum-start').value=start;
+  document.getElementById('p-cs-sum-end').value=end;
+  loadPersonalCreatorStatsSummary();
+}
+
+function renderPersonalRevenueMixBar(rows){
+  const segments=[
+    {label:'Subscriptions', key:'subscription_earnings', color:'#6b8fff'},
+    {label:'Recurring Subs', key:'recurring_subscription_earnings', color:'#4a9eff'},
+    {label:'Tips', key:'tips_earnings', color:'#4ade80'},
+    {label:'Messages/PPV', key:'message_earnings', color:'#facc15'},
+    {label:'Streams', key:'streams_earnings', color:'#f472b6'},
+    {label:'Posts', key:'posts_earnings', color:'#a78bfa'},
+  ];
+  const totals=segments.map(s=>({...s, total:rows.reduce((sum,r)=>sum+parseFloat(r[s.key]||0),0)}));
+  const grandTotal=totals.reduce((s,t)=>s+t.total,0);
+  const el=document.getElementById('p-cs-sum-revenue-mix'); if(!el) return;
+  if(!grandTotal){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No revenue data for this period</div>'; return; }
+  const visible=totals.filter(t=>t.total>0);
+  const bar=visible.map(t=>`<div style="width:${(t.total/grandTotal*100).toFixed(2)}%;background:${t.color};height:100%;" title="${t.label}: $${fmt(t.total)}"></div>`).join('');
+  const legend=visible.map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block;flex-shrink:0;"></span>${t.label}: $${fmt(t.total)} (${(t.total/grandTotal*100).toFixed(1)}%)</div>`).join('');
+  el.innerHTML=`<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;">${bar}</div><div style="display:flex;flex-direction:column;gap:4px;">${legend}</div>`;
+}
+
+// Profile Visitors -> New Subscribers -> Active Fans -> Spenders, each bar sized relative to
+// the largest step (usually Visitors) with a conversion-from-previous-step percentage.
+function renderPersonalFanFunnel(rows){
+  const steps=[
+    {label:'Profile Visitors', value:rows.reduce((s,r)=>s+(r.profile_visitors||0),0)},
+    {label:'New Subscribers', value:rows.reduce((s,r)=>s+(r.new_subscribers||0),0)},
+    {label:'Active Fans', value:rows.reduce((s,r)=>s+(r.active_fans||0),0)},
+    {label:'Spenders', value:rows.reduce((s,r)=>s+(r.number_of_spenders||0),0)},
+  ];
+  const el=document.getElementById('p-cs-sum-funnel'); if(!el) return;
+  const max=Math.max(1,...steps.map(s=>s.value));
+  el.innerHTML=steps.map((s,i)=>{
+    const pct=(s.value/max*100).toFixed(1);
+    const conv = i>0 && steps[i-1].value>0 ? ` <span style="color:var(--text2);">(${(s.value/steps[i-1].value*100).toFixed(1)}% of prev)</span>` : '';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span>${s.label}</span><span><strong>${s.value.toLocaleString()}</strong>${conv}</span></div>
+      <div style="background:var(--surface2);border-radius:4px;height:10px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--accent);"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// Sums personal_creator_stats_daily.total_earnings by day-of-week across all models for the period --
+// only source that can answer "which day actually earns" since personal_weekly_reports is pre-summed.
+function renderPersonalDayOfWeekChart(dailyRows){
+  const el=document.getElementById('p-cs-sum-daychart'); if(!el) return;
+  if(!dailyRows.length){
+    el.innerHTML='<div style="color:var(--text2);font-size:12px;">No daily breakdown available for this period — make sure the uploaded Creator Statistics file includes the "Detail" sheet</div>';
+    return;
+  }
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const totals=new Array(7).fill(0);
+  dailyRows.forEach(r=>{
+    if(!r.stat_date) return;
+    const dow=new Date(r.stat_date+'T00:00:00').getDay();
+    totals[dow]+=parseFloat(r.total_earnings||0);
+  });
+  const max=Math.max(1,...totals);
+  const order=[1,2,3,4,5,6,0]; // Mon..Sun for readability
+  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:8px;height:120px;">`+
+    order.map(i=>{
+      const h=(totals[i]/max*100).toFixed(1);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">$${fmt(totals[i])}</div>
+        <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;height:${h}%;min-height:2px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">${dayNames[i]}</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+// Averages the fields where "-" in the source export must stay excluded (not 0) -- these were
+// parsed with numOrNull for exactly this reason, see extractCreatorStatFields.
+function renderPersonalQualityStats(rows){
+  const avg=(key)=>{
+    const vals=rows.map(r=>r[key]).filter(v=>v!==null&&v!==undefined);
+    return vals.length?vals.reduce((s,v)=>s+parseFloat(v),0)/vals.length:null;
+  };
+  const avgSpendPerSpender=avg('avg_spend_per_spender');
+  const avgSpendPerTxn=avg('avg_spend_per_transaction');
+  const avgEarningsPerFan=avg('avg_earnings_per_fan');
+  const avgReplyTime=avg('reply_time_minutes');
+  const avgSubLength=avg('avg_subscription_length_days');
+  const el=document.getElementById('p-cs-sum-quality'); if(!el) return;
+  el.innerHTML=
+    statCard('Avg Spend/Spender',avgSpendPerSpender!==null?'$'+fmt(avgSpendPerSpender):'—','','')+
+    statCard('Avg Spend/Txn',avgSpendPerTxn!==null?'$'+fmt(avgSpendPerTxn):'—','','')+
+    statCard('Avg Earnings/Fan',avgEarningsPerFan!==null?'$'+fmt(avgEarningsPerFan):'—','','')+
+    statCard('Avg Reply Time',avgReplyTime!==null?avgReplyTime.toFixed(1)+' min':'—','accent','blue')+
+    statCard('Avg Sub Length',avgSubLength!==null?avgSubLength.toFixed(0)+' days':'—','accent','green');
+}
+
+async function loadPersonalSalesSummary(){
+  const startEl=document.getElementById('p-ss-sum-start'); const endEl=document.getElementById('p-ss-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const{data}=await sb.from('personal_sales_records').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalGross=rows.reduce((s,r)=>s+parseFloat(r.gross_revenue||0),0);
+  const totalNet=rows.reduce((s,r)=>s+parseFloat(r.net_revenue||0),0);
+  const totalChatterEarnings=rows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+  const activeChatters=new Set(rows.filter(r=>r.chatter_id).map(r=>r.chatter_id)).size;
+  const activeModels=new Set(rows.filter(r=>r.model_id).map(r=>r.model_id)).size;
+
+  document.getElementById('p-ss-sum-stats').innerHTML=
+    statCard('Sales Count',rows.length,'','')+
+    statCard('Gross Revenue','$'+fmt(totalGross),'white','purple')+
+    statCard('Net Revenue','$'+fmt(totalNet),'','')+
+    statCard('Chatter Earnings','$'+fmt(totalChatterEarnings),'accent','green')+
+    statCard('Active Chatters',activeChatters,'','')+
+    statCard('Active Models',activeModels,'','');
+
+  const chatterMap=new Map();
+  rows.forEach(r=>{
+    if(!r.chatter_id) return;
+    if(!chatterMap.has(r.chatter_id)) chatterMap.set(r.chatter_id,{name:r.chatter_name,count:0,earnings:0,gross:0});
+    const g=chatterMap.get(r.chatter_id); g.count++; g.earnings+=parseFloat(r.earnings||0); g.gross+=parseFloat(r.gross_revenue||0);
+  });
+  const leaderboard=[...chatterMap.values()].sort((a,b)=>b.earnings-a.earnings);
+  document.getElementById('p-ss-sum-leaderboard').innerHTML=leaderboard.length
+    ? leaderboard.map((g,i)=>`<tr><td>${i+1}</td><td><strong>${g.name}</strong></td><td>${g.count}</td><td class="profit">$${fmt(g.earnings)}</td><td>$${fmt(g.gross)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No attributed sales for this period</td></tr>';
+
+  const modelMap=new Map();
+  rows.forEach(r=>{
+    if(!r.model_id) return;
+    if(!modelMap.has(r.model_id)) modelMap.set(r.model_id,{name:r.model_name,count:0,gross:0,net:0});
+    const g=modelMap.get(r.model_id); g.count++; g.gross+=parseFloat(r.gross_revenue||0); g.net+=parseFloat(r.net_revenue||0);
+  });
+  const byModel=[...modelMap.values()].sort((a,b)=>b.gross-a.gross);
+  document.getElementById('p-ss-sum-models').innerHTML=byModel.length
+    ? byModel.map((g,i)=>`<tr><td>${i+1}</td><td><strong>${g.name}</strong></td><td>${g.count}</td><td class="profit">$${fmt(g.gross)}</td><td>$${fmt(g.net)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No attributed sales for this period</td></tr>';
+}
+function setPersonalSalesSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('p-ss-sum-start').value=start;
+  document.getElementById('p-ss-sum-end').value=end;
+  loadPersonalSalesSummary();
+}
+
+
+// ── Reconciliation: Sales Records (source of truth) vs Employee Performance ──
+// Per chatter, compares personal_chatter_performance.sales (self-reported on the Infloww Employee
+// Performance export) against personal_sales_records.earnings summed for the same chatter/period
+// (built from the Infloww Sales record export, one row per sale -- the more granular and
+// therefore more trustworthy of the two). Flags any chatter whose two totals diverge by
+// more than the chosen threshold so a mismatch can be chased down before payout.
+async function loadPersonalReconciliation(){
+  const startEl=document.getElementById('p-rec-start'); const endEl=document.getElementById('p-rec-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const thresholdVal=parseFloat(document.getElementById('p-rec-threshold').value)||0;
+  const thresholdUnit=document.getElementById('p-rec-threshold-unit').value;
+
+  const[{data:perfData},{data:salesData}]=await Promise.all([
+    sb.from('personal_chatter_performance').select('*'),
+    sb.from('personal_sales_records').select('*')
+  ]);
+  const perfRows=(perfData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+  const salesRows=(salesData||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  // Key by chatter_id where matched, otherwise fall back to the normalized name so
+  // unmatched/manually-typed names from both sides can still be lined up against each other.
+  const keyOf=r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+  const map=new Map();
+  perfRows.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=keyOf(r);
+    if(!map.has(key)) map.set(key,{name:r.chatter_name,perfSales:0,salesEarnings:0,hasPerf:false,hasSales:false});
+    const g=map.get(key); g.perfSales+=cleanAmount(r.sales); g.hasPerf=true;
+  });
+  salesRows.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=keyOf(r);
+    if(!map.has(key)) map.set(key,{name:r.chatter_name,perfSales:0,salesEarnings:0,hasPerf:false,hasSales:false});
+    const g=map.get(key); g.salesEarnings+=parseFloat(r.earnings||0); g.hasSales=true;
+  });
+
+  const rows=[...map.values()].map(g=>{
+    const delta=g.perfSales-g.salesEarnings;
+    const deltaPct=g.salesEarnings?(delta/g.salesEarnings*100):(g.perfSales?100:0);
+    const flagged=!g.hasPerf||!g.hasSales||(thresholdUnit==='pct'?Math.abs(deltaPct)>thresholdVal:Math.abs(delta)>thresholdVal);
+    return{...g,delta,deltaPct,flagged};
+  }).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+
+  const flaggedCount=rows.filter(r=>r.flagged).length;
+  const totalDelta=rows.reduce((s,r)=>s+Math.abs(r.delta),0);
+  document.getElementById('p-rec-stats').innerHTML=
+    statCard('Chatters Compared',rows.length,'','')+
+    statCard('Flagged',flaggedCount,flaggedCount?'red':'','red')+
+    statCard('Total Absolute Delta','$'+fmt(totalDelta),'','')+
+    statCard('Source of Truth','Sales Records','accent','green');
+
+  document.getElementById('p-rec-empty').style.display=rows.length?'none':'block';
+  document.getElementById('p-rec-table').innerHTML=rows.length?rows.map(r=>{
+    const missing=!r.hasPerf?' <span style="color:var(--red);font-size:10px;font-weight:700;">no employee report</span>'
+      :!r.hasSales?' <span style="color:var(--red);font-size:10px;font-weight:700;">no sales records</span>':'';
+    return`<tr${r.flagged?' style="background:rgba(255,70,70,0.06);"':''}>
+      <td><strong>${r.name}</strong>${missing}</td>
+      <td>$${fmt(r.perfSales)}</td>
+      <td>$${fmt(r.salesEarnings)}</td>
+      <td class="${r.delta>0?'':r.delta<0?'profit':''}">${r.delta>=0?'+':'-'}$${fmt(Math.abs(r.delta))}</td>
+      <td>${isFinite(r.deltaPct)?(r.deltaPct>=0?'+':'')+r.deltaPct.toFixed(1)+'%':'—'}</td>
+      <td>${r.flagged?'<span style="color:var(--red);font-weight:700;">⚠ Flagged</span>':'<span style="color:var(--accent2);">✓ Match</span>'}</td>
+    </tr>`;
+  }).join(''):'';
+}
+function setPersonalReconcilePeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('p-rec-start').value=start;
+  document.getElementById('p-rec-end').value=end;
+  loadPersonalReconciliation();
+}
+
+async function loadPersonalEmpSummary(){
+  const startEl=document.getElementById('p-emp-sum-start'); const endEl=document.getElementById('p-emp-sum-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const{data}=await sb.from('personal_chatter_performance').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+
+  const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const activeChatters=new Set(rows.map(r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||'')))).size;
+  let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0,unlockSum=0,unlockCount=0;
+  rows.forEach(r=>{
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
+    const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(unlockNum)){unlockSum+=unlockNum;unlockCount++;}
+  });
+
+  document.getElementById('p-emp-sum-stats').innerHTML=
+    statCard('Total Sales','$'+fmt(totalSales),'white','purple')+
+    statCard('Active Chatters',activeChatters,'','')+
+    statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'\u2014','accent','blue')+
+    statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'\u2014','accent','green')+
+    statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'\u2014','accent','purple');
+
+  // Rolled up one row per chatter -- identical logic to the combined Overview tab's
+  // chatter performance breakdown (see loadReportsOverview below), duplicated here so this
+  // panel works standalone off its own week range instead of the combined one.
+  const perfMap=new Map();
+  rows.forEach(r=>{
+    const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+    if(!perfMap.has(key)) perfMap.set(key,{name:r.chatter_name||'(unknown)', models:new Set(), entries:0, sales:0, dms:0, cvrSum:0, cvrCount:0, goldenSum:0, goldenCount:0, unlockSum:0, unlockCount:0, hoursSum:0});
+    const g=perfMap.get(key);
+    g.entries++;
+    g.sales+=parseFloat(r.sales||0);
+    const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);
+    if(!isNaN(dmsNum)) g.dms+=dmsNum;
+    const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(cvrNum)){ g.cvrSum+=cvrNum; g.cvrCount++; }
+    const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(goldenNum)){ g.goldenSum+=goldenNum; g.goldenCount++; }
+    const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(unlockNum)){ g.unlockSum+=unlockNum; g.unlockCount++; }
+    const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());
+    if(!isNaN(hoursNum)) g.hoursSum+=hoursNum;
+    (r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[]).forEach(m=>g.models.add(m));
+  });
+  const perfList=[...perfMap.values()].sort((a,b)=>b.sales-a.sales);
+  const body=document.getElementById('p-emp-sum-table'); const empty=document.getElementById('p-emp-sum-empty');
+  if(perfList.length){
+    empty.style.display='none';
+    body.innerHTML=perfList.map(g=>{
+      const modelsLabel=g.models.size?`${g.models.size} model${g.models.size>1?'s':''}`:'\u2014';
+      const avgCvr=g.cvrCount?(g.cvrSum/g.cvrCount):null;
+      const avgGolden=g.goldenCount?(g.goldenSum/g.goldenCount):null;
+      const avgUnlock=g.unlockCount?(g.unlockSum/g.unlockCount):null;
+      const salesPerHr=g.hoursSum>0?(g.sales/g.hoursSum):0;
+      return `<tr>
+        <td><strong>${g.name}</strong> <span style="color:var(--text2);font-size:11px;">(${g.entries} entr${g.entries!==1?'ies':'y'})</span></td>
+        <td>${modelsLabel}</td>
+        <td class="profit">$${fmt(g.sales)}</td>
+        <td>${g.dms||'\u2014'}</td>
+        <td>${avgCvr!==null?avgCvr.toFixed(2)+'%':'\u2014'}</td>
+        <td>${avgGolden!==null?avgGolden.toFixed(2)+'%':'\u2014'}</td>
+        <td>${avgUnlock!==null?avgUnlock.toFixed(2)+'%':'\u2014'}</td>
+        <td>$${fmt(salesPerHr)}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    body.innerHTML='';
+    empty.style.display='block';
+  }
+
+  renderPersonalEmpSalesMix(rows);
+  renderPersonalEmpFunnel(rows);
+  renderPersonalEmpBarChart(perfList);
+  renderPersonalEmpQualityStats({cvrSum,cvrCount,goldenSum,goldenCount,unlockSum,unlockCount},rows);
+}
+
+// Same visual pattern as the Creator Stats deep-dive (renderPersonalRevenueMixBar/renderPersonalFanFunnel/
+// renderPersonalDayOfWeekChart/renderPersonalQualityStats) applied to personal_chatter_performance instead -- pure CSS,
+// no charting library, so it matches the rest of the app.
+function renderPersonalEmpSalesMix(rows){
+  const segments=[
+    {label:'PPV Sales', key:'ppv_sales', color:'#facc15'},
+    {label:'Tips', key:'tips', color:'#4ade80'},
+  ];
+  const ppvTotal=rows.reduce((s,r)=>s+parseFloat(r.ppv_sales||0),0);
+  const tipsTotal=rows.reduce((s,r)=>s+parseFloat(r.tips||0),0);
+  const salesTotal=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const otherTotal=Math.max(0,salesTotal-ppvTotal-tipsTotal);
+  const totals=[...segments.map(s=>({...s,total:s.key==='ppv_sales'?ppvTotal:tipsTotal})),{label:'Other Sales',color:'#6b8fff',total:otherTotal}];
+  const grandTotal=totals.reduce((s,t)=>s+t.total,0);
+  const el=document.getElementById('p-emp-sum-revenue-mix'); if(!el) return;
+  if(!grandTotal){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No sales data for this period</div>'; return; }
+  const visible=totals.filter(t=>t.total>0);
+  const bar=visible.map(t=>`<div style="width:${(t.total/grandTotal*100).toFixed(2)}%;background:${t.color};height:100%;" title="${t.label}: $${fmt(t.total)}"></div>`).join('');
+  const legend=visible.map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block;flex-shrink:0;"></span>${t.label}: $${fmt(t.total)} (${(t.total/grandTotal*100).toFixed(1)}%)</div>`).join('');
+  el.innerHTML=`<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;">${bar}</div><div style="display:flex;flex-direction:column;gap:4px;">${legend}</div>`;
+}
+
+// DMs Sent -> Fans Chatted -> PPVs Unlocked: the closest thing personal_chatter_performance has to a
+// conversion funnel (there's no per-sale row here the way personal_sales_records has, just weekly
+// per-chatter totals).
+function renderPersonalEmpFunnel(rows){
+  const parseCount=(val)=>{const n=parseInt(String(val||'').replace(/[^0-9.-]/g,''),10);return isNaN(n)?0:n;};
+  const steps=[
+    {label:'DMs Sent', value:rows.reduce((s,r)=>s+parseCount(r.dms_sent),0)},
+    {label:'Fans Chatted', value:rows.reduce((s,r)=>s+parseCount(r.fans_chatted),0)},
+    {label:'PPVs Unlocked', value:rows.reduce((s,r)=>s+parseCount(r.ppvs_unlocked),0)},
+  ];
+  const el=document.getElementById('p-emp-sum-funnel'); if(!el) return;
+  const max=Math.max(1,...steps.map(s=>s.value));
+  el.innerHTML=steps.map((s,i)=>{
+    const pct=(s.value/max*100).toFixed(1);
+    const conv = i>0 && steps[i-1].value>0 ? ` <span style="color:var(--text2);">(${(s.value/steps[i-1].value*100).toFixed(1)}% of prev)</span>` : '';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span>${s.label}</span><span><strong>${s.value.toLocaleString()}</strong>${conv}</span></div>
+      <div style="background:var(--surface2);border-radius:4px;height:10px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--accent);"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// Ranked bar chart of sales by chatter, capped to the top 8 so it stays readable when the
+// roster is large -- the full breakdown is already in the table above this.
+function renderPersonalEmpBarChart(perfList){
+  const el=document.getElementById('p-emp-sum-chatterchart'); if(!el) return;
+  if(!perfList.length){ el.innerHTML='<div style="color:var(--text2);font-size:12px;">No chatter performance data for this period</div>'; return; }
+  const top=perfList.slice(0,8);
+  const max=Math.max(1,...top.map(g=>g.sales));
+  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:8px;height:120px;">`+
+    top.map(g=>{
+      const h=(g.sales/max*100).toFixed(1);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">$${fmt(g.sales)}</div>
+        <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;height:${h}%;min-height:2px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${g.name}</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+function renderPersonalEmpQualityStats(agg,rows){
+  const el=document.getElementById('p-emp-sum-quality'); if(!el) return;
+  const totalDms=rows.reduce((s,r)=>{const n=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10);return s+(isNaN(n)?0:n);},0);
+  const totalHours=rows.reduce((s,r)=>{const n=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim());return s+(isNaN(n)?0:n);},0);
+  const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+  const salesPerHr=totalHours>0?totalSales/totalHours:null;
+  el.innerHTML=
+    statCard('Avg Fan CVR',agg.cvrCount?(agg.cvrSum/agg.cvrCount).toFixed(2)+'%':'—','','blue')+
+    statCard('Avg Golden Ratio',agg.goldenCount?(agg.goldenSum/agg.goldenCount).toFixed(2)+'%':'—','','green')+
+    statCard('Avg Unlock Ratio',agg.unlockCount?(agg.unlockSum/agg.unlockCount).toFixed(2)+'%':'—','','purple')+
+    statCard('Sales/Hr',salesPerHr!==null?'$'+fmt(salesPerHr):'—','accent','blue')+
+    statCard('Total DMs Sent',totalDms||'—','accent','');
+}
+function setPersonalEmpSummaryPeriod(kind){
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('p-emp-sum-start').value=start;
+  document.getElementById('p-emp-sum-end').value=end;
+  loadPersonalEmpSummary();
+}
+
+
+function handlePersonalEmpCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handlePersonalEmpCsvFile(e.dataTransfer.files[0]);}
+function handlePersonalEmpCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});if(!rows.length)return showAlert('p-emp-report-alert','Could not parse file.','error');previewPersonalEmpReport(rows);}
+    catch(err){showAlert('p-emp-report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+
+var _pParsedEmpPerf=null;
+
+function previewPersonalEmpReport(rows) {
+  const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const autoDate=parseInflowwDate(dateRaw);
+  const wkStartEl=document.getElementById('p-emp-week-start'); const wkEndEl=document.getElementById('p-emp-week-end');
+  if(autoDate.start && !wkStartEl.value) wkStartEl.value=autoDate.start;
+  if(autoDate.end && !wkEndEl.value) wkEndEl.value=autoDate.end;
+  const weekStart=wkStartEl.value||autoDate.start; const weekEnd=wkEndEl.value||autoDate.end;
+  if(!weekStart) return showAlert('p-emp-report-alert','Could not detect date range — please select a Week From manually.','error');
+
+  _pParsedEmpPerf=rows.map(row=>{
+    // getField() trims/lowercases and tries each candidate name against the row's actual
+    // keys, not just an exact bracket match -- a plain row['Unlock rate']||row['Unlock Rate']
+    // silently returns '' forever if Infloww's real header differs by so much as a trailing
+    // space or a word (e.g. "PPV unlock rate"), which is exactly what happened here: Golden
+    // Ratio populated fine but Unlock Ratio came back empty on every upload. A few plausible
+    // header spellings are listed so this keeps working even if the export wording drifts.
+    const name=String(getField(row,'Employees','Employee')||'').trim();
+    const models=String(getField(row,'Creators')||'').trim();
+    const sales=cleanAmount(getField(row,'Sales')||0);
+    const ppv=cleanAmount(getField(row,'PPV sales','PPV Sales')||0);
+    const tips=cleanAmount(getField(row,'Tips')||0);
+    const dms=getField(row,'Direct messages sent','DMs sent')||'';
+    const fans=getField(row,'Fans chatted')||'';
+    const cvr=getField(row,'Fan CVR')||'';
+    const golden=getField(row,'Golden ratio','Golden Ratio')||'';
+    const unlockRate=getField(row,'Unlock rate','Unlock Rate','PPV unlock rate','PPV Unlock Rate','Unlocked rate','Unlock %','Unlock ratio','Unlock Ratio')
+      ||getFieldFuzzy(row,'unlock',['rate','ratio','%','pct'],[])||'';
+    const ppvsUnlocked=getField(row,'PPVs unlocked','PPVs Unlocked','PPV unlocked','PPV Unlocked')
+      ||getFieldFuzzy(row,'unlock',[],['rate','ratio','%','pct'])||'';
+    const hours=getField(row,'Scheduled hours','Scheduled Hours')||'';
+    const sph=cleanAmount(getField(row,'Sales per hour','Sales Per Hour')||0);
+    const {chatter, matchType}=findChatterMatch(name,'');
+    return {
+      week_of:weekStart, week_end:weekEnd||null,
+      chatter_id:chatter?chatter.id:null, chatter_name:name, chatter_match_type:name?matchType:'unassigned',
+      models, sales, ppv_sales:ppv, tips,
+      dms_sent:String(dms), fans_chatted:String(fans), fan_cvr:String(cvr), golden_ratio:String(golden),
+      unlock_rate:String(unlockRate), ppvs_unlocked:String(ppvsUnlocked), scheduled_hours:String(hours),
+      sales_per_hour:sph
+    };
+  }).filter(r=>r.chatter_name);
+
+  renderPersonalEmpPreview();
+  showAlert('p-emp-report-alert','Chatter report loaded — review matches below, then save.','success');
+}
+
+function renderPersonalEmpPreview(){
+  const parsed=_pParsedEmpPerf||[];
+  const period=`${document.getElementById('p-emp-week-start').value} to ${document.getElementById('p-emp-week-end').value||document.getElementById('p-emp-week-start').value}`;
+
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} chatters · ${period}</div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>Chatter</th><th>Models</th><th>Sales</th><th>PPV Sales</th><th>Tips</th>
+    <th>DMs Sent</th><th>Fans Chatted</th><th>Fan CVR</th><th>Golden Ratio</th><th>Unlock Ratio</th>
+    <th>Sched Hours</th><th>Sales/Hr</th><th></th>
+  </tr></thead><tbody>`;
+
+  const chatterOptions=selectedId=>`<option value=""${!selectedId?' selected':''}>— Unmatched —</option>`+
+    STATE.chatters.map(c=>`<option value="${c.id}"${c.id===selectedId?' selected':''}>${c.name}</option>`).join('');
+
+  parsed.forEach((r,i)=>{
+    const creatorList=r.models?r.models.split(',').map(s=>s.trim()).filter(Boolean):[];
+    const creatorBadge=creatorList.length
+      ?`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:default;white-space:nowrap;" title="${creatorList.join(', ')}">
+          ${creatorList.length} model${creatorList.length>1?'s':''}
+        </span>`
+      :'—';
+    const badge=r.chatter_match_type==='exact'?'':
+      r.chatter_match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
+      r.chatter_match_type==='none'?`<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`:'';
+    html+=`<tr>
+      <td><strong>${r.chatter_name}</strong>${badge}</td>
+      <td>${creatorBadge}</td>
+      <td class="profit">$${fmt(r.sales)}</td>
+      <td>$${fmt(r.ppv_sales)}</td>
+      <td>$${fmt(r.tips)}</td>
+      <td>${r.dms_sent||'—'}</td>
+      <td>${r.fans_chatted||'—'}</td>
+      <td>${r.fan_cvr||'—'}</td>
+      <td>${r.golden_ratio||'—'}</td>
+      <td>${r.unlock_rate||'—'}</td>
+      <td>${r.scheduled_hours||'—'}</td>
+      <td>$${fmt(r.sales_per_hour)}</td>
+      <td><select onchange="reassignPersonalEmpPerf(${i},this.value)" style="width:150px;font-size:12px;">${chatterOptions(r.chatter_id)}</select></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('p-emp-csv-preview').innerHTML=html;
+  const saveBtn=document.getElementById('p-emp-save');
+  if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
+}
+
+function reassignPersonalEmpPerf(i,chatterId){
+  const row=_pParsedEmpPerf?.[i]; if(!row)return;
+  const chatter=chatterId?STATE.chatters.find(c=>c.id===chatterId):null;
+  row.chatter_id=chatter?chatter.id:null; row.chatter_match_type=chatter?'manual':'none';
+  renderPersonalEmpPreview();
+}
+
+
+async function savePersonalEmpPerformance(){
+  const raw=_pParsedEmpPerf||[];
+  if(!raw.length) return showAlert('p-emp-report-alert','No data to save.','error');
+  const proceed=await confirmReplaceWeek('personal_chatter_performance',raw[0].week_of,raw[0].week_end,'chatter performance');
+  if(!proceed) return;
+  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
+  const{error}=await sb.from('personal_chatter_performance').insert(rows);
+  if(error) return showAlert('p-emp-report-alert',error.message,'error');
+  showAlert('p-emp-report-alert',`Saved! ${rows.length} chatter rows recorded.`,'success');
+  _pParsedEmpPerf=null;
+  document.getElementById('p-emp-csv-preview').innerHTML='';
+  document.getElementById('p-emp-save').style.display='none';
+  document.getElementById('p-emp-csv-input').value='';
+  loadPersonalEmpHistory();
+  loadPersonalEmpSummary();
+}
+
+async function loadPersonalEmpHistory(){
+  const{data}=await sb.from('personal_chatter_performance').select('*').order('week_of',{ascending:false});
+  const container=document.getElementById('p-emp-history-groups'); const empty=document.getElementById('p-emp-history-empty');
+  if(!container) return;
+  container.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+
+  const groups=new Map();
+  data.forEach(r=>{
+    const key=r.upload_batch_id||('legacy:'+r.week_of+'|'+r.week_end);
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(r);
+  });
+
+  groups.forEach((rows,key)=>{
+    const wStart=rows[0].week_of, wEnd=rows[0].week_end;
+    const label=wEnd?`${fmtDate(wStart)} – ${fmtDate(wEnd)}`:fmtDate(wStart);
+    const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales||0),0);
+    const idsAttr=JSON.stringify(rows.map(r=>r.id)).replace(/"/g,"'");
+    const gid='pemp-grp-'+key.replace(/[^a-z0-9]/gi,'_');
+
+    const wrap=document.createElement('div');
+    wrap.className='card'; wrap.style.marginBottom='10px';
+    wrap.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div onclick="toggleHistoryGroup('${gid}')" style="cursor:pointer;user-select:none;flex:1;">
+          <span style="font-weight:700;font-size:14px;color:#fff;">${label}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">${rows.length} chatter${rows.length!==1?'s':''}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Sales: <strong style="color:#fff;">$${fmt(totalSales)}</strong></span>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deletePersonalEmpGroup(${idsAttr},'${label.replace(/'/g,"\\'")}')">✕ Delete Upload</button>
+        <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;">▼</span>
+      </div>
+      <div id="${gid}" style="display:none;margin-top:14px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Chatter</th><th>Sales</th><th>PPV</th><th>Tips</th><th>Golden Ratio</th><th>Sales/Hr</th></tr></thead>
+          <tbody>${rows.map(r=>`<tr><td>${r.chatter_name||'—'}</td><td>$${fmt(r.sales)}</td><td>$${fmt(r.ppv_sales)}</td><td>$${fmt(r.tips)}</td><td>${r.golden_ratio||'—'}</td><td>$${fmt(r.sales_per_hour)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    container.appendChild(wrap);
+  });
+}
+
+async function deletePersonalEmpGroup(ids,label){
+  if(!ids||!ids.length)return;
+  if(!confirm(`Delete all ${ids.length} row${ids.length!==1?'s':''} for ${label||'this upload'}? This cannot be undone.`))return;
+  const{data,error}=await sb.from('personal_chatter_performance').delete().in('id',ids).select();
+  if(error) return showAlert('p-emp-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('p-emp-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the personal_chatter_performance table — ask Claude for the SQL to add one.','error');
+  showAlert('p-emp-history-alert',`Deleted ${data.length} row${data.length!==1?'s':''}.`,'success');
+  loadPersonalEmpHistory();
+}
+
+
+function handlePersonalSalesCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handlePersonalSalesCsvFile(e.dataTransfer.files[0]);}
+function handlePersonalSalesCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length)return showAlert('p-sales-alert','Could not parse file.','error');
+      previewPersonalSales(rows);
+    }catch(err){showAlert('p-sales-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+
+function previewPersonalSales(rows){
+  const dateKey=r=>r['Date & time Australia/Canberra']||r['Date/Time Australia/Canberra']||r['Date/Time']||r['Date']||'';
+  const validRows=rows.filter(r=>dateKey(r));
+  if(!validRows.length) return showAlert('p-sales-alert','No valid rows found — expected a "Date & time" column like the Infloww Sales record export.','error');
+
+  const dates=validRows.map(r=>extractDateOnly(dateKey(r))).filter(Boolean).sort();
+  const autoStart=dates[0]||''; const autoEnd=dates[dates.length-1]||'';
+  const wkStartEl=document.getElementById('p-sales-week-start'); const wkEndEl=document.getElementById('p-sales-week-end');
+  if(autoStart && !wkStartEl.value) wkStartEl.value=autoStart;
+  if(autoEnd && !wkEndEl.value) wkEndEl.value=autoEnd;
+  const weekStart=wkStartEl.value||autoStart; const weekEnd=wkEndEl.value||autoEnd;
+
+  _pParsedSales=validRows.map(row=>{
+    const employeeName=String(row['Employee']||'').trim();
+    const employeeEmail=String(row['Email']||'').trim();
+    const modelNameRaw=String(row['Creator']||row['Model']||'').trim();
+    const fanName=String(row['Fan']||'').trim();
+    const fanId=String(row['Fan ID']||row['Fan Id']||'').trim();
+    const earnings=cleanAmount(row['Earnings']);
+    const gross=cleanAmount(row['Gross revenue']||row['Gross Revenue']);
+    const net=cleanAmount(row['Net revenue']||row['Net Revenue']);
+    const saleType=String(row['Type']||'').trim();
+    const rule=String(row['Rule']||'').trim();
+    const status=String(row['Status']||'').trim();
+
+    const {model, matchType:modelMatchType}=findPersonalModelMatch(modelNameRaw);
+    const {chatter, matchType:chatterMatchType}=findChatterMatch(employeeName, employeeEmail);
+
+    return {
+      sale_date:dateKey(row), week_of:weekStart, week_end:weekEnd,
+      chatter_id:chatter?chatter.id:null, chatter_name:employeeName, chatter_email:employeeEmail, chatter_match_type:chatterMatchType,
+      model_id:model?model.id:null, model_name:modelNameRaw, model_match_type:modelMatchType,
+      fan_name:fanName, fan_id:fanId,
+      earnings, gross_revenue:gross, net_revenue:net,
+      sale_type:saleType, rule, status
+    };
+  });
+  renderPersonalSalesPreview();
+}
+
+function renderPersonalSalesPreview(){
+  const parsed=_pParsedSales||[];
+  const totalGross=parsed.reduce((s,r)=>s+r.gross_revenue,0);
+  const totalNet=parsed.reduce((s,r)=>s+r.net_revenue,0);
+  const totalEarnings=parsed.reduce((s,r)=>s+r.earnings,0);
+  const unassignedCount=parsed.filter(r=>!r.chatter_name).length;
+  const needsReviewCount=parsed.filter(r=>r.chatter_name && r.chatter_match_type==='none').length;
+
+  // Per-chatter rollup — skip rows with no employee name at all (normal for Subscriptions,
+  // which Infloww leaves Unassigned by default rather than crediting a specific chatter).
+  const chatterMap=new Map();
+  parsed.forEach(r=>{
+    if(!r.chatter_name) return;
+    const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name));
+    if(!chatterMap.has(key)) chatterMap.set(key,{name:r.chatter_name, chatter_id:r.chatter_id, match_type:r.chatter_match_type, count:0, earnings:0, gross:0, net:0});
+    const g=chatterMap.get(key);
+    g.count++; g.earnings+=r.earnings; g.gross+=r.gross_revenue; g.net+=r.net_revenue;
+  });
+
+  const chatterOptions=selectedId=>`<option value=""${!selectedId?' selected':''}>— Unmatched —</option>`+
+    STATE.chatters.map(c=>`<option value="${c.id}"${c.id===selectedId?' selected':''}>${c.name}</option>`).join('');
+
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} sales · ${document.getElementById('p-sales-week-start').value} to ${document.getElementById('p-sales-week-end').value}</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;">
+      <div>Gross: <strong>$${fmt(totalGross)}</strong></div>
+      <div>Net: <strong>$${fmt(totalNet)}</strong></div>
+      <div>Chatter Earnings: <strong class="profit">$${fmt(totalEarnings)}</strong></div>
+      <div style="color:var(--text2);">${unassignedCount} sale${unassignedCount!==1?'s':''} with no chatter attribution (normal for Subscriptions)</div>
+      ${needsReviewCount?`<div style="color:var(--red);font-weight:700;">${needsReviewCount} sale${needsReviewCount!==1?'s':''} named a chatter we couldn't match — reassign below</div>`:''}
+    </div>
+    <div style="font-size:12px;color:var(--text2);font-weight:700;margin-bottom:6px;">By Chatter</div>
+    <div class="table-wrap"><table><thead><tr><th>Chatter</th><th>Sales</th><th>Earnings</th><th>Gross</th><th>Net</th><th></th></tr></thead><tbody>`;
+
+  chatterMap.forEach((g,key)=>{
+    const badge=g.match_type==='exact'?'':
+      g.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
+      `<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr>
+      <td><strong>${g.name}</strong>${badge}</td>
+      <td>${g.count}</td>
+      <td class="profit">$${fmt(g.earnings)}</td>
+      <td>$${fmt(g.gross)}</td>
+      <td>$${fmt(g.net)}</td>
+      <td><select onchange="reassignPersonalSalesChatter('${key}',this.value)" style="width:150px;font-size:12px;">${chatterOptions(g.chatter_id)}</select></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // Per-model rollup, read-only — reuses the same fuzzy matching Creator Stats already relies on.
+  const modelMap=new Map();
+  parsed.forEach(r=>{
+    const key=r.model_id||('raw:'+normalizeName(r.model_name||''));
+    if(!modelMap.has(key)) modelMap.set(key,{name:r.model_name||'(unknown)', match_type:r.model_match_type, count:0, gross:0, net:0});
+    const g=modelMap.get(key); g.count++; g.gross+=r.gross_revenue; g.net+=r.net_revenue;
+  });
+  html+=`<div style="margin-top:16px;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:6px;">By Model</div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Sales</th><th>Gross</th><th>Net</th></tr></thead><tbody>`;
+  modelMap.forEach(g=>{
+    const badge=g.match_type==='exact'?'':g.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;">~ fuzzy</span>`:`<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr><td><strong>${g.name}</strong>${badge}</td><td>${g.count}</td><td>$${fmt(g.gross)}</td><td>$${fmt(g.net)}</td></tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+
+  document.getElementById('p-sales-preview').innerHTML=html;
+  const saveBtn=document.getElementById('p-sales-save');
+  if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
+}
+
+// Reassigns every parsed sale for a given chatter rollup key to a different chatter (or back to
+// unmatched) — done at the rollup level rather than per individual sale row, since a single
+// upload can carry 100+ line items and re-picking a chatter once should apply to all of theirs.
+function reassignPersonalSalesChatter(key,chatterId){
+  const chatter=chatterId?STATE.chatters.find(c=>c.id===chatterId):null;
+  (_pParsedSales||[]).forEach(r=>{
+    if(!r.chatter_name) return;
+    const rKey=r.chatter_id||('raw:'+normalizeName(r.chatter_name));
+    if(rKey===key){ r.chatter_id=chatter?chatter.id:null; r.chatter_match_type=chatter?'manual':'none'; }
+  });
+  renderPersonalSalesPreview();
+}
+
+async function savePersonalSalesRecords(){
+  const raw=_pParsedSales||[];
+  if(!raw.length) return showAlert('p-sales-alert','No data to save.','error');
+  const proceed=await confirmReplaceWeek('personal_sales_records',raw[0].week_of,raw[0].week_end,'sales record');
+  if(!proceed) return;
+  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
+  const{error}=await sb.from('personal_sales_records').insert(rows);
+  if(error) return showAlert('p-sales-alert',error.message,'error');
+  showAlert('p-sales-alert',`Saved! ${rows.length} sales recorded.`,'success');
+  _pParsedSales=null;
+  document.getElementById('p-sales-preview').innerHTML='';
+  document.getElementById('p-sales-save').style.display='none';
+  document.getElementById('p-sales-csv-input').value='';
+  loadPersonalSalesHistory();
+  loadPersonalSalesSummary();
+}
+
+async function loadPersonalSalesHistory(){
+  const{data}=await sb.from('personal_sales_records').select('*').order('week_of',{ascending:false});
+  const container=document.getElementById('p-sales-history-groups'); const empty=document.getElementById('p-sales-history-empty');
+  if(!container) return;
+  container.innerHTML='';
+  if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
+
+  // Group by upload batch (not just week) so re-uploads/corrections for the same week
+  // stay distinct and can each be deleted independently.
+  const groups=new Map();
+  data.forEach(r=>{
+    const key=r.upload_batch_id||('legacy:'+r.week_of+'|'+r.week_end);
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(r);
+  });
+
+  groups.forEach((rows,key)=>{
+    const wStart=rows[0].week_of, wEnd=rows[0].week_end;
+    const label=wEnd?`${fmtDate(wStart)} – ${fmtDate(wEnd)}`:fmtDate(wStart);
+    const totalGross=rows.reduce((s,r)=>s+parseFloat(r.gross_revenue||0),0);
+    const totalNet=rows.reduce((s,r)=>s+parseFloat(r.net_revenue||0),0);
+    const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+    const idsAttr=JSON.stringify(rows.map(r=>r.id)).replace(/"/g,"'");
+    const gid='psales-grp-'+key.replace(/[^a-z0-9]/gi,'_');
+
+    const wrap=document.createElement('div');
+    wrap.className='card'; wrap.style.marginBottom='10px';
+    wrap.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div onclick="toggleHistoryGroup('${gid}')" style="cursor:pointer;user-select:none;flex:1;">
+          <span style="font-weight:700;font-size:14px;color:#fff;">${label}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">${rows.length} sale${rows.length!==1?'s':''}</span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Gross: <strong style="color:#fff;">$${fmt(totalGross)}</strong></span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Net: <strong style="color:#fff;">$${fmt(totalNet)}</strong></span>
+          <span style="margin-left:12px;font-size:12px;color:var(--text2);">Chatter Earnings: <strong style="color:var(--accent2);">$${fmt(totalEarnings)}</strong></span>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deletePersonalSalesGroup(${idsAttr},'${label.replace(/'/g,"\\'")}')">✕ Delete Upload</button>
+        <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;">▼</span>
+      </div>
+      <div id="${gid}" style="display:none;margin-top:14px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Chatter</th><th>Model</th><th>Fan</th><th>Type</th><th>Earnings</th><th>Gross</th><th>Net</th></tr></thead>
+          <tbody>${rows.map(r=>`<tr><td style="white-space:nowrap;font-size:11px;">${r.sale_date?String(r.sale_date).split(' ')[0]:''}</td><td>${r.chatter_name||'—'}</td><td>${r.model_name||'—'}</td><td style="font-size:11px;color:var(--text2);">${r.fan_name||'—'}</td><td style="font-size:11px;">${r.sale_type||'—'}</td><td>$${fmt(r.earnings)}</td><td>$${fmt(r.gross_revenue)}</td><td>$${fmt(r.net_revenue)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    container.appendChild(wrap);
+  });
+}
+
+async function deletePersonalSalesGroup(ids,label){
+  if(!ids||!ids.length)return;
+  if(!confirm(`Delete all ${ids.length} sale${ids.length!==1?'s':''} for ${label||'this upload'}? This cannot be undone.`))return;
+  const{data,error}=await sb.from('personal_sales_records').delete().in('id',ids).select();
+  if(error) return showAlert('p-sales-history-alert',error.message,'error');
+  if(!data||!data.length) return showAlert('p-sales-history-alert','Nothing was deleted. Your Supabase project likely needs a DELETE policy on the personal_sales_records table — ask Claude for the SQL to add one.','error');
+  showAlert('p-sales-history-alert',`Deleted ${data.length} sale${data.length!==1?'s':''}.`,'success');
+  loadPersonalSalesHistory();
+}
+
+
 
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
 </script>
