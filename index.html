@@ -155,30 +155,6 @@
   .guide-hub-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
   .guide-hub-desc { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
   .guide-hub-cta { font-size: 12px; font-weight: 700; color: var(--accent2); }
-
-  /* ── Drawing Board (workspaces / notes / goals / to-do) ──────── */
-  .mgmt-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-  .mgmt-tab-body { display: none; }
-  .mgmt-tab-body.active { display: block; }
-  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 14px; margin-bottom: 6px; }
-  .ws-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
-  .ws-card:hover { transform: translateY(-2px); border-color: rgba(30,79,255,0.5); }
-  .ws-card-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
-  .ws-card-preview { font-size: 11px; color: var(--text2); line-height: 1.5; max-height: 48px; overflow: hidden; white-space: pre-wrap; }
-  .ws-cat-header { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 8px; }
-  .note-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-  .note-text { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.5; }
-  .note-time { font-size: 10px; color: var(--text2); margin-top: 4px; }
-  .goal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
-  .goal-bar-track { background: var(--border); border-radius: 4px; height: 6px; margin-top: 8px; }
-  .goal-bar-fill { border-radius: 4px; height: 6px; }
-  .todo-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
-  .todo-row.done { opacity: 0.5; }
-  .todo-row.done .todo-text { text-decoration: line-through; }
-  .priority-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
-  .priority-tag.high { background: #2a0f0f; color: var(--red); }
-  .priority-tag.med { background: #2a2010; color: var(--yellow); }
-  .priority-tag.low { background: #0f2a1a; color: var(--green); }
   .guide-back { font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; margin-bottom: 16px; display: inline-block; }
   .guide-back:hover { color: var(--accent2); }
 
@@ -793,6 +769,162 @@
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         MY ACCOUNTS — private section, visible only to liameastgate@hotmail.com.
+         Access control lives in NAV (secret:true) + pageAllowed/buildNav/navigate;
+         the real security boundary is Postgres RLS on the personal_* tables
+         (see migration personal_of_accounts_isolated_section), which locks every
+         row to auth.jwt() email = liameastgate@hotmail.com regardless of what
+         this UI does or doesn't show. Fully separate tables/state/functions from
+         the shared agency data below -- nothing here ever touches models/
+         weekly_reports/content_performance or is visible to admin/va/chatter/model.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Personal Dashboard -->
+    <div class="page" id="page-personal-dashboard">
+      <div class="page-title">🔒 My Accounts</div>
+      <div class="page-sub">Private dashboard for Liam Free &amp; Liam VIP — visible only to you</div>
+      <div id="pd-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:18px;"></div>
+      <div class="card">
+        <div class="card-title">Latest Week — Combined</div>
+        <div class="stats-grid" id="pd-combined-stats"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Per-Account Breakdown</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Account</th><th>Week Of</th><th>Total Earnings</th><th>Renew %</th><th>Active Fans</th></tr></thead>
+          <tbody id="pd-breakdown"></tbody>
+        </table></div>
+        <div id="pd-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No weekly reports uploaded yet — head to Weekly Reports to upload your first Infloww export</p></div>
+      </div>
+    </div>
+
+    <!-- Personal Weekly Reports -->
+    <div class="page" id="page-personal-reports">
+      <div class="page-title">🔒 Weekly Reports</div>
+      <div class="page-sub">Upload the Infloww export for Liam Free / Liam VIP — private to you, never shared with the main agency data</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchPersonalReportTab('overview')">Overview</div>
+        <div class="tab" onclick="switchPersonalReportTab('upload')">Upload</div>
+        <div class="tab" onclick="switchPersonalReportTab('history')">History</div>
+      </div>
+
+      <div id="p-report-tab-overview">
+        <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
+          <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-wro-week-start" onchange="loadPersonalReportsOverview()"></div>
+          <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-wro-week-end" onchange="loadPersonalReportsOverview()"></div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-ghost" onclick="setPersonalReportsPeriod('last')">Last Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setPersonalReportsPeriod('week')">This Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setPersonalReportsPeriod('month')">This Month</button>
+          </div>
+        </div>
+        <div class="stats-grid" id="p-wro-stats" style="margin-bottom:16px;"></div>
+        <div class="card">
+          <div class="card-title">Account Earnings</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Account</th><th>Earnings</th><th>Renew %</th><th>Active Fans</th></tr></thead>
+            <tbody id="p-wro-accounts"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="p-report-tab-upload" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="color:var(--accent2);">Creator Statistics — Infloww Export</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-report-week-start"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-report-week-end"></div>
+          </div>
+          <div class="file-drop" onclick="document.getElementById('p-csv-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handlePersonalCsvDrop(event)">
+            <div style="font-size:24px;">📄</div>
+            <p style="font-size:12px;">Creator Statistics CSV/XLSX</p>
+          </div>
+          <input type="file" id="p-csv-input" accept=".csv,.xlsx" style="display:none" onchange="handlePersonalCsvFile(this.files[0])">
+        </div>
+        <div id="p-report-alert" class="alert"></div>
+        <div id="p-csv-preview" style="margin-top:14px;"></div>
+        <div id="p-csv-save" style="display:none;margin-top:8px;">
+          <button class="btn btn-primary" onclick="savePersonalReportRows()">💾 Save Report</button>
+        </div>
+      </div>
+
+      <div id="p-report-tab-history" style="display:none;">
+        <div id="p-report-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div id="p-report-history-groups"></div>
+        <div id="p-report-history-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No reports yet</p></div>
+      </div>
+    </div>
+
+    <!-- Personal Content Performance -->
+    <div class="page" id="page-personal-contentperf">
+      <div class="page-title">🔒 Content Performance</div>
+      <div class="page-sub">Post performance for content driving Liam Free / Liam VIP — private to you</div>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button class="btn btn-primary" onclick="openPersonalCpModal()">➕ Add Entry</button>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+        <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="pcp-start" onchange="filterPersonalContentPerf()"></div>
+        <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="pcp-end" onchange="filterPersonalContentPerf()"></div>
+        <select id="pcp-filter-model" onchange="filterPersonalContentPerf()" style="width:170px;"><option value="">All Accounts</option></select>
+        <select id="pcp-sort" onchange="filterPersonalContentPerf()" style="width:180px;">
+          <option value="rating_desc">Rating: Best first</option>
+          <option value="date_desc">Date: Newest first</option>
+          <option value="date_asc">Date: Oldest first</option>
+          <option value="views_desc">Views: High to low</option>
+          <option value="likes_desc">Likes: High to low</option>
+          <option value="follows_desc">Follows: High to low</option>
+        </select>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-ghost" onclick="setPersonalCpPeriod('last')">Last Week</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPersonalCpPeriod('week')">This Week</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPersonalCpPeriod('month')">This Month</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPersonalCpPeriod('all')">All Time</button>
+        </div>
+      </div>
+      <div id="pcp-summary" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>
+      <div id="pcp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+      <div id="pcp-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No content performance entries yet</p></div>
+    </div>
+
+    <!-- Personal Content Performance — Add/Edit modal -->
+    <div class="modal-overlay" id="pcp-modal">
+      <div class="modal">
+        <div class="modal-title"><span id="pcp-modal-title">Add Performance Entry</span><button class="modal-close" onclick="closeModal('pcp-modal')">✕</button></div>
+        <input type="hidden" id="pcp-edit-id">
+        <div class="form-group"><label>Account</label>
+          <select id="pcp-model"><option value="">— Select —</option></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group"><label>Post Type</label>
+            <select id="pcp-post-type"><option>IG reel</option><option>TikTok</option><option>IG post</option><option>IG story</option><option>Other</option></select>
+          </div>
+          <div class="form-group"><label>Post Date</label><input type="date" id="pcp-date"></div>
+        </div>
+        <div class="form-group"><label>Post URL</label><input type="text" id="pcp-url" placeholder="https://..."></div>
+        <div class="form-group"><label>Caption / Note</label><input type="text" id="pcp-caption"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group"><label>Views</label><input type="number" id="pcp-views" value="0"></div>
+          <div class="form-group"><label>Reach</label><input type="number" id="pcp-reach" value="0"></div>
+          <div class="form-group"><label>Likes</label><input type="number" id="pcp-likes" value="0"></div>
+          <div class="form-group"><label>Comments</label><input type="number" id="pcp-comments" value="0"></div>
+          <div class="form-group"><label>Shares</label><input type="number" id="pcp-shares" value="0"></div>
+          <div class="form-group"><label>Saves</label><input type="number" id="pcp-saves" value="0"></div>
+          <div class="form-group"><label>New Followers</label><input type="number" id="pcp-followers" value="0"></div>
+          <div class="form-group"><label>Duration (sec)</label><input type="number" id="pcp-duration"></div>
+          <div class="form-group"><label>Avg Watch Time (sec)</label><input type="number" id="pcp-watch-time"></div>
+          <div class="form-group"><label>Retention %</label><input type="number" id="pcp-retention"></div>
+        </div>
+        <div class="form-group"><label>Notes</label><input type="text" id="pcp-notes"></div>
+        <div id="pcp-alert" class="alert"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="savePersonalCpEntry()">💾 Save</button>
+          <button class="btn btn-ghost" onclick="closeModal('pcp-modal')">Cancel</button>
+          <button class="btn btn-danger" id="pcp-delete-btn" style="display:none;" onclick="deletePersonalCpEntryFromModal()">🗑 Delete</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Model Settings -->
     <div class="page" id="page-models">
       <div class="page-title">Model Settings</div>
@@ -1268,119 +1400,51 @@
     <!-- Management -->
     <div class="page" id="page-management">
       <div class="page-title">Drawing Board</div>
-      <div class="page-sub">Workspaces, notes, goals & to-dos — your planning hub</div>
-
-      <div class="card">
-        <div class="card-title">Latest Week Actuals</div>
-        <div id="kpi-comparison"></div>
-      </div>
-
-      <div class="mgmt-tabs">
-        <button class="btn btn-sm btn-primary" id="mgmt-tab-btn-workspaces" onclick="setManagementTab('workspaces')">🗂️ Workspaces</button>
-        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-notes" onclick="setManagementTab('notes')">📝 Quick Notes</button>
-        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-goals" onclick="setManagementTab('goals')">🎯 Goals</button>
-        <button class="btn btn-sm btn-ghost" id="mgmt-tab-btn-todos" onclick="setManagementTab('todos')">✅ To-Do</button>
-      </div>
-
-      <!-- Workspaces -->
-      <div class="mgmt-tab-body active" id="mgmt-tab-workspaces">
-        <div class="btn-row" style="margin-top:0;margin-bottom:16px;">
-          <button class="btn btn-sm btn-primary" onclick="openAddWorkspaceModal()">+ Add Workspace</button>
-        </div>
-        <div id="ws-container"></div>
-      </div>
-
-      <!-- Quick Notes -->
-      <div class="mgmt-tab-body" id="mgmt-tab-notes">
-        <div class="card">
-          <div class="card-title">Add Note</div>
-          <div style="display:flex;gap:8px;align-items:flex-start;">
-            <textarea id="qn-input" placeholder="Jot something down..." rows="2" style="flex:1;background:var(--surface2);min-height:44px;"></textarea>
-            <button class="btn btn-sm btn-primary" onclick="addQuickNote()">Add</button>
-          </div>
-        </div>
-        <div id="qn-container"></div>
-      </div>
-
-      <!-- Goals -->
-      <div class="mgmt-tab-body" id="mgmt-tab-goals">
-        <div class="btn-row" style="margin-top:0;margin-bottom:16px;">
-          <button class="btn btn-sm btn-primary" onclick="openAddGoalModal()">+ Add Goal</button>
-        </div>
-        <div id="goals-container"></div>
-      </div>
-
-      <!-- To-Do -->
-      <div class="mgmt-tab-body" id="mgmt-tab-todos">
-        <div class="card">
-          <div class="card-title">Add Task</div>
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">
-            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Task</label><input type="text" id="td-text" placeholder="What needs doing?" onkeydown="if(event.key==='Enter')addTodo()"></div>
-            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Priority</label>
-              <select id="td-priority"><option value="high">High</option><option value="med" selected>Medium</option><option value="low">Low</option></select>
+      <div class="page-sub">Agency goals and KPI tracking</div>
+      <div class="two-col">
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div class="stat-card accent">
+              <div class="stat-label">Revenue Target (weekly)</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <span style="font-weight:700;">$</span>
+                <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
+              </div>
             </div>
-            <div class="form-group" style="gap:4px;"><label style="font-size:10px;">Due (optional)</label><input type="date" id="td-due"></div>
-            <button class="btn btn-sm btn-primary" onclick="addTodo()">Add</button>
+            <div class="stat-card">
+              <div class="stat-label">Model Target</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
+                <span style="font-size:13px;color:var(--text2);">models</span>
+              </div>
+            </div>
+            <div class="stat-card accent">
+              <div class="stat-label">Agency Net Target (weekly)</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <span style="font-weight:700;">$</span>
+                <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Renewal Rate Target</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
+                <span style="font-size:13px;color:var(--text2);">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Agency Notes</div>
+            <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:180px;background:var(--surface2);" onchange="saveKPI()"></textarea>
           </div>
         </div>
-        <div id="todos-container"></div>
-      </div>
-    </div>
-
-    <!-- Workspace detail — generic template populated per-workspace, deliberately not in NAV so it never shows in the sidebar -->
-    <div class="page" id="page-workspace">
-      <div class="guide-back" onclick="navigate('management')">← Back to Drawing Board</div>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-        <div style="flex:1;min-width:240px;">
-          <input type="text" id="ws-detail-name" class="page-title" style="background:none;border:none;color:#fff;width:100%;padding:0;margin-bottom:4px;" onchange="saveWorkspaceDetail()">
-          <input type="text" id="ws-detail-category" class="page-sub" style="background:none;border:none;width:100%;padding:0;text-transform:none;letter-spacing:normal;" placeholder="Category (e.g. Traffic, Chatting, Content)" onchange="saveWorkspaceDetail()">
+        <div class="card">
+          <div class="card-title">KPI vs Actuals — Latest Week</div>
+          <div id="kpi-comparison"></div>
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="deleteWorkspace()" style="color:var(--red);">🗑️ Delete Workspace</button>
-      </div>
-      <div class="card">
-        <textarea id="ws-detail-body" placeholder="Write anything here..." style="width:100%;min-height:420px;background:var(--surface2);" onchange="saveWorkspaceDetail()"></textarea>
       </div>
     </div>
 
-  </div>
-</div>
-
-<!-- Add/Edit Workspace Modal -->
-<div class="modal-overlay" id="ws-modal">
-  <div class="modal">
-    <div class="modal-title"><span>Add Workspace</span><button class="modal-close" onclick="closeModal('ws-modal')">✕</button></div>
-    <div class="form-grid">
-      <div class="form-group full"><label>Name</label><input type="text" id="ws-modal-name" placeholder="e.g. Traffic"></div>
-      <div class="form-group full"><label>Category (optional — used to group workspaces)</label><input type="text" id="ws-modal-category" placeholder="e.g. Traffic, Chatting, Content" list="ws-category-suggestions"></div>
-      <datalist id="ws-category-suggestions"></datalist>
-    </div>
-    <div id="ws-modal-alert" class="alert"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveNewWorkspace()">💾 Create Workspace</button>
-      <button class="btn btn-ghost" onclick="closeModal('ws-modal')">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- Add/Edit Goal Modal -->
-<div class="modal-overlay" id="goal-modal">
-  <div class="modal">
-    <div class="modal-title"><span id="goal-modal-title">Add Goal</span><button class="modal-close" onclick="closeModal('goal-modal')">✕</button></div>
-    <div class="form-grid">
-      <div class="form-group full"><label>Goal Name</label><input type="text" id="goal-name" placeholder="e.g. Hit 10 models by Q4"></div>
-      <div class="form-group"><label>Target</label><input type="number" id="goal-target" placeholder="0"></div>
-      <div class="form-group"><label>Current</label><input type="number" id="goal-current" placeholder="0"></div>
-      <div class="form-group"><label>Unit</label>
-        <select id="goal-unit"><option value="$">$ (dollars)</option><option value="%">% (percent)</option><option value="">Plain number</option></select>
-      </div>
-      <div class="form-group"><label>Deadline (optional)</label><input type="date" id="goal-deadline"></div>
-      <div class="form-group full"><label>Notes (optional)</label><textarea id="goal-notes" rows="2" placeholder="Any context..."></textarea></div>
-    </div>
-    <div id="goal-alert" class="alert"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveGoal()">💾 Save Goal</button>
-      <button class="btn btn-ghost" onclick="closeModal('goal-modal')">Cancel</button>
-    </div>
   </div>
 </div>
 
@@ -1630,7 +1694,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [] };
+var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [], personalModels: [], personalReports: [], personalContentPerf: [] };
 var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
 // Grouped into General / Chatting / Models / Management per Liam's requested layout.
@@ -1658,7 +1722,10 @@ var NAV = [
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
   { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
-  { id: 'team',       icon: '🔑', label: 'Team Access',         roles: ['admin'],                                  section: 'Management' }
+  { id: 'team',       icon: '🔑', label: 'Team Access',         roles: ['admin'],                                  section: 'Management' },
+  { id: 'personal-dashboard', icon: '🔒', label: 'Dashboard',          secret: true, roles: [], section: 'My Accounts' },
+  { id: 'personal-reports',   icon: '🔒', label: 'Weekly Reports',     secret: true, roles: [], section: 'My Accounts' },
+  { id: 'personal-contentperf', icon: '🔒', label: 'Content Performance', secret: true, roles: [], section: 'My Accounts' }
 ];
 
 // ── Init ─────────────────────────────────────────────────────
@@ -1699,6 +1766,9 @@ async function initApp(user) {
 function pageAllowed(pageId, profile){
   const item=NAV.find(n=>n.id===pageId);
   if(!item) return false;
+  // Secret items bypass roles/permissions entirely -- gated purely on a hardcoded email,
+  // so no role grant or Team Access permission checkbox can ever expose them to anyone else.
+  if(item.secret) return (profile?.email||'').trim().toLowerCase()==='liameastgate@hotmail.com';
   const customPerms=profile?.permissions;
   return customPerms ? customPerms.includes(pageId) : item.roles.includes(profile?.role);
 }
@@ -1706,9 +1776,10 @@ function pageAllowed(pageId, profile){
 function buildNav(role) {
   const nav = document.getElementById('nav'); nav.innerHTML = '';
   const customPerms = STATE.profile?.permissions;
+  const isOwner = (STATE.profile?.email||'').trim().toLowerCase()==='liameastgate@hotmail.com';
   let lastSection = null;
   NAV.forEach(item => {
-    const allowed = customPerms ? customPerms.includes(item.id) : item.roles.includes(role);
+    const allowed = item.secret ? isOwner : (customPerms ? customPerms.includes(item.id) : item.roles.includes(role));
     if (!allowed) return;
     // Add section label if new section
     if (item.section && item.section !== lastSection) {
@@ -1727,6 +1798,8 @@ function buildNav(role) {
 }
 
 function navigate(page) {
+  const navItem=NAV.find(n=>n.id===page);
+  if(navItem?.secret && !pageAllowed(page, STATE.profile)) page = STATE.profile?.role==='model' ? 'model-home' : 'overview';
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const el = document.getElementById('page-' + page); if (el) el.classList.add('active');
@@ -1746,6 +1819,9 @@ function navigate(page) {
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
+  if (page === 'personal-dashboard') renderPersonalDashboard();
+  if (page === 'personal-reports') loadPersonalReportsOverview();
+  if (page === 'personal-contentperf') loadPersonalContentPerformance();
 }
 
 // The first thing a model sees when they log in. Personalizes the greeting using their
@@ -6235,43 +6311,18 @@ async function saveContentPerfRows(){
   }
 }
 
-// ── Drawing Board: workspaces / quick notes / goals / to-do ────
-// All four datasets live as separate rows in the existing generic agency_settings
-// key-value table (key='workspaces'|'quicknotes'|'goals'|'todos') -- no new tables
-// needed. MGMT holds the in-memory working copy; persistMgmt(key) writes it back.
-var MGMT = { workspaces:[], quicknotes:[], goals:[], todos:[], currentTab:'workspaces', currentWorkspaceId:null, editingGoalId:null };
-
+// ── Management / KPIs ─────────────────────────────────────────
 async function loadManagement(){
-  const{data}=await sb.from('agency_settings').select('*').in('key',['kpis','workspaces','quicknotes','goals','todos']);
-  const byKey={}; (data||[]).forEach(r=>byKey[r.key]=r.value);
-  const legacyKpis=byKey.kpis||{};
-  MGMT.workspaces=byKey.workspaces||[];
-  MGMT.quicknotes=byKey.quicknotes||[];
-  MGMT.goals=byKey.goals||null; // null = old fixed-KPI board, not migrated to custom goals yet
-  MGMT.todos=byKey.todos||[];
-
-  // One-time migration from the old fixed-target Drawing Board so nothing set previously is lost.
-  if(MGMT.goals===null){
-    MGMT.goals=[];
-    const seed=[
-      {name:'Revenue Target (weekly)', target:legacyKpis.revenue, unit:'$'},
-      {name:'Model Target', target:legacyKpis.models, unit:''},
-      {name:'Agency Net Target (weekly)', target:legacyKpis.net, unit:'$'},
-      {name:'Renewal Rate Target', target:legacyKpis.renew, unit:'%'},
-    ];
-    seed.forEach(s=>{ if(s.target){ MGMT.goals.push({id:uid(),name:s.name,target:parseFloat(s.target),current:0,unit:s.unit,deadline:null,notes:'',createdAt:new Date().toISOString()}); } });
-    await persistMgmt('goals');
+  const{data}=await sb.from('agency_settings').select('*').eq('key','kpis').single();
+  if(data){
+    const kpis=data.value||{};
+    document.getElementById('kpi-revenue-target').value=kpis.revenue||'';
+    document.getElementById('kpi-model-target').value=kpis.models||'';
+    document.getElementById('kpi-net-target').value=kpis.net||'';
+    document.getElementById('kpi-renew-target').value=kpis.renew||'';
+    document.getElementById('agency-notes').value=kpis.notes||'';
   }
-  if(MGMT.quicknotes.length===0 && legacyKpis.notes && legacyKpis.notes.trim()){
-    MGMT.quicknotes.push({id:uid(),text:legacyKpis.notes.trim(),createdAt:new Date().toISOString()});
-    await persistMgmt('quicknotes');
-  }
-
-  renderWorkspaces(); renderQuickNotes(); renderGoals(); renderTodos();
-  setManagementTab(MGMT.currentTab||'workspaces');
-
-  // Latest week actuals -- same source/definitions as before, just no fixed-target comparison anymore
-  // (targets now live as freeform Goals, tracked separately/manually).
+  // Load latest week actuals for comparison
   const{data:reports}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
   if(reports&&reports.length){
     const weeks=[...new Set(reports.map(r=>r.week_of))];
@@ -6280,6 +6331,7 @@ async function loadManagement(){
     const totalE=week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
     const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
     const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
+    const kpis=data?.value||{};
 
     // Chatter-side actuals for the same latest week -- same source/definitions as the
     // Chatter Performance summary tab, just rolled into one number each rather than per-chatter.
@@ -6298,10 +6350,10 @@ async function loadManagement(){
 
     document.getElementById('kpi-comparison').innerHTML=`
       <div class="stats-grid" style="margin-top:0;">
-        ${statCard('Revenue','$'+fmt(totalE),'','')}
-        ${statCard('Agency Net','$'+fmt(totalN),'','')}
-        ${statCard('Active Models',week.length,'','')}
-        ${statCard('Avg Renew %',(avgRenew*100).toFixed(1)+'%','','')}
+        ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
+        ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
+        ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
+        ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
         ${statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'—','','green')}
         ${statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'—','','blue')}
         ${statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'—','','')}
@@ -6312,255 +6364,502 @@ async function loadManagement(){
   }
 }
 
-async function persistMgmt(key){
-  await sb.from('agency_settings').upsert({key,value:MGMT[key]},{onConflict:'key'});
+function kpiCard(label,actual,target,prefix,isPct=false){
+  const fmt2=v=>isPct?v.toFixed(1):fmt(v);
+  const hit=target>0&&actual>=target;
+  const pct=target>0?Math.min(100,(actual/target)*100):0;
+  return`<div class="stat-card">
+    <div class="stat-label">${label}</div>
+    <div style="font-size:20px;font-weight:800;color:${hit?'var(--green)':'var(--text)'};">${prefix}${fmt2(actual)}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Target: ${prefix}${fmt2(target)}</div>
+    <div style="background:var(--border);border-radius:4px;height:4px;margin-top:8px;"><div style="background:${hit?'var(--green)':'var(--accent)'};width:${pct}%;height:4px;border-radius:4px;"></div></div>
+  </div>`;
 }
 
-function setManagementTab(tab){
-  MGMT.currentTab=tab;
-  ['workspaces','notes','goals','todos'].forEach(t=>{
-    const body=document.getElementById('mgmt-tab-'+t); if(body) body.classList.toggle('active',t===tab);
-    const btn=document.getElementById('mgmt-tab-btn-'+t); if(btn) btn.className='btn btn-sm '+(t===tab?'btn-primary':'btn-ghost');
-  });
-}
-
-// ── Workspaces ───────────────────────────────────────────────
-function renderWorkspaces(){
-  const el=document.getElementById('ws-container'); if(!el) return;
-  if(!MGMT.workspaces.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No workspaces yet — add one to get started.</div>'; return; }
-  const groups={};
-  MGMT.workspaces.forEach(w=>{ const cat=(w.category||'').trim()||'Uncategorized'; (groups[cat]=groups[cat]||[]).push(w); });
-  let html='';
-  Object.keys(groups).sort().forEach(cat=>{
-    html+=`<div class="ws-cat-header">${cat}</div><div class="ws-grid">`;
-    groups[cat].forEach(w=>{
-      const preview=(w.body||'').slice(0,90).replace(/</g,'&lt;');
-      html+=`<div class="ws-card" onclick="openWorkspace('${w.id}')">
-        <div class="ws-card-title">${(w.name||'Untitled').replace(/</g,'&lt;')}</div>
-        <div class="ws-card-preview">${preview||'No notes yet'}</div>
-      </div>`;
-    });
-    html+='</div>';
-  });
-  el.innerHTML=html;
-}
-
-function openAddWorkspaceModal(){
-  document.getElementById('ws-modal-alert').style.display='none';
-  document.getElementById('ws-modal-name').value='';
-  document.getElementById('ws-modal-category').value='';
-  const dl=document.getElementById('ws-category-suggestions');
-  if(dl) dl.innerHTML=[...new Set(MGMT.workspaces.map(w=>w.category).filter(Boolean))].map(c=>`<option value="${c}">`).join('');
-  openModal('ws-modal');
-}
-
-async function saveNewWorkspace(){
-  const name=document.getElementById('ws-modal-name').value.trim();
-  if(!name){ showAlert('ws-modal-alert','Name is required','error'); return; }
-  const category=document.getElementById('ws-modal-category').value.trim();
-  const w={id:uid(),name,category,body:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
-  MGMT.workspaces.push(w);
-  await persistMgmt('workspaces');
-  closeModal('ws-modal');
-  renderWorkspaces();
-  openWorkspace(w.id);
-}
-
-function openWorkspace(id){
-  const w=MGMT.workspaces.find(x=>x.id===id); if(!w) return;
-  MGMT.currentWorkspaceId=id;
-  document.getElementById('ws-detail-name').value=w.name||'';
-  document.getElementById('ws-detail-category').value=w.category||'';
-  document.getElementById('ws-detail-body').value=w.body||'';
-  navigate('workspace');
-}
-
-async function saveWorkspaceDetail(){
-  const w=MGMT.workspaces.find(x=>x.id===MGMT.currentWorkspaceId); if(!w) return;
-  w.name=document.getElementById('ws-detail-name').value.trim()||'Untitled';
-  w.category=document.getElementById('ws-detail-category').value.trim();
-  w.body=document.getElementById('ws-detail-body').value;
-  w.updatedAt=new Date().toISOString();
-  document.getElementById('ws-detail-name').value=w.name;
-  await persistMgmt('workspaces');
-}
-
-async function deleteWorkspace(){
-  if(!confirm('Delete this workspace? This cannot be undone.')) return;
-  MGMT.workspaces=MGMT.workspaces.filter(x=>x.id!==MGMT.currentWorkspaceId);
-  await persistMgmt('workspaces');
-  MGMT.currentWorkspaceId=null;
-  renderWorkspaces();
-  navigate('management');
-}
-
-// ── Quick Notes ──────────────────────────────────────────────
-function renderQuickNotes(){
-  const el=document.getElementById('qn-container'); if(!el) return;
-  if(!MGMT.quicknotes.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:10px 0;">No notes yet.</div>'; return; }
-  const sorted=[...MGMT.quicknotes].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  el.innerHTML=sorted.map(n=>`<div class="note-card">
-    <div><div class="note-text">${(n.text||'').replace(/</g,'&lt;')}</div><div class="note-time">${fmtDateTime(n.createdAt)}</div></div>
-    <button onclick="deleteQuickNote('${n.id}')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
-  </div>`).join('');
-}
-
-async function addQuickNote(){
-  const val=document.getElementById('qn-input').value.trim();
-  if(!val) return;
-  MGMT.quicknotes.push({id:uid(),text:val,createdAt:new Date().toISOString()});
-  await persistMgmt('quicknotes');
-  document.getElementById('qn-input').value='';
-  renderQuickNotes();
-}
-
-async function deleteQuickNote(id){
-  MGMT.quicknotes=MGMT.quicknotes.filter(n=>n.id!==id);
-  await persistMgmt('quicknotes');
-  renderQuickNotes();
-}
-
-// ── Goals ────────────────────────────────────────────────────
-function renderGoals(){
-  const el=document.getElementById('goals-container'); if(!el) return;
-  if(!MGMT.goals.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No goals yet — add one to start tracking.</div>'; return; }
-  el.innerHTML=MGMT.goals.map(g=>{
-    const target=parseFloat(g.target||0), current=parseFloat(g.current||0);
-    const pct=target>0?Math.min(100,(current/target)*100):0;
-    const hit=target>0&&current>=target;
-    const unit=g.unit||'';
-    const fmtVal=v=>unit==='$'?'$'+fmt(v):unit==='%'?v+'%':fmt(v);
-    return `<div class="goal-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#fff;">${(g.name||'Untitled Goal').replace(/</g,'&lt;')}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${fmtVal(current)} of ${fmtVal(target)}${g.deadline?' · due '+fmtDate(g.deadline):''}</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button class="btn btn-sm btn-ghost" onclick="openEditGoalModal('${g.id}')">Edit</button>
-          <button class="btn btn-sm btn-ghost" onclick="deleteGoal('${g.id}')" style="color:var(--red);">Delete</button>
-        </div>
-      </div>
-      <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${hit?'var(--green)':'var(--accent)'};"></div></div>
-      ${g.notes?`<div style="font-size:12px;color:var(--text2);margin-top:8px;">${g.notes.replace(/</g,'&lt;')}</div>`:''}
-    </div>`;
-  }).join('');
-}
-
-function openAddGoalModal(){
-  MGMT.editingGoalId=null;
-  document.getElementById('goal-alert').style.display='none';
-  document.getElementById('goal-modal-title').textContent='Add Goal';
-  document.getElementById('goal-name').value='';
-  document.getElementById('goal-target').value='';
-  document.getElementById('goal-current').value='';
-  document.getElementById('goal-unit').value='$';
-  document.getElementById('goal-deadline').value='';
-  document.getElementById('goal-notes').value='';
-  openModal('goal-modal');
-}
-
-function openEditGoalModal(id){
-  const g=MGMT.goals.find(x=>x.id===id); if(!g) return;
-  MGMT.editingGoalId=id;
-  document.getElementById('goal-alert').style.display='none';
-  document.getElementById('goal-modal-title').textContent='Edit Goal';
-  document.getElementById('goal-name').value=g.name||'';
-  document.getElementById('goal-target').value=g.target||'';
-  document.getElementById('goal-current').value=g.current||'';
-  document.getElementById('goal-unit').value=g.unit||'$';
-  document.getElementById('goal-deadline').value=g.deadline||'';
-  document.getElementById('goal-notes').value=g.notes||'';
-  openModal('goal-modal');
-}
-
-async function saveGoal(){
-  const name=document.getElementById('goal-name').value.trim();
-  if(!name){ showAlert('goal-alert','Name is required','error'); return; }
-  const payload={name,target:parseFloat(document.getElementById('goal-target').value)||0,current:parseFloat(document.getElementById('goal-current').value)||0,unit:document.getElementById('goal-unit').value,deadline:document.getElementById('goal-deadline').value||null,notes:document.getElementById('goal-notes').value.trim()};
-  if(MGMT.editingGoalId){
-    const g=MGMT.goals.find(x=>x.id===MGMT.editingGoalId);
-    if(g) Object.assign(g,payload);
-  } else {
-    MGMT.goals.push({id:uid(),...payload,createdAt:new Date().toISOString()});
-  }
-  await persistMgmt('goals');
-  closeModal('goal-modal');
-  renderGoals();
-}
-
-async function deleteGoal(id){
-  if(!confirm('Delete this goal?')) return;
-  MGMT.goals=MGMT.goals.filter(g=>g.id!==id);
-  await persistMgmt('goals');
-  renderGoals();
-}
-
-// ── To-Do (priority-sorted) ──────────────────────────────────
-function sortedTodos(){
-  const rank={high:0,med:1,low:2};
-  return [...MGMT.todos].sort((a,b)=>{
-    if(!!a.done!==!!b.done) return a.done?1:-1; // active tasks first, completed sink to bottom
-    if(a.done&&b.done) return new Date(b.completedAt||0)-new Date(a.completedAt||0);
-    const pr=(rank[a.priority]??1)-(rank[b.priority]??1);
-    if(pr!==0) return pr; // High > Medium > Low
-    if(a.due&&b.due) return new Date(a.due)-new Date(b.due); // soonest due date first within the same priority
-    if(a.due) return -1;
-    if(b.due) return 1;
-    return new Date(a.createdAt)-new Date(b.createdAt);
-  });
-}
-
-function renderTodos(){
-  const el=document.getElementById('todos-container'); if(!el) return;
-  if(!MGMT.todos.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:20px 0;">No tasks yet — add one above.</div>'; return; }
-  const rows=sortedTodos();
-  const todayStr=new Date().toISOString().slice(0,10);
-  el.innerHTML=rows.map(t=>{
-    const dueStr=t.due?fmtDate(t.due):'';
-    const overdue=t.due&&!t.done&&t.due<todayStr;
-    return `<div class="todo-row ${t.done?'done':''}">
-      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0;">
-      <span class="priority-tag ${t.priority}">${t.priority}</span>
-      <span class="todo-text" style="flex:1;font-size:13px;">${(t.text||'').replace(/</g,'&lt;')}</span>
-      ${dueStr?`<span style="font-size:11px;color:${overdue?'var(--red)':'var(--text2)'};flex-shrink:0;">${overdue?'⚠️ ':''}${dueStr}</span>`:''}
-      <button onclick="deleteTodo('${t.id}')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
-    </div>`;
-  }).join('');
-}
-
-async function addTodo(){
-  const text=document.getElementById('td-text').value.trim();
-  if(!text) return;
-  const priority=document.getElementById('td-priority').value;
-  const due=document.getElementById('td-due').value||null;
-  MGMT.todos.push({id:uid(),text,priority,due,done:false,createdAt:new Date().toISOString()});
-  await persistMgmt('todos');
-  document.getElementById('td-text').value=''; document.getElementById('td-due').value=''; document.getElementById('td-priority').value='med';
-  renderTodos();
-}
-
-async function toggleTodo(id){
-  const t=MGMT.todos.find(x=>x.id===id); if(!t) return;
-  t.done=!t.done; t.completedAt=t.done?new Date().toISOString():null;
-  await persistMgmt('todos');
-  renderTodos();
-}
-
-async function deleteTodo(id){
-  MGMT.todos=MGMT.todos.filter(x=>x.id!==id);
-  await persistMgmt('todos');
-  renderTodos();
+async function saveKPI(){
+  const kpis={revenue:document.getElementById('kpi-revenue-target').value,models:document.getElementById('kpi-model-target').value,net:document.getElementById('kpi-net-target').value,renew:document.getElementById('kpi-renew-target').value,notes:document.getElementById('agency-notes').value};
+  await sb.from('agency_settings').upsert({key:'kpis',value:kpis},{onConflict:'key'});
 }
 
 // ── Utils ────────────────────────────────────────────────────
 function fmt(n){return parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
-function fmtDateTime(d){if(!d)return'—';try{return new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(e){return d;}}
-function uid(){return crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2));}
 function showAlert(id,msg,type){const el=document.getElementById(id);if(!el)return;el.className='alert alert-'+(type==='success'?'success':'error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',4000);}
 function show(id){const el=document.getElementById(id);if(el)el.style.display='flex';}
 function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MY ACCOUNTS — private section for Liam Free / Liam VIP.
+// Fully separate tables (personal_models / personal_weekly_reports /
+// personal_creator_stats_daily / personal_content_performance), fully separate
+// STATE slice, fully separate functions. The real access boundary is Postgres
+// RLS (locked to auth.jwt() email = liameastgate@hotmail.com) — NAV's secret:true
+// flag + pageAllowed/buildNav/navigate just keep the UI from ever rendering this
+// for anyone else. Deliberately does NOT reuse the shared models/weekly_reports/
+// content_performance tables or STATE.models, so nothing here can ever leak into
+// (or be reached from) the agency-wide views admins/VAs/chatters/models see.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function findPersonalModelMatch(name){
+  const norm=normalizeName(name);
+  if(!norm) return {model:null, matchType:'none'};
+  const list=STATE.personalModels||[];
+  const exact=list.find(m=>normalizeName(m.name)===norm||normalizeName(m.of_account)===norm);
+  if(exact) return {model:exact, matchType:'exact'};
+  const threshold=Math.min(3,Math.max(1,Math.ceil(norm.length*0.34)));
+  const candidates=list.map(m=>({
+    model:m,
+    dist:Math.min(levenshtein(norm,normalizeName(m.name)), m.of_account?levenshtein(norm,normalizeName(m.of_account)):Infinity)
+  })).filter(c=>c.dist<=threshold).sort((a,b)=>a.dist-b.dist);
+  if(candidates.length===1||(candidates.length>1&&candidates[0].dist<candidates[1].dist)) return {model:candidates[0].model, matchType:'fuzzy'};
+  return {model:null, matchType:'none'};
+}
+
+async function loadPersonalModels(){
+  const{data,error}=await sb.from('personal_models').select('*').order('name');
+  if(error){ console.error('personal_models load failed',error); STATE.personalModels=STATE.personalModels||[]; return; }
+  STATE.personalModels=data||[];
+  populatePersonalDropdowns();
+}
+
+function populatePersonalDropdowns(){
+  const list=STATE.personalModels||[];
+  const opts=list.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  const filterModel=document.getElementById('pcp-filter-model');
+  if(filterModel) filterModel.innerHTML=`<option value="">All Accounts</option>`+opts;
+  const pcpModel=document.getElementById('pcp-model');
+  if(pcpModel) pcpModel.innerHTML=`<option value="">— Select —</option>`+opts;
+}
+
+// ── Weekly Reports ───────────────────────────────────────────
+function switchPersonalReportTab(tab){
+  const order=['overview','upload','history'];
+  document.querySelectorAll('#page-personal-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
+  document.getElementById('p-report-tab-overview').style.display=tab==='overview'?'block':'none';
+  document.getElementById('p-report-tab-upload').style.display=tab==='upload'?'block':'none';
+  document.getElementById('p-report-tab-history').style.display=tab==='history'?'block':'none';
+  if(tab==='overview') loadPersonalReportsOverview();
+  if(tab==='history') loadPersonalReportHistory();
+}
+
+function handlePersonalCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handlePersonalCsvFile(e.dataTransfer.files[0]);}
+function handlePersonalCsvFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const summaryName=wb.SheetNames[0];
+      const detailName=wb.SheetNames.find(n=>/detail/i.test(n));
+      const summaryRows=XLSX.utils.sheet_to_json(wb.Sheets[summaryName],{defval:''});
+      const detailRows=detailName?XLSX.utils.sheet_to_json(wb.Sheets[detailName],{defval:''}):[];
+      if(!summaryRows.length) return showAlert('p-report-alert','Could not parse file.','error');
+      previewPersonalReport(summaryRows,detailRows);
+    }catch(err){showAlert('p-report-alert','Could not parse file: '+err.message,'error');}
+  };
+  r.readAsBinaryString(file);
+}
+
+var _pParsedRows=null, _pParsedDailyRows=null;
+
+function previewPersonalReport(rows, detailRows){
+  const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const autoDate = parseInflowwDate(firstDate);
+  const startEl=document.getElementById('p-report-week-start'), endEl=document.getElementById('p-report-week-end');
+  let weekStart = startEl.value || autoDate.start;
+  let weekEnd   = endEl.value   || autoDate.end;
+  if(autoDate.start && !startEl.value) startEl.value=autoDate.start;
+  if(autoDate.end   && !endEl.value)   endEl.value=autoDate.end;
+  if(!weekStart||!weekEnd) return showAlert('p-report-alert','Could not detect date range — please select manually.','error');
+
+  const parsed=rows.map(row=>{
+    const name = row['Creator']||row['Account']||row['Model']||row['Name']||'';
+    const earnings    = cleanAmount(row['Total earnings Net']||row['Total Earnings']||row['Earnings']||0);
+    let renewPct      = cleanAmount(row['Renew on %']||row['Renew %']||row['Renewal Rate']||0);
+    if(renewPct>1) renewPct=renewPct/100;
+    const activeFans  = parseInt(row['Active fans']||row['Active Fans']||row['Fans']||0)||0;
+    const newFans     = parseInt(row['New fans']||row['New Fans']||row['New Subscribers']||0)||0;
+    const {model, matchType} = findPersonalModelMatch(name);
+    return {
+      week_of:weekStart, week_end:weekEnd,
+      raw_name:name, match_type:matchType,
+      model_id:model?model.id:null,
+      model_name:model?model.name:name,
+      total_earnings:earnings,
+      renew_pct:renewPct, active_fans:activeFans, new_fans:newFans,
+      ...extractCreatorStatFields(row),
+    };
+  }).filter(r=>r.total_earnings>0||r.raw_name);
+
+  _pParsedRows=parsed;
+  _pParsedDailyRows=(detailRows||[]).map(row=>{
+    const name=getField(row,'Creator')||'';
+    const dateRaw=getField(row,'Date/Time Australia/Canberra','Date/Time')||'';
+    const statDate=String(dateRaw).trim().split(' ')[0];
+    const {model}=findPersonalModelMatch(name);
+    return {
+      model_id:model?model.id:null,
+      model_name:model?model.name:name,
+      stat_date:statDate,
+      total_earnings:cleanAmount(getField(row,'Total earnings Net')),
+      active_fans:intOrNull(getField(row,'Active fans')),
+      ...extractCreatorStatFields(row),
+    };
+  }).filter(r=>r.stat_date && r.model_name);
+
+  renderPersonalReportPreview();
+}
+
+function renderPersonalReportPreview(){
+  const parsed=_pParsedRows||[];
+  const totalE=parsed.reduce((s,r)=>s+r.total_earnings,0);
+  const modelOptions=(selectedId)=>`<option value=""${!selectedId?' selected':''}>— Unmatched —</option>`+
+    (STATE.personalModels||[]).map(mo=>`<option value="${mo.id}"${mo.id===selectedId?' selected':''}>${mo.name}</option>`).join('');
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} account${parsed.length!==1?'s':''} · ${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}</div><div class="table-wrap"><table><thead><tr><th>Creator (from CSV)</th><th>Matched Account</th><th>Total</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  parsed.forEach((r,i)=>{
+    const matchBadge = r.match_type==='exact'?'':
+      r.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
+      `<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
+    html+=`<tr>
+      <td><strong>${r.raw_name}</strong>${matchBadge}</td>
+      <td><select onchange="reassignPersonalReportRow(${i},this.value)" style="width:150px;font-size:12px;">${modelOptions(r.model_id)}</select></td>
+      <td>$${fmt(r.total_earnings)}</td>
+      <td>${(r.renew_pct*100).toFixed(1)}%</td>
+      <td>${r.active_fans}</td>
+    </tr>`;
+  });
+  html+=`<tr style="font-weight:700;"><td colspan="2">TOTAL</td><td>$${fmt(totalE)}</td><td>—</td><td>—</td></tr></tbody></table></div></div>`;
+  document.getElementById('p-csv-preview').innerHTML=html;
+  const saveBtn=document.getElementById('p-csv-save');
+  if(saveBtn) saveBtn.style.display=parsed.length?'block':'none';
+}
+
+function reassignPersonalReportRow(i,modelId){
+  const row=_pParsedRows[i]; if(!row) return;
+  const model=modelId?(STATE.personalModels||[]).find(m=>m.id===modelId):null;
+  row.match_type = model ? 'manual' : 'none';
+  row.model_id = model?model.id:null;
+  row.model_name = model?model.name:row.raw_name;
+  renderPersonalReportPreview();
+}
+
+async function savePersonalReportRows(){
+  const raw=_pParsedRows||[];
+  if(!raw.length) return showAlert('p-report-alert','No data to save.','error');
+  const weekOf=raw[0].week_of, weekEnd=raw[0].week_end;
+  const proceed=await confirmReplaceWeek('personal_weekly_reports',weekOf,weekEnd,'creator stats');
+  if(!proceed) return;
+  await sb.from('personal_creator_stats_daily').delete().gte('stat_date',weekOf).lte('stat_date',weekEnd);
+  const all=raw.map(({raw_name,match_type,...r})=>r);
+  const{error}=await sb.from('personal_weekly_reports').insert(all);
+  if(error) return showAlert('p-report-alert',error.message,'error');
+  let msg=`Saved! ${all.length} row${all.length!==1?'s':''} recorded.`;
+  const dailyRaw=_pParsedDailyRows||[];
+  if(dailyRaw.length){
+    const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+    const dailyRows=dailyRaw.map(r=>({...r, upload_batch_id:batchId}));
+    const{error:dailyError}=await sb.from('personal_creator_stats_daily').insert(dailyRows);
+    msg+= dailyError ? ` (Daily breakdown did not save: ${dailyError.message})` : ` +${dailyRows.length} daily rows.`;
+  }
+  showAlert('p-report-alert',msg,'success');
+  _pParsedRows=null; _pParsedDailyRows=null;
+  document.getElementById('p-csv-preview').innerHTML='';
+  document.getElementById('p-csv-save').style.display='none';
+  document.getElementById('p-csv-input').value='';
+  loadPersonalReportsOverview();
+}
+
+async function loadPersonalReportHistory(){
+  const{data}=await sb.from('personal_weekly_reports').select('*').order('week_of',{ascending:false});
+  const groupsEl=document.getElementById('p-report-history-groups');
+  const emptyEl=document.getElementById('p-report-history-empty');
+  if(!groupsEl) return;
+  if(!data||!data.length){ groupsEl.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; return; }
+  if(emptyEl) emptyEl.style.display='none';
+  const byWeek={};
+  data.forEach(r=>{ const key=r.week_of+'|'+(r.week_end||''); (byWeek[key]=byWeek[key]||[]).push(r); });
+  groupsEl.innerHTML=Object.entries(byWeek).map(([key,rows])=>{
+    const [weekOf,weekEnd]=key.split('|');
+    const total=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+    const ids=rows.map(r=>r.id);
+    return `<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div><strong>${weekOf}${weekEnd&&weekEnd!==weekOf?' to '+weekEnd:''}</strong> — ${rows.length} account${rows.length!==1?'s':''}, $${fmt(total)} total</div>
+        <button class="btn btn-sm btn-ghost" onclick='deletePersonalReportGroup(${JSON.stringify(ids)},"${weekOf}")'>🗑 Delete</button>
+      </div>
+      <div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Account</th><th>Total</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr><td>${r.model_name||'—'}</td><td>$${fmt(r.total_earnings)}</td><td>${((r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||0}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  }).join('');
+}
+
+async function deletePersonalReportGroup(ids,label){
+  if(!confirm(`Delete the ${label} report (${ids.length} row${ids.length!==1?'s':''})? This can't be undone.`)) return;
+  const{data,error}=await sb.from('personal_weekly_reports').delete().in('id',ids).select();
+  if(!data||!data.length) return showAlert('p-report-history-alert', error?.message||'Nothing was deleted.', 'error');
+  loadPersonalReportHistory();
+  loadPersonalReportsOverview();
+}
+
+async function loadPersonalReportsOverview(){
+  await loadPersonalModels();
+  const startEl=document.getElementById('p-wro-week-start'), endEl=document.getElementById('p-wro-week-end');
+  const {data:reports}=await sb.from('personal_weekly_reports').select('*').order('week_of',{ascending:false});
+  const all=reports||[];
+  STATE.personalReports=all;
+  if(startEl && !startEl.value && all.length){ startEl.value=all[0].week_of; endEl.value=all[0].week_end||all[0].week_of; }
+  const start=startEl?startEl.value:'', end=(endEl&&endEl.value)||start;
+  const rows=start ? all.filter(r=>overlaps(r.week_of,r.week_end,start,end)) : all.filter(r=>r.week_of===all[0]?.week_of);
+  const totalE=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const totalFans=rows.reduce((s,r)=>s+parseInt(r.active_fans||0),0);
+  const avgRenew=rows.length?rows.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/rows.length*100:0;
+  const statsEl=document.getElementById('p-wro-stats');
+  if(statsEl) statsEl.innerHTML=[
+    {label:'Total Earnings',val:'$'+fmt(totalE)},
+    {label:'Active Fans (combined)',val:totalFans},
+    {label:'Avg Renew %',val:avgRenew.toFixed(1)+'%'},
+    {label:'Accounts Reporting',val:rows.length},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.val}</div></div>`).join('');
+  const accEl=document.getElementById('p-wro-accounts');
+  if(accEl) accEl.innerHTML = rows.length
+    ? rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.model_name||'—'}</td><td>$${fmt(r.total_earnings)}</td><td>${((r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||0}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No data — upload a weekly report first</td></tr>';
+  renderPersonalDashboard();
+}
+
+function setPersonalReportsPeriod(kind){
+  const {start,end}=computePeriodRange(kind);
+  document.getElementById('p-wro-week-start').value=start;
+  document.getElementById('p-wro-week-end').value=end;
+  loadPersonalReportsOverview();
+}
+
+// ── Personal Dashboard ───────────────────────────────────────
+async function renderPersonalDashboard(){
+  await loadPersonalModels();
+  const {data:reports}=await sb.from('personal_weekly_reports').select('*').order('week_of',{ascending:false});
+  const all=reports||[];
+  STATE.personalReports=all;
+
+  const cardsEl=document.getElementById('pd-cards');
+  const breakdownEl=document.getElementById('pd-breakdown');
+  const emptyEl=document.getElementById('pd-empty');
+  if(!cardsEl) return; // not on this page
+
+  if(!all.length){
+    cardsEl.innerHTML=(STATE.personalModels||[]).map(m=>`<div class="card" style="margin:0;"><div class="card-title">${m.name}</div><div style="font-size:12px;color:var(--text2);">No reports uploaded yet</div></div>`).join('');
+    if(breakdownEl) breakdownEl.innerHTML='';
+    if(emptyEl) emptyEl.style.display='block';
+    document.getElementById('pd-combined-stats').innerHTML='';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display='none';
+
+  // Latest week per account
+  const latestByModel={};
+  all.forEach(r=>{ const k=r.model_id||r.model_name; if(!latestByModel[k] || r.week_of>latestByModel[k].week_of) latestByModel[k]=r; });
+  const latestRows=Object.values(latestByModel);
+
+  cardsEl.innerHTML=(STATE.personalModels||[]).map(m=>{
+    const r=latestRows.find(x=>x.model_id===m.id);
+    if(!r) return `<div class="card" style="margin:0;"><div class="card-title">${m.name}</div><div style="font-size:12px;color:var(--text2);">No reports uploaded yet</div></div>`;
+    return `<div class="card" style="margin:0;">
+      <div class="card-title">${m.name}</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Week of ${r.week_of}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+        <div><span style="color:var(--text2);">Earnings</span><br><strong class="profit">$${fmt(r.total_earnings)}</strong></div>
+        <div><span style="color:var(--text2);">Renew %</span><br><strong>${((r.renew_pct||0)*100).toFixed(1)}%</strong></div>
+        <div><span style="color:var(--text2);">Active Fans</span><br><strong>${r.active_fans||0}</strong></div>
+        <div><span style="color:var(--text2);">New Fans</span><br><strong>${r.new_fans||0}</strong></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const combinedE=latestRows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const combinedFans=latestRows.reduce((s,r)=>s+parseInt(r.active_fans||0),0);
+  const combinedRenew=latestRows.length?latestRows.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/latestRows.length*100:0;
+  document.getElementById('pd-combined-stats').innerHTML=[
+    {label:'Combined Earnings (latest week)',val:'$'+fmt(combinedE)},
+    {label:'Combined Active Fans',val:combinedFans},
+    {label:'Avg Renew %',val:combinedRenew.toFixed(1)+'%'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.val}</div></div>`).join('');
+
+  if(breakdownEl) breakdownEl.innerHTML = all.slice(0,20).map(r=>
+    `<tr><td>${r.model_name||'—'}</td><td>${r.week_of}</td><td>$${fmt(r.total_earnings)}</td><td>${((r.renew_pct||0)*100).toFixed(1)}%</td><td>${r.active_fans||0}</td></tr>`
+  ).join('');
+}
+
+// ── Content Performance ──────────────────────────────────────
+async function loadPersonalContentPerformance(){
+  await loadPersonalModels();
+  const{data,error}=await sb.from('personal_content_performance').select('*').order('post_date',{ascending:false});
+  if(error){ console.error('loadPersonalContentPerformance',error); return; }
+  STATE.personalContentPerf=data||[];
+  filterPersonalContentPerf();
+}
+
+function filterPersonalContentPerf(){
+  const start=document.getElementById('pcp-start')?.value||'';
+  const end=document.getElementById('pcp-end')?.value||'';
+  const modelId=document.getElementById('pcp-filter-model')?.value||'';
+  const sortKey=document.getElementById('pcp-sort')?.value||'rating_desc';
+  let rows=(STATE.personalContentPerf||[]).slice();
+  if(start) rows=rows.filter(r=>r.post_date>=start);
+  if(end) rows=rows.filter(r=>r.post_date<=end);
+  if(modelId) rows=rows.filter(r=>r.model_id===modelId);
+
+  const ratings=computeContentPerfRatings(rows);
+  rows.forEach(r=>{ r._rating=ratings.has(r.id)?ratings.get(r.id):null; });
+
+  const sorters={
+    rating_desc:(a,b)=>(b._rating??-1)-(a._rating??-1),
+    date_desc:(a,b)=>(b.post_date||'').localeCompare(a.post_date||''),
+    date_asc:(a,b)=>(a.post_date||'').localeCompare(b.post_date||''),
+    views_desc:(a,b)=>(b.views||0)-(a.views||0),
+    likes_desc:(a,b)=>(b.likes||0)-(a.likes||0),
+    follows_desc:(a,b)=>(b.new_followers||0)-(a.new_followers||0),
+  };
+  rows.sort(sorters[sortKey]||sorters.rating_desc);
+
+  renderPersonalCpSummary(rows);
+  renderPersonalCpGrid(rows);
+}
+
+function setPersonalCpPeriod(kind){
+  if(kind==='all'){
+    document.getElementById('pcp-start').value='';
+    document.getElementById('pcp-end').value='';
+    filterPersonalContentPerf();
+    return;
+  }
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('pcp-start').value=start;
+  document.getElementById('pcp-end').value=end;
+  filterPersonalContentPerf();
+}
+
+function renderPersonalCpSummary(rows){
+  const el=document.getElementById('pcp-summary'); if(!el) return;
+  const totalViews=rows.reduce((s,r)=>s+(r.views||0),0);
+  const totalFollows=rows.reduce((s,r)=>s+(r.new_followers||0),0);
+  const totalSaves=rows.reduce((s,r)=>s+(r.saves||0),0);
+  const posts=rows.length;
+  const avgRating=(()=>{ const rated=rows.filter(r=>r._rating!=null); return rated.length?Math.round(rated.reduce((s,r)=>s+r._rating,0)/rated.length):null; })();
+  el.innerHTML=[
+    {label:'Posts',val:posts},
+    {label:'Total Views',val:fmt(totalViews)},
+    {label:'New Followers',val:fmt(totalFollows)},
+    {label:'Saves',val:fmt(totalSaves)},
+    {label:'Avg Rating',val:avgRating==null?'—':avgRating},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.val}</div></div>`).join('');
+}
+
+function renderPersonalCpGrid(rows){
+  const grid=document.getElementById('pcp-grid'); const empty=document.getElementById('pcp-empty');
+  if(!grid) return;
+  if(!rows.length){ grid.innerHTML=''; if(empty) empty.style.display='block'; return; } if(empty) empty.style.display='none';
+  grid.innerHTML=rows.map(r=>{
+    const score=r._rating;
+    return `
+    <div class="card" style="margin:0;cursor:pointer;" onclick="openPersonalCpModal('${r.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;">
+        <span style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.model_name||'Unassigned'}</span>
+        <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:${cpRatingColor(score)};flex-shrink:0;">${score==null?'—':score}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.caption||'—'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px;color:var(--text2);margin-bottom:8px;">
+        <div>👁 ${(r.views||0).toLocaleString()}</div>
+        <div>❤️ ${(r.likes||0).toLocaleString()}</div>
+        <div>➕ ${(r.new_followers||0).toLocaleString()}</div>
+      </div>
+      <div style="font-size:10px;color:var(--text2);">${fmtDate(r.post_date)} · ${r.post_type||'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function openPersonalCpModal(id){
+  document.getElementById('pcp-alert').textContent='';
+  document.getElementById('pcp-edit-id').value=id||'';
+  const fields=['pcp-model','pcp-post-type','pcp-date','pcp-url','pcp-caption','pcp-duration','pcp-views','pcp-reach','pcp-likes','pcp-comments','pcp-shares','pcp-saves','pcp-followers','pcp-watch-time','pcp-retention','pcp-notes'];
+  const deleteBtn=document.getElementById('pcp-delete-btn');
+  if(id){
+    const row=(STATE.personalContentPerf||[]).find(r=>r.id===id);
+    if(!row) return;
+    document.getElementById('pcp-modal-title').textContent='Edit Performance Entry';
+    document.getElementById('pcp-model').value=row.model_id||'';
+    document.getElementById('pcp-post-type').value=row.post_type||'IG reel';
+    document.getElementById('pcp-date').value=row.post_date||'';
+    document.getElementById('pcp-url').value=row.post_url||'';
+    document.getElementById('pcp-caption').value=row.caption||'';
+    document.getElementById('pcp-duration').value=row.duration_sec||'';
+    document.getElementById('pcp-views').value=row.views||0;
+    document.getElementById('pcp-reach').value=row.reach||0;
+    document.getElementById('pcp-likes').value=row.likes||0;
+    document.getElementById('pcp-comments').value=row.comments||0;
+    document.getElementById('pcp-shares').value=row.shares||0;
+    document.getElementById('pcp-saves').value=row.saves||0;
+    document.getElementById('pcp-followers').value=row.new_followers||0;
+    document.getElementById('pcp-watch-time').value=row.watch_time_avg_sec||'';
+    document.getElementById('pcp-retention').value=row.retention_pct||'';
+    document.getElementById('pcp-notes').value=row.notes||'';
+    if(deleteBtn) deleteBtn.style.display='inline-block';
+  } else {
+    document.getElementById('pcp-modal-title').textContent='Add Performance Entry';
+    fields.forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=fid==='pcp-post-type'?'IG reel':''; });
+    if(deleteBtn) deleteBtn.style.display='none';
+  }
+  openModal('pcp-modal');
+}
+
+async function savePersonalCpEntry(){
+  const id=document.getElementById('pcp-edit-id').value;
+  const modelId=document.getElementById('pcp-model').value;
+  const postDate=document.getElementById('pcp-date').value;
+  if(!modelId||!postDate){document.getElementById('pcp-alert').textContent='Account and Post Date are required';return;}
+  const model=(STATE.personalModels||[]).find(m=>m.id===modelId);
+  const payload={
+    model_id:modelId, model_name:model?model.name:null,
+    platform:'instagram',
+    post_type:document.getElementById('pcp-post-type').value||null,
+    post_date:postDate,
+    post_url:document.getElementById('pcp-url').value.trim()||null,
+    caption:document.getElementById('pcp-caption').value.trim()||null,
+    duration_sec:parseFloat(document.getElementById('pcp-duration').value)||null,
+    views:parseFloat(document.getElementById('pcp-views').value)||0,
+    reach:parseFloat(document.getElementById('pcp-reach').value)||0,
+    likes:parseFloat(document.getElementById('pcp-likes').value)||0,
+    comments:parseFloat(document.getElementById('pcp-comments').value)||0,
+    shares:parseFloat(document.getElementById('pcp-shares').value)||0,
+    saves:parseFloat(document.getElementById('pcp-saves').value)||0,
+    new_followers:parseFloat(document.getElementById('pcp-followers').value)||0,
+    watch_time_avg_sec:parseFloat(document.getElementById('pcp-watch-time').value)||null,
+    retention_pct:parseFloat(document.getElementById('pcp-retention').value)||null,
+    notes:document.getElementById('pcp-notes').value.trim()||null
+  };
+  if(id){
+    const{data,error}=await sb.from('personal_content_performance').update(payload).eq('id',id).select().single();
+    if(error){document.getElementById('pcp-alert').textContent='Could not save: '+error.message;return;}
+    const i=STATE.personalContentPerf.findIndex(r=>r.id===id); if(i>-1) STATE.personalContentPerf[i]=data;
+  } else {
+    const{data,error}=await sb.from('personal_content_performance').insert(payload).select().single();
+    if(error){document.getElementById('pcp-alert').textContent='Could not save: '+error.message;return;}
+    STATE.personalContentPerf.unshift(data);
+  }
+  closeModal('pcp-modal');
+  filterPersonalContentPerf();
+}
+
+async function deletePersonalCpEntryFromModal(){
+  const id=document.getElementById('pcp-edit-id').value;
+  if(!id) return;
+  if(!confirm('Delete this performance entry?')) return;
+  const{error}=await sb.from('personal_content_performance').delete().eq('id',id);
+  if(error){document.getElementById('pcp-alert').textContent='Could not delete: '+error.message;return;}
+  STATE.personalContentPerf=(STATE.personalContentPerf||[]).filter(r=>r.id!==id);
+  closeModal('pcp-modal');
+  filterPersonalContentPerf();
+}
+
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
 </script>
 </body>
