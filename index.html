@@ -140,6 +140,21 @@
   .mh-sub { position: relative; z-index: 1; font-size: 14px; color: var(--text2); max-width: 460px; margin: 0 auto 40px; line-height: 1.6; }
   .mh-cards { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 980px; }
   .mh-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; width: 168px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; animation: mh-float 4s ease-in-out infinite; }
+  /* Below ~500px a fixed 168px card only ever fits one per row (full-width, stacked) --
+     shrink to a percentage-based width instead so the grid keeps 2-3 per row on mobile,
+     same multi-column feel as desktop instead of one giant tile per row. */
+  @media (max-width: 500px) {
+    .mh-wrap { padding: 28px 14px; min-height: calc(100vh - 100px); }
+    .mh-sub { margin-bottom: 24px; font-size: 13px; }
+    .mh-cards { gap: 10px; max-width: 100%; }
+    .mh-card { width: calc(50% - 5px); padding: 16px 10px; }
+    .mh-card-icon { width: 34px; height: 34px; font-size: 15px; margin-bottom: 8px; }
+    .mh-card-label { font-size: 12px; }
+    .mh-card-desc { font-size: 10px; }
+  }
+  @media (max-width: 340px) {
+    .mh-card { width: 100%; }
+  }
   /* Repeating 5-phase stagger (instead of a fixed nth-child list) so the float animation
      still looks staggered no matter how many cards a given user's permissions produce. */
   .mh-card:nth-child(5n+2) { animation-delay: 0.4s; } .mh-card:nth-child(5n+3) { animation-delay: 0.8s; } .mh-card:nth-child(5n+4) { animation-delay: 1.2s; } .mh-card:nth-child(5n+5) { animation-delay: 1.6s; } .mh-card:nth-child(5n+6) { animation-delay: 2s; }
