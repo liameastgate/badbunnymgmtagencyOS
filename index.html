@@ -20,8 +20,21 @@
      anything else absolutely-positioned) from ever being able to trigger a horizontal
      scrollbar on a narrow mobile screen. */
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
-  #auth-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; }
-  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 36px; width: 380px; border-top: 2px solid var(--accent); }
+  #auth-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; position: relative; overflow: hidden; }
+  /* Floating "storm" of the app's own sidebar-nav emojis drifting up behind the login card --
+     purely decorative (aria-hidden, pointer-events:none) so it never interferes with the form.
+     .auth-glow-mask sits above the emoji layer and blurs+darkens it with a soft blue radial glow,
+     so the emojis read as a hazy backdrop rather than competing with the card for attention. */
+  .auth-emoji-storm { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .auth-emoji-storm .ae { position: absolute; top: 110%; line-height: 1; animation-name: aeFloat; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform, opacity; }
+  @keyframes aeFloat {
+    0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+    8%   { opacity: 0.55; }
+    92%  { opacity: 0.55; }
+    100% { transform: translateY(-130vh) translateX(30px) rotate(20deg); opacity: 0; }
+  }
+  .auth-glow-mask { position: absolute; inset: 0; z-index: 1; pointer-events: none; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); background: radial-gradient(ellipse at center, rgba(30,79,255,0.18) 0%, rgba(8,8,15,0.55) 55%, rgba(8,8,15,0.88) 100%); }
+  .auth-box { position: relative; z-index: 2; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 36px; width: 380px; border-top: 2px solid var(--accent); box-shadow: 0 0 60px rgba(30,79,255,0.16); }
   .auth-logo { font-size: 26px; font-weight: 800; color: #ffffff; margin-bottom: 4px; letter-spacing: 1px; }
   .auth-logo span { display: block; font-size: 9px; color: var(--text2); letter-spacing: 3px; font-weight: 500; text-transform: uppercase; margin-bottom: 4px; }
   .auth-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
@@ -243,6 +256,39 @@
 <div id="loading-overlay">Loading AgencyOS…</div>
 
 <div id="auth-screen">
+  <div class="auth-emoji-storm" aria-hidden="true">
+    <span class="ae" style="left:3%;font-size:26px;animation-duration:16s;animation-delay:-3s;">🏠</span>
+    <span class="ae" style="left:8%;font-size:20px;animation-duration:19s;animation-delay:-11s;">🏆</span>
+    <span class="ae" style="left:13%;font-size:32px;animation-duration:14s;animation-delay:-6s;">📊</span>
+    <span class="ae" style="left:18%;font-size:24px;animation-duration:21s;animation-delay:-14s;">💬</span>
+    <span class="ae" style="left:23%;font-size:28px;animation-duration:17s;animation-delay:-2s;">📖</span>
+    <span class="ae" style="left:28%;font-size:22px;animation-duration:15s;animation-delay:-9s;">📋</span>
+    <span class="ae" style="left:33%;font-size:30px;animation-duration:20s;animation-delay:-17s;">🧾</span>
+    <span class="ae" style="left:38%;font-size:24px;animation-duration:13s;animation-delay:-5s;">🔗</span>
+    <span class="ae" style="left:43%;font-size:26px;animation-duration:18s;animation-delay:-12s;">📹</span>
+    <span class="ae" style="left:48%;font-size:20px;animation-duration:16s;animation-delay:-1s;">📈</span>
+    <span class="ae" style="left:53%;font-size:34px;animation-duration:22s;animation-delay:-19s;">💡</span>
+    <span class="ae" style="left:58%;font-size:24px;animation-duration:14s;animation-delay:-7s;">📚</span>
+    <span class="ae" style="left:63%;font-size:28px;animation-duration:19s;animation-delay:-15s;">💵</span>
+    <span class="ae" style="left:68%;font-size:22px;animation-duration:17s;animation-delay:-4s;">✍️</span>
+    <span class="ae" style="left:73%;font-size:26px;animation-duration:15s;animation-delay:-10s;">👤</span>
+    <span class="ae" style="left:78%;font-size:30px;animation-duration:21s;animation-delay:-18s;">🎯</span>
+    <span class="ae" style="left:83%;font-size:24px;animation-duration:13s;animation-delay:-6s;">💸</span>
+    <span class="ae" style="left:88%;font-size:28px;animation-duration:20s;animation-delay:-13s;">🔑</span>
+    <span class="ae" style="left:93%;font-size:22px;animation-duration:16s;animation-delay:-8s;">🔒</span>
+    <span class="ae" style="left:6%;font-size:20px;animation-duration:18s;animation-delay:-16s;">🏠</span>
+    <span class="ae" style="left:16%;font-size:26px;animation-duration:14s;animation-delay:-3s;">🏆</span>
+    <span class="ae" style="left:26%;font-size:22px;animation-duration:19s;animation-delay:-9s;">📊</span>
+    <span class="ae" style="left:36%;font-size:30px;animation-duration:15s;animation-delay:-1s;">💬</span>
+    <span class="ae" style="left:46%;font-size:24px;animation-duration:21s;animation-delay:-12s;">📖</span>
+    <span class="ae" style="left:56%;font-size:20px;animation-duration:17s;animation-delay:-6s;">📋</span>
+    <span class="ae" style="left:66%;font-size:28px;animation-duration:13s;animation-delay:-18s;">🧾</span>
+    <span class="ae" style="left:76%;font-size:24px;animation-duration:20s;animation-delay:-4s;">🔗</span>
+    <span class="ae" style="left:86%;font-size:26px;animation-duration:16s;animation-delay:-10s;">📹</span>
+    <span class="ae" style="left:96%;font-size:22px;animation-duration:14s;animation-delay:-15s;">📈</span>
+    <span class="ae" style="left:50%;font-size:32px;animation-duration:23s;animation-delay:-7s;">💡</span>
+  </div>
+  <div class="auth-glow-mask"></div>
   <div class="auth-box">
     <div class="auth-logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <div class="auth-sub">Sign in to your agency dashboard</div>
