@@ -1992,6 +1992,17 @@ async function initApp(user) {
   }
   hide('auth-screen');
   show('app');
+  // Land with the sidebar collapsed by default (both mobile and desktop) -- same
+  // classes toggleSidebar() sets, just applied once up front instead of on click.
+  const sidebarEl=document.getElementById('sidebar');
+  const mainEl=document.getElementById('main');
+  const toggleBtn=document.getElementById('sidebar-toggle');
+  if(sidebarEl&&mainEl&&toggleBtn){
+    sidebarEl.classList.add('collapsed');
+    mainEl.classList.add('expanded');
+    toggleBtn.classList.add('collapsed');
+    toggleBtn.textContent='☰';
+  }
   document.getElementById('user-email-display').textContent = profile.email;
   document.getElementById('user-role-display').textContent = profile.role;
   buildNav(profile.role);
