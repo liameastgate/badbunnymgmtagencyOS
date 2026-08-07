@@ -5672,14 +5672,36 @@ async function showModelSheet(model){
         ${sheet.pdf_url?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="clearSheetPdf()">🗑️ Remove PDF</button>`:''}
       </div>`:''}
       <div class="card">
-        <div class="card-title" style="margin-bottom:12px;">Model Info</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0;">Model Info</div>
+          ${isAdmin?`<button id="sheet-preview-toggle" class="btn btn-ghost btn-sm" onclick="toggleSheetPreview()">👁 Preview chatter view</button>`:''}
+        </div>
         ${isAdmin
           ?`<textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Paste onboarding response here — emoji format, pricing, personality, content offered etc.">${sheet.onboarding_text||''}</textarea>
-             <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip in the searchable/pop-out views.</div>`
+             <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip in the searchable/pop-out views.</div>
+             <div id="sheet-preview-area" style="display:none;"></div>`
           :renderSheetSearchable(sheet.onboarding_text,'sheet')}
       </div>
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
     </div>`;
+}
+
+// Lets an admin preview exactly what a chatter sees (search box + jump-chips) without
+// logging out — reads live from the textarea so it reflects unsaved edits too.
+function toggleSheetPreview(){
+  const ta=document.getElementById('sheet-onboarding');
+  const previewArea=document.getElementById('sheet-preview-area');
+  const btn=document.getElementById('sheet-preview-toggle');
+  if(!ta||!previewArea||!btn)return;
+  const showingPreview=previewArea.style.display!=='none';
+  if(showingPreview){
+    previewArea.style.display='none'; previewArea.innerHTML='';
+    ta.style.display=''; btn.textContent='👁 Preview chatter view';
+  } else {
+    previewArea.innerHTML=renderSheetSearchable(ta.value,'sheetpreview');
+    previewArea.style.display='block';
+    ta.style.display='none'; btn.textContent='✏️ Back to editing';
+  }
 }
 
 var _sheetPdfDataUrl=null;
