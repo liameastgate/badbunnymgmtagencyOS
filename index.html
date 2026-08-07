@@ -2515,22 +2515,39 @@ function resizeImageFile(file,cb){
 // the single-quoted onclick="...decodeURIComponent('...')..." attribute these get embedded
 // in -- belt-and-braces since neither base64 data: URIs nor Drive URLs normally contain one.
 function pdfUrlEscape(u){ return encodeURIComponent(u||'').replace(/'/g,'%27'); }
+// Shared by openPdfLink and togglePdfPreview — a data: URL PDF has to become a Blob object
+// URL before a browser will render it (in a new tab or an iframe); a normal http(s) URL
+// (e.g. a Google Drive link) is used as-is either way.
+function pdfSrcFor(url){
+  if(!url) return null;
+  if(!url.startsWith('data:')) return url;
+  const commaIdx=url.indexOf(',');
+  const meta=url.slice(0,commaIdx);
+  const b64=url.slice(commaIdx+1);
+  const mime=(meta.match(/data:([^;]+)/)||[])[1]||'application/pdf';
+  const byteChars=atob(b64);
+  const byteNumbers=new Array(byteChars.length);
+  for(let i=0;i<byteChars.length;i++) byteNumbers[i]=byteChars.charCodeAt(i);
+  const blob=new Blob([new Uint8Array(byteNumbers)],{type:mime});
+  return URL.createObjectURL(blob);
+}
 function openPdfLink(url){
   if(!url) return;
-  if(!url.startsWith('data:')){ window.open(url,'_blank'); return; }
+  try{ window.open(pdfSrcFor(url),'_blank'); }
+  catch(e){ alert('Could not open PDF: '+e.message); }
+}
+// Inline collapsible PDF preview — toggles an <iframe> into/out of the given container
+// instead of opening a new tab, so the PDF can be checked without leaving the page.
+function togglePdfPreview(containerId,url){
+  const el=document.getElementById(containerId); if(!el||!url)return;
+  if(el.style.display!=='none'&&el.innerHTML){ el.style.display='none'; el.innerHTML=''; return; }
   try{
-    const commaIdx=url.indexOf(',');
-    const meta=url.slice(0,commaIdx);
-    const b64=url.slice(commaIdx+1);
-    const mime=(meta.match(/data:([^;]+)/)||[])[1]||'application/pdf';
-    const byteChars=atob(b64);
-    const byteNumbers=new Array(byteChars.length);
-    for(let i=0;i<byteChars.length;i++) byteNumbers[i]=byteChars.charCodeAt(i);
-    const blob=new Blob([new Uint8Array(byteNumbers)],{type:mime});
-    const blobUrl=URL.createObjectURL(blob);
-    window.open(blobUrl,'_blank');
+    const src=pdfSrcFor(url);
+    el.innerHTML=`<iframe src="${src}" style="width:100%;height:600px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>`;
+    el.style.display='block';
   }catch(e){
-    alert('Could not open PDF: '+e.message);
+    el.innerHTML=`<div class="alert alert-error">Could not preview PDF: ${e.message}</div>`;
+    el.style.display='block';
   }
 }
 function readPdfFile(file,cb){
@@ -5653,10 +5670,12 @@ async function showModelSheet(model){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${sheet.onboarding_text?`<button onclick="popoutModelSheet('${model.id}')" class="btn btn-ghost" title="Open a small searchable window to keep open while chatting">🔎 Quick Reference</button>`:''}
-          ${sheet.pdf_url?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost">📄 View Info Sheet PDF</button>`:''}
+          ${sheet.pdf_url?`<button onclick="togglePdfPreview('sheet-pdf-preview',decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost">📄 Preview PDF</button>`:''}
+          ${sheet.pdf_url?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost" title="Open in a new tab">↗️</button>`:''}
           ${isAdmin?`<button class="btn btn-primary" onclick="saveSheet('${model.id}')">💾 Save</button>`:''}
         </div>
       </div>
+      <div id="sheet-pdf-preview" style="display:none;margin-bottom:16px;"></div>
       ${isAdmin?`
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">Info Sheet PDF</div>
@@ -5804,9 +5823,10 @@ function openSOP(id){
             <input type="file" id="sop-pdf-file" accept=".pdf,application/pdf" onchange="handleSopPdfFile(this.files[0])">
             <div id="sop-pdf-filename" style="font-size:11px;color:var(--text2);margin-top:4px;">${sop.pdf_url?'A PDF is attached — choose a new file to replace it.':''}</div>
           </div>
-          ${sop.pdf_url?`<div style="display:flex;gap:8px;"><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm">📄 View Attached PDF</button><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
+          ${sop.pdf_url?`<div style="display:flex;gap:8px;"><button onclick="togglePdfPreview('sop-pdf-preview',decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm">📄 Preview PDF</button><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm" title="Open in a new tab">↗️</button><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
         </div>`
-      :sop.pdf_url?`<div class="btn-row" style="margin-bottom:16px;"><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost">📄 View Attached PDF</button></div>`:''}
+      :sop.pdf_url?`<div class="btn-row" style="margin-bottom:16px;"><button onclick="togglePdfPreview('sop-pdf-preview',decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost">📄 Preview PDF</button><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost" title="Open in a new tab">↗️</button></div>`:''}
+    ${sop.pdf_url?`<div id="sop-pdf-preview" style="display:none;margin-bottom:16px;"></div>`:''}
     ${isAdmin
       ?`<textarea id="sop-content-input" style="width:100%;min-height:500px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:14px;line-height:1.8;color:var(--text);resize:vertical;font-family:inherit;">${(sop.content||'').replace(/</g,'&lt;')}</textarea>
          <div class="btn-row"><button class="btn btn-primary" onclick="saveSOP('${sop.id}')">💾 Save</button></div>`
