@@ -34,9 +34,12 @@
   #app { display: none; min-height: 100vh; }
   #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: width 0.2s, transform 0.2s; overflow: hidden; }
   #sidebar.collapsed { width: 0; transform: translateX(-220px); }
-  #sidebar-toggle { position: fixed; top: 14px; left: 228px; z-index: 200; background: var(--surface); border: 1px solid var(--border); color: var(--text2); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: left 0.2s; }
-  #sidebar-toggle.collapsed { left: 10px; }
-  #sidebar-toggle:hover { color: var(--text); border-color: var(--accent); }
+  /* Bigger, blue, high-contrast toggle button (was a small dark-gray-on-near-black square
+     that read as an unclear "box" on mobile) -- env(safe-area-inset-*) keeps it clear of
+     the iPhone notch/Dynamic Island instead of a flat px offset that ignores it. */
+  #sidebar-toggle { position: fixed; top: max(14px, env(safe-area-inset-top)); left: max(248px, calc(220px + env(safe-area-inset-left) + 14px)); z-index: 200; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: #fff; width: 42px; height: 42px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 16px rgba(30,79,255,0.4); transition: left 0.2s, transform 0.15s; }
+  #sidebar-toggle.collapsed { left: max(14px, env(safe-area-inset-left)); }
+  #sidebar-toggle:hover { transform: scale(1.06); }
   .logo { padding: 20px 18px 16px; font-weight: 800; font-size: 18px; color: #ffffff; letter-spacing: 1px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .logo::after { content: ''; display: block; width: 28px; height: 2px; background: var(--accent); margin-top: 8px; border-radius: 1px; }
   .logo span { display: block; font-size: 9px; color: var(--text2); letter-spacing: 3px; font-weight: 500; margin-top: 3px; text-transform: uppercase; }
