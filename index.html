@@ -6,6 +6,7 @@
 <title>AgencyOS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
   :root {
     --bg: #08080f; --surface: #0d0d1c; --surface2: #12121f;
@@ -91,6 +92,24 @@
   .badge.model { background: #0f1a2a; color: var(--blue); }
   .badge.traffic { background: #2a1a10; color: var(--yellow); }
   .badge.va { background: #1a2a2a; color: #67e8f9; }
+  .badge.unsigned { background: #2a2010; color: var(--yellow); }
+  .badge.signed { background: #0f2a1a; color: var(--green); }
+  /* Contract feature: a neat "printed page" look inside the app's dark theme, a signature
+     capture pad, and a clear visual distinction between filled-in vs still-blank fields so a
+     model always knows exactly what they're about to sign before they draw a signature. */
+  .contract-doc { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 36px 44px; max-width: 760px; margin: 0 auto; font-size: 13px; line-height: 1.85; color: var(--text); }
+  .contract-doc .cd-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 6px; }
+  .contract-doc .cd-sub { text-align: center; font-size: 11px; color: var(--text2); margin-bottom: 26px; }
+  .contract-doc .cd-parties { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 14px 0; margin-bottom: 22px; font-size: 13px; }
+  .contract-doc .cd-parties div { margin: 3px 0; }
+  .contract-doc h3 { font-size: 12px; font-weight: 800; color: var(--accent2); margin: 22px 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .contract-doc p { margin: 6px 0; white-space: pre-wrap; }
+  .contract-field { font-weight: 800; padding: 0 2px; border-bottom: 1px dashed var(--accent); }
+  .contract-field.blank { color: var(--yellow); border-bottom-color: var(--yellow); font-weight: 700; }
+  .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
+  .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
+  .sig-pad-wrap { border: 1px solid var(--border); border-radius: 8px; background: #fff; touch-action: none; overflow: hidden; }
+  .sig-pad-wrap canvas { display: block; width: 100%; height: 160px; cursor: crosshair; }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-group.full { grid-column: 1 / -1; }
@@ -1356,6 +1375,36 @@
       <div id="minv-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No invoices yet</p></div>
     </div><!-- close page-model-invoices -->
 
+    <!-- Contract -->
+    <div class="page" id="page-contract">
+      <!-- Staff hub: default-contract settings + a model picker. A 'model' role account
+           never sees this -- loadContract() hides it and drops them straight into their
+           own contract, same pattern as Chatting Script. -->
+      <div id="contract-hub">
+        <div class="page-title">Contract</div>
+        <div class="page-sub">The standard BadBunnyMGMT management agreement, per model</div>
+        <div class="card" style="max-width:680px;margin-bottom:20px;" id="contract-settings-card">
+          <div class="card-title">Default Contract Settings</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Applied to any contract that hasn't been signed yet. Changing this after a model has already signed does not touch their locked copy.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Governing State/Territory</label><input type="text" id="contract-gov-state" placeholder="e.g. New South Wales" onchange="saveContractSettings()"></div>
+            <div class="form-group"><label>Default Payment Method</label><input type="text" id="contract-payment-method" placeholder="e.g. Bank Transfer" onchange="saveContractSettings()"></div>
+            <div class="form-group full"><label>Payout Schedule Wording</label><input type="text" id="contract-payout-schedule" placeholder="e.g. within 10 business days following the end of each calendar month" onchange="saveContractSettings()"></div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" onclick="backfillContracts()" title="Creates a blank unsigned contract row for any model that doesn't have one yet (e.g. models added before this feature existed).">＋ Backfill Missing Contracts</button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Model</th><th>Status</th><th>Signed</th><th></th></tr></thead>
+          <tbody id="contract-model-list"></tbody>
+        </table></div>
+      </div>
+      <!-- Single-contract detail view (staff viewing any model's, or a model viewing their
+           own) -- rendered by openContractForModel(). -->
+      <div id="contract-detail" style="display:none;"></div>
+    </div>
+
     <!-- Expenses -->
     <div class="page" id="page-expenses">
       <div class="page-title">Expenses</div>
@@ -1969,6 +2018,7 @@ var NAV = [
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
+  { id: 'contract',   icon: '✍️', label: 'Contract',            roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
@@ -2081,6 +2131,7 @@ function navigate(page) {
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
+  if (page === 'contract') loadContract();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -4576,6 +4627,10 @@ async function saveModel(){
       // defaultSheetTemplate()) so there's always a consistent structure to fill in from
       // day one -- no more per-model PDF upload needed.
       await sb.from('model_sheets').insert({model_id:data.id, onboarding_text:defaultSheetTemplate()});
+      // Same auto-template pattern for the standard management agreement -- every new model
+      // starts with a blank, unsigned contract row so it's always ready to be filled in/signed,
+      // no separate "create contract" step needed.
+      await sb.from('model_contracts').insert({model_id:data.id, status:'unsigned', model_stage_name:data.name||'', model_split_pct:100-parseFloat(data.split||20), agency_split_pct:parseFloat(data.split||20), agreement_date:new Date().toISOString().split('T')[0]});
     }
   }
   if(error){ showAlert('model-alert','Could not save — '+error.message,'error'); return; }
@@ -6096,6 +6151,392 @@ async function deleteContentIdea(id){
   const{error,data}=await sb.from('content_ideas').delete().eq('id',id).select();
   if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_ideas table.');return;}
   STATE.contentIdeas=STATE.contentIdeas.filter(x=>x.id!==id); filterContentIdeas();
+}
+
+// ── Contract ─────────────────────────────────────────────────
+// The standard BadBunnyMGMT management agreement, rendered from a token-substituted template
+// (see defaultContractSections()) rather than a static PDF, so it's always shown "very neatly"
+// and consistently for every model. Admin/VA control the deal-term fields (split, payout
+// wording, governing state); the model can only ever touch their own legal name, stage name
+// and the date, then draw a signature -- matching the exact permission split Liam asked for.
+// Once signed the row is locked (status='signed', locked=true) and a real PDF snapshot
+// (signature baked in) is generated client-side via jsPDF and pushed to the 'contract-files'
+// Supabase Storage bucket, so there's a permanent, un-editable copy independent of this table.
+var _contractSettings={governing_state:'',payment_method:'',payout_schedule:''};
+
+function defaultContractSections(){
+  return [
+    {h:'1. Purpose', b:`The Model hereby engages the Manager to provide account management and promotional services for the Model's OnlyFans account, and the Manager agrees to provide such services under the terms set forth in this Agreement.`},
+    {h:'2. Services Provided by Manager', b:`The Manager shall:\na. Manage and operate the Model's OnlyFans account on behalf of the Model.\nb. Provide advertising and promotional services to drive traffic and subscribers to the account, at the Manager's expense.\nc. Oversee subscriber interactions, pay-per-view (PPV) messaging, promotions, and content posting strategy (subject to the Model's consent for content provided).\nd. Provide reporting of account performance and revenues to the Model.`},
+    {h:'3. Responsibilities of Model', b:`The Model shall:\na. Provide original content (photos, videos, and related materials) for use on the OnlyFans platform.\nb. Retain all intellectual property rights in their content.\nc. Cooperate with Manager in ensuring timely provision of content.\nd. Maintain compliance with OnlyFans' Terms of Service and applicable laws.`},
+    {h:'4. Revenue Sharing', b:`a. All revenues generated through the OnlyFans account ("Gross Profits") shall be split as follows: {{model_split_pct}}% to the Model / {{agency_split_pct}}% to the Management.\nb. Gross Profits are defined as revenues received from OnlyFans after OnlyFans' platform fees are deducted, but before any other expenses.\nc. Payouts will be made via {{payment_method}}, {{payout_schedule}}.\nd. This split reflects the agency's responsibility to cover the costs of traffic/marketing, providing around-the-clock chatting services, and time spent posting and managing the account.`},
+    {h:'5. Expenses', b:`a. Manager shall be solely responsible for covering advertising, marketing, and promotional expenses.\nb. The Model shall not be obligated to reimburse the Manager for such expenses.`},
+    {h:'6. Confidentiality', b:`a. The Manager agrees to maintain strict confidentiality regarding the Model's personal information, content, and account details, and shall not disclose such information to third parties without written consent, except as required by law.\nb. The Model agrees to maintain strict confidentiality regarding the Manager's proprietary business information, including but not limited to chatting scripts, standard operating procedures, pricing structures, marketing and traffic strategies, and the identities of the Manager's staff and chatters, and shall not disclose such information to any third party, including any current or future manager or agency, without the Manager's prior written consent.\nc. This confidentiality obligation survives termination of this Agreement.`},
+    {h:'7. Intellectual Property of Agency Materials', b:`All chatting scripts, standard operating procedures, marketing materials, growth strategies, and other work product created by or on behalf of the Manager in the course of providing services under this Agreement ("Agency Materials") are and remain the sole property of the Manager. The Model is granted a limited license to use the Agency Materials solely in connection with the Model's account during the term of this Agreement, and shall not copy, retain, distribute, or use the Agency Materials for any purpose after termination of this Agreement.`},
+    {h:'8. Non-Solicitation', b:`During the term of this Agreement and for twelve (12) months following its termination, the Model shall not directly or indirectly solicit, hire, engage, or encourage any chatter, staff member, or contractor of the Manager to leave their engagement with the Manager or to provide similar services to the Model or any competing agency.`},
+    {h:'9. Non-Disparagement', b:`Neither Party shall make any public statement, whether written or verbal, that is intended to or reasonably likely to disparage, defame, or harm the reputation or goodwill of the other Party, both during the term of this Agreement and after its termination. This clause does not limit either Party's right to make truthful statements required by law or in connection with a legal proceeding.`},
+    {h:'10. Representations & Warranties', b:`The Model represents and warrants that:\na. She is at least eighteen (18) years of age as of the date of this Agreement, and will remain the minimum legal age required under applicable law for the duration of this Agreement.\nb. She owns or holds all necessary rights, licenses, and consents (including from any other individuals appearing in her content) to provide the content supplied to the Manager for use under this Agreement.\nc. All information she provides to the Manager, including identity and age verification documents, is true, accurate, and not misleading.`},
+    {h:'11. Indemnification', b:`The Model agrees to indemnify and hold harmless the Manager from and against any claims, losses, damages, liabilities, and expenses (including reasonable legal fees) arising out of or related to any breach of the Model's representations and warranties under this Agreement, or the Model's violation of any applicable law or third party's rights.`},
+    {h:'12. Term & Termination', b:`a. This Agreement shall commence on the date first written above and shall remain in effect until terminated by either Party.\nb. Either Party may terminate this Agreement by providing thirty (30) days' written notice to the other Party.\nc. Upon termination, the Manager shall return full access and control of the OnlyFans account to the Model within five (5) business days of the effective date of termination, including all account credentials and any content or materials belonging to the Model.\nd. Sections 6 (Confidentiality), 7 (Intellectual Property of Agency Materials), 8 (Non-Solicitation), 9 (Non-Disparagement), and 11 (Indemnification) shall survive termination of this Agreement.`},
+    {h:'13. Independent Contractor Relationship', b:`The Parties agree that the Manager is acting as an independent contractor. Nothing in this Agreement shall be construed as creating a partnership, joint venture, or employer-employee relationship.`},
+    {h:'14. Governing Law & Dispute Resolution', b:`a. This Agreement shall be governed by and construed in accordance with the laws of {{governing_state}}, Australia.\nb. In the event of any dispute arising out of or relating to this Agreement, the Parties shall first attempt to resolve the dispute through good-faith negotiation. If the dispute cannot be resolved within thirty (30) days, either Party may pursue mediation before resorting to formal legal proceedings, which shall be brought exclusively in the courts of {{governing_state}}, Australia.`},
+    {h:'15. Entire Agreement', b:`This Agreement constitutes the entire understanding between the Parties and supersedes all prior agreements, whether written or oral.`}
+  ];
+}
+
+// Replaces {{token}} placeholders in already-escaped text with either the real value (styled
+// as filled-in) or a highlighted "[token name]" placeholder (styled as still-blank) -- this is
+// what makes the live preview visually obvious about what's missing before someone signs.
+function contractTokenMap(record){
+  return {
+    agreement_date: record.agreement_date?fmtDate(record.agreement_date):null,
+    model_legal_name: record.model_legal_name||null,
+    model_stage_name: record.model_stage_name||null,
+    model_split_pct: record.model_split_pct!=null?record.model_split_pct:null,
+    agency_split_pct: record.agency_split_pct!=null?record.agency_split_pct:null,
+    payment_method: record.payment_method||null,
+    payout_schedule: record.payout_schedule||null,
+    governing_state: record.governing_state||null,
+    signed_date: record.signed_date?fmtDate(record.signed_date):null
+  };
+}
+function contractSubst(escapedText,record){
+  const map=contractTokenMap(record);
+  return escapedText.replace(/\{\{(\w+)\}\}/g,(m,key)=>{
+    const val=map[key];
+    return (val!=null&&val!=='')
+      ? `<span class="contract-field">${escapeHtml(String(val))}</span>`
+      : `<span class="contract-field blank">[${key.replace(/_/g,' ')}]</span>`;
+  });
+}
+
+function buildContractDocHtml(record){
+  const partiesHtml=`
+    <div class="cd-parties">
+      <div>Manager: Liam Eastgate / BadBunnyMGMT</div>
+      <div>Model: ${contractSubst('{{model_legal_name}}',record)} ("${contractSubst('{{model_stage_name}}',record)}")</div>
+      <div>Collectively referred to as the "Parties."</div>
+    </div>`;
+  const bodyHtml=defaultContractSections().map(s=>
+    `<h3>${escapeHtml(s.h)}</h3><p>${contractSubst(escapeHtml(s.b),record).replace(/\n/g,'<br>')}</p>`
+  ).join('');
+  const signed=record.status==='signed';
+  const sigHtml=`
+    <div class="cd-sign-block">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.</div>
+      <div>Manager: Liam Eastgate &nbsp; Name: Liam Eastgate &nbsp; Date: ${contractSubst('{{agreement_date}}',record)}</div>
+      <div style="margin-top:4px;">Model: ${contractSubst('{{model_stage_name}}',record)} &nbsp; Name: ${contractSubst('{{model_legal_name}}',record)} &nbsp; Date: ${contractSubst('{{signed_date}}',record)}</div>
+      <div style="margin-top:10px;">Signature:<br>${signed&&record.signature_data?`<img src="${record.signature_data}">`:'<span class="contract-field blank">[awaiting signature]</span>'}</div>
+    </div>`;
+  return `<div class="contract-doc">
+    <div class="cd-title">BadBunnyMGMT Management Agreement</div>
+    <div class="cd-sub">${signed?'✅ Signed & Locked':'📝 Draft — not yet signed'}</div>
+    ${partiesHtml}${bodyHtml}${sigHtml}
+  </div>`;
+}
+
+async function loadContractSettings(){
+  const{data}=await sb.from('agency_settings').select('*').eq('key','contract_settings').single();
+  if(data) _contractSettings=data.value||{};
+  return _contractSettings;
+}
+async function saveContractSettings(){
+  _contractSettings={
+    governing_state:document.getElementById('contract-gov-state').value.trim(),
+    payment_method:document.getElementById('contract-payment-method').value.trim(),
+    payout_schedule:document.getElementById('contract-payout-schedule').value.trim()
+  };
+  await sb.from('agency_settings').upsert({key:'contract_settings',value:_contractSettings},{onConflict:'key'});
+}
+
+// Page dispatcher -- same staff-hub-vs-model-own-view split as loadModelSheets()/loadContentPerformance().
+async function loadContract(){
+  await loadContractSettings();
+  const isModelRole=STATE.profile?.role==='model';
+  const hub=document.getElementById('contract-hub');
+  const detail=document.getElementById('contract-detail');
+  if(isModelRole){
+    hub.style.display='none';
+    detail.style.display='block';
+    const mine=myOwnModel();
+    if(!mine){
+      detail.innerHTML='<div class="empty" style="margin-top:60px;"><div class="empty-icon">✍️</div><p>No model profile is linked to your account yet — ask an admin to set your login email on your model profile.</p></div>';
+      return;
+    }
+    await openContractForModel(mine.id);
+    return;
+  }
+  hub.style.display='block';
+  detail.style.display='none';
+  document.getElementById('contract-gov-state').value=_contractSettings.governing_state||'';
+  document.getElementById('contract-payment-method').value=_contractSettings.payment_method||'';
+  document.getElementById('contract-payout-schedule').value=_contractSettings.payout_schedule||'';
+  await renderContractHub();
+}
+
+async function renderContractHub(){
+  const{data}=await sb.from('model_contracts').select('*');
+  const byModel={}; (data||[]).forEach(r=>byModel[r.model_id]=r);
+  const tbody=document.getElementById('contract-model-list');
+  if(!tbody)return;
+  if(!STATE.models.length){ tbody.innerHTML='<tr><td colspan="4" style="color:var(--text2);">No models yet.</td></tr>'; return; }
+  tbody.innerHTML=STATE.models.map(m=>{
+    const c=byModel[m.id];
+    const signed=c?.status==='signed';
+    return `<tr>
+      <td>${escapeHtml(m.name)}</td>
+      <td><span class="badge ${signed?'signed':'unsigned'}">${signed?'Signed':'Unsigned'}</span></td>
+      <td>${signed&&c.signed_date?fmtDate(c.signed_date):'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="viewContractFromHub('${m.id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+function viewContractFromHub(modelId){
+  document.getElementById('contract-hub').style.display='none';
+  document.getElementById('contract-detail').style.display='block';
+  openContractForModel(modelId);
+}
+function backToContractHub(){
+  document.getElementById('contract-detail').style.display='none';
+  document.getElementById('contract-hub').style.display='block';
+  renderContractHub();
+}
+async function backfillContracts(){
+  const{data:existing}=await sb.from('model_contracts').select('model_id');
+  const have=new Set((existing||[]).map(r=>r.model_id));
+  const missing=STATE.models.filter(m=>!have.has(m.id));
+  if(!missing.length){ alert('Every model already has a contract row.'); return; }
+  const rows=missing.map(m=>({
+    model_id:m.id, status:'unsigned', model_stage_name:m.name||'',
+    governing_state:_contractSettings.governing_state||'', payment_method:_contractSettings.payment_method||'', payout_schedule:_contractSettings.payout_schedule||'',
+    model_split_pct:100-parseFloat(m.split||20), agency_split_pct:parseFloat(m.split||20),
+    agreement_date:new Date().toISOString().split('T')[0]
+  }));
+  const{error}=await sb.from('model_contracts').insert(rows);
+  if(error){ alert('Could not backfill — '+error.message); return; }
+  alert(`Created ${rows.length} contract(s).`);
+  renderContractHub();
+}
+
+window._currentContract=null;
+async function openContractForModel(modelId){
+  const model=STATE.models.find(m=>m.id===modelId);
+  if(!model)return;
+  let{data}=await sb.from('model_contracts').select('*').eq('model_id',modelId).single();
+  if(!data){
+    // Safety net for any model that predates this feature (or slipped through the backfill) --
+    // create its blank row on the fly the first time anyone opens it.
+    const seed={
+      model_id:modelId, status:'unsigned', model_stage_name:model.name||'',
+      governing_state:_contractSettings.governing_state||'', payment_method:_contractSettings.payment_method||'', payout_schedule:_contractSettings.payout_schedule||'',
+      model_split_pct:100-parseFloat(model.split||20), agency_split_pct:parseFloat(model.split||20),
+      agreement_date:new Date().toISOString().split('T')[0]
+    };
+    const{data:created}=await sb.from('model_contracts').insert(seed).select().single();
+    data=created||seed;
+  }
+  window._currentContract=data;
+  const role=STATE.profile?.role;
+  const isStaff=['admin','va'].includes(role);
+  const isOwnModel=role==='model'&&myOwnModel()?.id===modelId;
+  const locked=data.status==='signed';
+  const container=document.getElementById('contract-detail');
+  if(!container)return;
+
+  let adminPanel='';
+  if(isStaff){
+    adminPanel=`
+      <div class="card" style="max-width:760px;margin:0 auto 18px;">
+        <div class="card-title">Contract Fields ${locked?'<span class="badge signed" style="margin-left:8px;">Signed &amp; Locked</span>':''}</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Model Legal Name</label><input type="text" id="cf-model-legal-name" value="${escapeHtml(data.model_legal_name||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','model_legal_name',this.value)"></div>
+          <div class="form-group"><label>Model Stage Name</label><input type="text" id="cf-model-stage-name" value="${escapeHtml(data.model_stage_name||model.name||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','model_stage_name',this.value)"></div>
+          <div class="form-group"><label>Agreement Date</label><input type="date" id="cf-agreement-date" value="${data.agreement_date||''}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','agreement_date',this.value)"></div>
+          <div class="form-group"><label>Model Split %</label><input type="number" step="0.1" id="cf-model-split" value="${data.model_split_pct??''}" ${locked?'disabled':''} onchange="saveContractSplit('${modelId}',this.value)"></div>
+          <div class="form-group"><label>Agency Split %</label><input type="number" id="cf-agency-split" value="${data.agency_split_pct??''}" disabled></div>
+          <div class="form-group"><label>Governing State/Territory</label><input type="text" id="cf-gov-state" value="${escapeHtml(data.governing_state||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','governing_state',this.value)"></div>
+          <div class="form-group"><label>Payment Method</label><input type="text" id="cf-payment-method" value="${escapeHtml(data.payment_method||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payment_method',this.value)"></div>
+          <div class="form-group full"><label>Payout Schedule Wording</label><input type="text" id="cf-payout-schedule" value="${escapeHtml(data.payout_schedule||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payout_schedule',this.value)"></div>
+        </div>
+        ${locked
+          ?`<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              ${data.pdf_url?`<button class="btn btn-ghost btn-sm" onclick="togglePdfPreview('contract-pdf-view',decodeURIComponent('${pdfUrlEscape(data.pdf_url)}'))">📄 View Locked PDF</button>`:''}
+              <button class="btn btn-ghost btn-sm" onclick="resetContract('${modelId}')" style="color:var(--red);">↺ Reset &amp; Allow Re-signing</button>
+            </div>
+            <div id="contract-pdf-view" style="display:none;margin-top:12px;"></div>`
+          :`<div style="font-size:11px;color:var(--text2);margin-top:10px;">Leave Legal Name / Stage Name blank to let the model fill them in themselves — anything set here is still editable by the model until they sign.</div>`}
+      </div>`;
+  }
+
+  let modelPanel='';
+  if(isOwnModel&&!locked){
+    modelPanel=`
+      <div class="card" style="max-width:760px;margin:0 auto 18px;">
+        <div class="card-title">Your Details</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Full Legal Name</label><input type="text" id="cf-my-legal-name" value="${escapeHtml(data.model_legal_name||'')}" placeholder="As it appears on your ID" onchange="saveContractField('${modelId}','model_legal_name',this.value)"></div>
+          <div class="form-group"><label>Stage Name</label><input type="text" id="cf-my-stage-name" value="${escapeHtml(data.model_stage_name||model.name||'')}" onchange="saveContractField('${modelId}','model_stage_name',this.value)"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="cf-my-date" value="${data.signed_date||new Date().toISOString().split('T')[0]}" onchange="saveContractField('${modelId}','signed_date',this.value)"></div>
+        </div>
+      </div>
+      <div class="card" style="max-width:760px;margin:0 auto 18px;">
+        <div class="card-title">Sign</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;">Draw your signature below, then press Sign &amp; Submit. Once submitted this becomes a locked, permanent record — it cannot be edited afterward.</div>
+        <div class="sig-pad-wrap"><canvas id="sig-canvas"></canvas></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" onclick="clearSignature()">Clear</button>
+          <button class="btn btn-primary" onclick="submitSignedContract('${modelId}')">✍️ Sign &amp; Submit</button>
+        </div>
+        <div id="contract-alert" class="alert" style="margin-top:10px;"></div>
+      </div>`;
+  } else if(isOwnModel&&locked){
+    modelPanel=`<div class="alert alert-success" style="max-width:760px;margin:0 auto 18px;display:block;">You signed this agreement on ${fmtDate(data.signed_date)}. This is a locked record and can no longer be edited.</div>`;
+  }
+
+  container.innerHTML=`
+    <div style="max-width:760px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:22px;font-weight:800;">${escapeHtml(model.name)}'s Contract</div>
+      ${isStaff?`<button class="btn btn-ghost btn-sm" onclick="backToContractHub()">← Back to list</button>`:''}
+    </div>
+    ${adminPanel}${modelPanel}
+    <div id="contract-doc-container">${buildContractDocHtml(data)}</div>`;
+
+  if(isOwnModel&&!locked) initSignatureCanvas();
+}
+
+async function saveContractField(modelId,key,value){
+  await sb.from('model_contracts').update({[key]:value}).eq('model_id',modelId);
+  if(window._currentContract&&window._currentContract.model_id===modelId){
+    window._currentContract[key]=value;
+    const c=document.getElementById('contract-doc-container');
+    if(c) c.innerHTML=buildContractDocHtml(window._currentContract);
+  }
+}
+async function saveContractSplit(modelId,modelPct){
+  const mp=parseFloat(modelPct); if(isNaN(mp))return;
+  const ap=100-mp;
+  await sb.from('model_contracts').update({model_split_pct:mp,agency_split_pct:ap}).eq('model_id',modelId);
+  const apInput=document.getElementById('cf-agency-split'); if(apInput) apInput.value=ap;
+  if(window._currentContract){ window._currentContract.model_split_pct=mp; window._currentContract.agency_split_pct=ap; }
+  const c=document.getElementById('contract-doc-container');
+  if(c) c.innerHTML=buildContractDocHtml(window._currentContract);
+}
+async function resetContract(modelId){
+  if(!confirm('This unlocks the contract for editing and re-signing — the model will need to sign again. Continue?'))return;
+  await sb.from('model_contracts').update({status:'unsigned',locked:false}).eq('model_id',modelId);
+  openContractForModel(modelId);
+}
+
+// ── Signature capture ───────────────────────────────────────
+var _sigCtx=null,_sigDrawing=false,_sigHasStrokes=false;
+function initSignatureCanvas(){
+  const canvas=document.getElementById('sig-canvas');
+  if(!canvas)return;
+  const ratio=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=Math.max(rect.width,300)*ratio; canvas.height=160*ratio;
+  _sigCtx=canvas.getContext('2d');
+  _sigCtx.scale(ratio,ratio);
+  _sigCtx.lineWidth=2.2; _sigCtx.lineCap='round'; _sigCtx.strokeStyle='#111';
+  _sigHasStrokes=false;
+  const pos=e=>{
+    const r=canvas.getBoundingClientRect();
+    const t=e.touches?e.touches[0]:e;
+    return {x:t.clientX-r.left,y:t.clientY-r.top};
+  };
+  const start=e=>{ e.preventDefault(); _sigDrawing=true; const p=pos(e); _sigCtx.beginPath(); _sigCtx.moveTo(p.x,p.y); };
+  const move=e=>{ if(!_sigDrawing)return; e.preventDefault(); const p=pos(e); _sigCtx.lineTo(p.x,p.y); _sigCtx.stroke(); _sigHasStrokes=true; };
+  const end=()=>{ _sigDrawing=false; };
+  canvas.onmousedown=start; canvas.onmousemove=move; canvas.onmouseup=end; canvas.onmouseleave=end;
+  canvas.ontouchstart=start; canvas.ontouchmove=move; canvas.ontouchend=end;
+}
+function clearSignature(){
+  const canvas=document.getElementById('sig-canvas'); if(!canvas||!_sigCtx)return;
+  _sigCtx.clearRect(0,0,canvas.width,canvas.height);
+  _sigHasStrokes=false;
+}
+
+// ── Sign & lock ──────────────────────────────────────────────
+async function submitSignedContract(modelId){
+  const legalName=(document.getElementById('cf-my-legal-name')?.value||'').trim();
+  const stageName=(document.getElementById('cf-my-stage-name')?.value||'').trim();
+  const signedDate=document.getElementById('cf-my-date')?.value;
+  if(!legalName) return showAlert('contract-alert','Please enter your full legal name.','error');
+  if(!signedDate) return showAlert('contract-alert','Please confirm the date.','error');
+  if(!_sigHasStrokes) return showAlert('contract-alert','Please draw your signature first.','error');
+  const canvas=document.getElementById('sig-canvas');
+  const signatureData=canvas.toDataURL('image/png');
+
+  // Best-effort IP capture for the audit trail -- if this fails (offline, blocked, etc.) the
+  // signing still proceeds, it just won't have an IP attached.
+  let ip=null;
+  try{ const res=await fetch('https://api.ipify.org?format=json'); const j=await res.json(); ip=j.ip; }catch(e){}
+
+  const{data:current}=await sb.from('model_contracts').select('*').eq('model_id',modelId).single();
+  const record={...(current||{}), model_id:modelId, model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true};
+
+  const pdfUrl=await generateContractPdf(record);
+  const update={model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true, pdf_url:pdfUrl};
+  const{error}=await sb.from('model_contracts').update(update).eq('model_id',modelId);
+  if(error){ showAlert('contract-alert','Could not save — '+error.message,'error'); return; }
+  showAlert('contract-alert','Signed! This copy is now locked.','success');
+  setTimeout(()=>openContractForModel(modelId),1200);
+}
+
+// Renders a real PDF (times-roman body text + the signature image baked in) and uploads it to
+// the contract-files Storage bucket -- this is the "copy they can't edit stored somewhere".
+// A failure here (e.g. bucket/network issue) doesn't block the sign -- the DB row still locks,
+// pdf_url just stays null and can be regenerated later if needed.
+async function generateContractPdf(record){
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'pt',format:'a4'});
+    const marginX=54,maxW=487,lineH=15; let y=60;
+    const plain=t=>t.replace(/\{\{(\w+)\}\}/g,(m,k)=>{
+      const map=contractTokenMap(record);
+      const v=map[k];
+      return (v!=null&&v!=='')?String(v):`[${k.replace(/_/g,' ')}]`;
+    });
+    const addLine=text=>{
+      doc.splitTextToSize(text,maxW).forEach(l=>{
+        if(y>760){doc.addPage();y=50;}
+        doc.text(l,marginX,y); y+=lineH;
+      });
+    };
+    doc.setFont('times','bold'); doc.setFontSize(16);
+    doc.text('BadBunnyMGMT Management Agreement',297.5,y,{align:'center'}); y+=28;
+    doc.setFont('times','normal'); doc.setFontSize(10);
+    addLine('Manager: Liam Eastgate / BadBunnyMGMT');
+    addLine(`Model: ${plain('{{model_legal_name}}')} ("${plain('{{model_stage_name}}')}")`);
+    addLine('Collectively referred to as the "Parties."');
+    y+=6;
+    defaultContractSections().forEach(s=>{
+      if(y>740){doc.addPage();y=50;}
+      doc.setFont('times','bold'); addLine(s.h);
+      doc.setFont('times','normal');
+      plain(s.b).split('\n').forEach(line=>addLine(line));
+      y+=6;
+    });
+    if(y>700){doc.addPage();y=50;}
+    doc.setFont('times','bold'); addLine('IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.');
+    doc.setFont('times','normal');
+    addLine(`Manager: Liam Eastgate     Name: Liam Eastgate     Date: ${plain('{{agreement_date}}')}`);
+    addLine(`Model: ${plain('{{model_stage_name}}')}     Name: ${plain('{{model_legal_name}}')}     Date: ${plain('{{signed_date}}')}`);
+    if(record.signature_data){
+      y+=6; if(y>700){doc.addPage();y=50;}
+      doc.text('Signature:',marginX,y); y+=8;
+      try{ doc.addImage(record.signature_data,'PNG',marginX,y,180,55); }catch(e){}
+      y+=65;
+    }
+    if(record.signed_ip){ addLine(`Signed IP address: ${record.signed_ip}   Signed at: ${new Date().toISOString()}`); }
+
+    const blob=doc.output('blob');
+    const path=`contracts/${record.model_id}_${Date.now()}.pdf`;
+    const{error}=await sb.storage.from('contract-files').upload(path,blob,{upsert:true,contentType:'application/pdf'});
+    if(error){ console.error(error); return null; }
+    const{data}=sb.storage.from('contract-files').getPublicUrl(path);
+    return data.publicUrl;
+  }catch(e){ console.error('Contract PDF generation failed',e); return null; }
 }
 
 // ── Content Performance ─────────────────────────────────────
