@@ -1405,6 +1405,40 @@
       <div id="contract-detail" style="display:none;"></div>
     </div>
 
+    <!-- Traffic / Tracking Links -->
+    <div class="page" id="page-traffic">
+      <div class="page-title">Tracking Links</div>
+      <div class="page-sub">Per-model traffic link performance, uploaded from your tracking-link export</div>
+
+      <div class="card" style="max-width:900px;margin-bottom:20px;">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Model</label>
+            <select id="traffic-model-select" onchange="loadTrafficForModel(this.value)"></select>
+          </div>
+        </div>
+      </div>
+
+      <div id="traffic-content"></div>
+
+      <div class="card" style="max-width:900px;margin-top:24px;">
+        <div class="card-title">Upload Tracking Links Export</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">This is a full snapshot export (not a weekly delta) — uploading a new file for a model replaces their existing tracking-link data.</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Model this file belongs to</label>
+            <select id="traffic-upload-model"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>File (.xlsx or .csv)</label>
+          <input type="file" id="traffic-file-input" accept=".xlsx,.csv" onchange="handleTrafficFile(this.files[0])">
+        </div>
+        <div id="traffic-preview"></div>
+        <div id="traffic-upload-alert" class="alert" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
     <!-- Expenses -->
     <div class="page" id="page-expenses">
       <div class="page-title">Expenses</div>
@@ -2013,6 +2047,8 @@ var NAV = [
   { id: 'sheets',     icon: '📋', label: 'Chatting Script',      roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
   { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
 
+  { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
+
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
@@ -2132,6 +2168,7 @@ function navigate(page) {
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
   if (page === 'contract') loadContract();
+  if (page === 'traffic') loadTraffic();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -6539,6 +6576,236 @@ async function generateContractPdf(record){
     const{data}=sb.storage.from('contract-files').getPublicUrl(path);
     return data.publicUrl;
   }catch(e){ console.error('Contract PDF generation failed',e); return null; }
+}
+
+// ── Traffic / Tracking Links ────────────────────────────────
+// One row per tracking link, uploaded as a full per-model snapshot export (the Infloww-style
+// "Tracking link" report: Clicks/Subs/CVR/Earnings/EPC etc). Platform is inferred client-side
+// from the link name + Source/Tag columns since Source is often blank in the real export.
+// A fresh upload for a model REPLACES its existing snapshot rather than piling up duplicate
+// historical exports, because this report is lifetime totals per link, not a per-week delta
+// (unlike Weekly Reports / Chatter Performance, which are additive by week).
+var _parsedTrafficLinks=null;
+
+function trafficPlatform(name,source,tag){
+  const hay=((name||'')+' '+(source||'')+' '+(tag||'')).toLowerCase();
+  if(/tiktok/.test(hay)) return 'TikTok';
+  if(/twitter|\bx\b/.test(hay)) return 'X/Twitter';
+  if(/insta|\big\b/.test(hay)) return 'Instagram';
+  if(/snap/.test(hay)) return 'Snapchat';
+  if(/reddit/.test(hay)) return 'Reddit';
+  if(/chaturbate/.test(hay)) return 'Chaturbate';
+  if(/pornhub/.test(hay)) return 'PornHub';
+  if(/redgifs/.test(hay)) return 'RedGifs';
+  return 'Other';
+}
+function parseTrafficDate(raw){
+  if(!raw) return null;
+  const d=new Date(raw);
+  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+}
+
+function populateTrafficModelDropdowns(){
+  const opts=STATE.models.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  const viewSel=document.getElementById('traffic-model-select');
+  const uploadSel=document.getElementById('traffic-upload-model');
+  if(viewSel) viewSel.innerHTML=opts||'<option value="">No models yet</option>';
+  if(uploadSel) uploadSel.innerHTML=opts||'<option value="">No models yet</option>';
+}
+
+async function loadTraffic(){
+  populateTrafficModelDropdowns();
+  if(!STATE.models.length){
+    document.getElementById('traffic-content').innerHTML='<div class="empty" style="margin-top:40px;"><div class="empty-icon">🔗</div><p>Add a model first, then come back to upload their tracking links.</p></div>';
+    return;
+  }
+  let saved=null; try{ saved=localStorage.getItem('agencyos_traffic_model'); }catch(e){}
+  const initial = saved && STATE.models.some(m=>m.id===saved) ? saved : STATE.models[0].id;
+  const sel=document.getElementById('traffic-model-select');
+  if(sel) sel.value=initial;
+  await loadTrafficForModel(initial);
+}
+
+async function loadTrafficForModel(modelId){
+  if(!modelId)return;
+  try{ localStorage.setItem('agencyos_traffic_model', modelId); }catch(e){}
+  const{data}=await sb.from('tracking_links').select('*').eq('model_id',modelId).order('earnings',{ascending:false});
+  const rows=data||[];
+  const container=document.getElementById('traffic-content');
+  if(!container)return;
+  if(!rows.length){
+    container.innerHTML='<div class="empty" style="margin-top:40px;"><div class="empty-icon">🔗</div><p>No tracking links uploaded for this model yet — use the upload card below.</p></div>';
+    return;
+  }
+  container.innerHTML=renderTrafficRollup(rows)+renderTrafficTable(rows)+renderTrafficUploadMeta(rows,modelId);
+}
+
+function renderTrafficRollup(rows){
+  const agg={};
+  rows.forEach(r=>{
+    const p=r.platform||'Other';
+    if(!agg[p]) agg[p]={clicks:0,subs:0,earnings:0,spenders:0};
+    agg[p].clicks+=r.clicks||0; agg[p].subs+=r.subs||0; agg[p].earnings+=parseFloat(r.earnings||0); agg[p].spenders+=r.fans_who_spent||0;
+  });
+  const totalClicks=rows.reduce((s,r)=>s+(r.clicks||0),0);
+  const totalSubs=rows.reduce((s,r)=>s+(r.subs||0),0);
+  const totalEarnings=rows.reduce((s,r)=>s+parseFloat(r.earnings||0),0);
+  const totalSpenders=rows.reduce((s,r)=>s+(r.fans_who_spent||0),0);
+  const platforms=Object.entries(agg).sort((a,b)=>b[1].earnings-a[1].earnings);
+  return `
+    <div class="stats-grid" style="margin-bottom:20px;">
+      ${statCard('Total Clicks',totalClicks.toLocaleString(),'','')}
+      ${statCard('Total Subs',totalSubs.toLocaleString(),'','blue')}
+      ${statCard('Overall CVR',totalClicks?(totalSubs/totalClicks*100).toFixed(2)+'%':'0.00%','','purple')}
+      ${statCard('Total Earnings','$'+fmt(totalEarnings),'','green')}
+      ${statCard('Paying Fans',totalSpenders.toLocaleString(),'','green')}
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">By Platform</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Platform</th><th>Clicks</th><th>Subs</th><th>CVR</th><th>Earnings</th><th>EPC</th><th>Paying Fans</th></tr></thead>
+        <tbody>${platforms.map(([p,a])=>`
+          <tr>
+            <td><strong>${escapeHtml(p)}</strong></td>
+            <td>${a.clicks.toLocaleString()}</td>
+            <td>${a.subs.toLocaleString()}</td>
+            <td>${a.clicks?(a.subs/a.clicks*100).toFixed(2):'0.00'}%</td>
+            <td class="profit">$${fmt(a.earnings)}</td>
+            <td>$${a.clicks?(a.earnings/a.clicks).toFixed(2):'0.00'}</td>
+            <td>${a.spenders.toLocaleString()}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+}
+
+function renderTrafficTable(rows){
+  return `<div class="card">
+    <div class="card-title">All Links</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Link</th><th>Platform</th><th>Created</th><th>Clicks</th><th>Subs</th><th>CVR</th><th>Earnings</th><th>EPC</th><th>Paying Fans</th><th></th></tr></thead>
+      <tbody>${rows.map(r=>{
+        const flag=(r.clicks||0)===0?'No clicks':((r.subs||0)===0?'No conversions':'');
+        return `<tr>
+          <td>${escapeHtml(r.link_name)}</td>
+          <td>${escapeHtml(r.platform||'Other')}</td>
+          <td>${r.date_created?fmtDate(r.date_created):'—'}</td>
+          <td>${(r.clicks||0).toLocaleString()}</td>
+          <td>${(r.subs||0).toLocaleString()}</td>
+          <td>${parseFloat(r.subscription_cvr||0).toFixed(2)}%</td>
+          <td class="profit">$${fmt(r.earnings)}</td>
+          <td>$${fmt(r.epc)}</td>
+          <td>${(r.fans_who_spent||0).toLocaleString()}</td>
+          <td>${flag?`<span class="badge rejected" title="No traffic value from this link yet">${flag}</span>`:''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderTrafficUploadMeta(rows,modelId){
+  const isStaffDelete=['admin','va'].includes(STATE.profile?.role);
+  const uploadedAt=rows.reduce((max,r)=>(!max||new Date(r.uploaded_at)>new Date(max))?r.uploaded_at:max,null);
+  return `<div style="font-size:11px;color:var(--text2);margin-top:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <span>Last uploaded: ${uploadedAt?fmtDate(uploadedAt):'—'} · ${rows.length} link${rows.length!==1?'s':''}</span>
+    ${isStaffDelete?`<button class="btn btn-ghost btn-sm" onclick="deleteTrafficSnapshot('${modelId}')" style="color:var(--red);">🗑️ Delete This Model's Tracking Links</button>`:''}
+  </div>`;
+}
+
+async function deleteTrafficSnapshot(modelId){
+  if(!modelId)return;
+  if(!confirm('Delete all tracking link data for this model? This cannot be undone.'))return;
+  const{data,error}=await sb.from('tracking_links').delete().eq('model_id',modelId).select();
+  if(error){ alert('Could not delete — '+error.message); return; }
+  if(!data||!data.length){ alert('Nothing was deleted — you may be missing delete permission on the tracking_links table.'); return; }
+  loadTrafficForModel(modelId);
+}
+
+function handleTrafficFile(file){
+  if(!file)return;
+  const modelId=document.getElementById('traffic-upload-model').value;
+  if(!modelId) return showAlert('traffic-upload-alert','Pick which model this file belongs to first.','error');
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length) return showAlert('traffic-upload-alert','Could not parse file — no rows found.','error');
+      previewTrafficLinks(rows);
+    }catch(err){ showAlert('traffic-upload-alert','Could not parse file: '+err.message,'error'); }
+  };
+  r.readAsBinaryString(file);
+}
+
+function previewTrafficLinks(rows){
+  _parsedTrafficLinks=rows.map(row=>{
+    const linkName=String(getField(row,'Tracking link','Tracking Link')||'').trim();
+    const source=String(getField(row,'Source')||'').trim();
+    const tag=String(getField(row,'Tag')||'').trim();
+    return {
+      link_name:linkName,
+      date_created:parseTrafficDate(getField(row,'Date created','Date Created')),
+      platform:trafficPlatform(linkName,source,tag),
+      clicks:Math.round(cleanAmount(getField(row,'Clicks'))),
+      subs:Math.round(cleanAmount(getField(row,'Subs'))),
+      subscription_cvr:cleanAmount(getField(row,'Subscription CVR')),
+      promo_cost:cleanAmount(getField(row,'Promo cost','Promo Cost')),
+      earnings:cleanAmount(getField(row,'Earnings')),
+      spending_cvr:cleanAmount(getField(row,'Spending CVR')),
+      fans_who_spent:Math.round(cleanAmount(getField(row,'Fans who spent'))),
+      profit:cleanAmount(getField(row,'Profit')),
+      cpc:cleanAmount(getField(row,'CPC')),
+      epc:cleanAmount(getField(row,'EPC')),
+      cps:cleanAmount(getField(row,'CPS')),
+      aeps:cleanAmount(getField(row,'AEPS')),
+      roi:cleanAmount(getField(row,'ROI')),
+      source, tag,
+      list:String(getField(row,'List')||'').trim(),
+      link_last_updated:String(getField(row,'Last Updated','Last updated')||'').trim()
+    };
+  }).filter(r=>r.link_name);
+  renderTrafficPreview();
+}
+
+function renderTrafficPreview(){
+  const rows=_parsedTrafficLinks||[];
+  const modelName=STATE.models.find(m=>m.id===document.getElementById('traffic-upload-model').value)?.name||'';
+  if(!rows.length){ document.getElementById('traffic-preview').innerHTML='<div class="alert alert-error" style="display:block;margin-top:10px;">No usable rows found — check the file has a "Tracking link" column.</div>'; return; }
+  document.getElementById('traffic-preview').innerHTML=`
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title" style="color:var(--accent2);">${rows.length} link${rows.length!==1?'s':''} parsed for ${escapeHtml(modelName)}</div>
+      <div class="table-wrap"><table><thead><tr><th>Link</th><th>Platform</th><th>Clicks</th><th>Subs</th><th>Earnings</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr><td>${escapeHtml(r.link_name)}</td><td>${escapeHtml(r.platform)}</td><td>${r.clicks}</td><td>${r.subs}</td><td>$${fmt(r.earnings)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div style="margin-top:12px;"><button class="btn btn-primary" onclick="saveTrackingLinks()">💾 Save (replaces existing snapshot for this model)</button></div>
+    </div>`;
+}
+
+async function saveTrackingLinks(){
+  const rows=_parsedTrafficLinks||[];
+  if(!rows.length) return showAlert('traffic-upload-alert','No data to save.','error');
+  const modelId=document.getElementById('traffic-upload-model').value;
+  if(!modelId) return showAlert('traffic-upload-alert','Pick which model this file belongs to.','error');
+  const{count}=await sb.from('tracking_links').select('id',{count:'exact',head:true}).eq('model_id',modelId);
+  if(count){
+    const ok=confirm(`This model already has ${count} tracking link row(s) saved. Uploading again will replace all of them with this new file. Continue?`);
+    if(!ok)return;
+    const{data:delData,error:delError}=await sb.from('tracking_links').delete().eq('model_id',modelId).select('id');
+    if(delError){ showAlert('traffic-upload-alert','Could not clear the existing snapshot — '+delError.message,'error'); return; }
+    if(!delData||!delData.length){ showAlert('traffic-upload-alert',"Could not clear the existing snapshot (0 rows removed) — you may be missing delete permission.",'error'); return; }
+  }
+  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const payload=rows.map(r=>({...r, model_id:modelId, upload_batch_id:batchId}));
+  const{error}=await sb.from('tracking_links').insert(payload);
+  if(error) return showAlert('traffic-upload-alert',error.message,'error');
+  showAlert('traffic-upload-alert',`Saved ${payload.length} tracking link(s).`,'success');
+  _parsedTrafficLinks=null;
+  document.getElementById('traffic-preview').innerHTML='';
+  document.getElementById('traffic-file-input').value='';
+  const viewSel=document.getElementById('traffic-model-select');
+  if(viewSel){ viewSel.value=modelId; }
+  loadTrafficForModel(modelId);
 }
 
 // ── Content Performance ─────────────────────────────────────
