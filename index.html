@@ -5674,33 +5674,39 @@ async function showModelSheet(model){
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div class="card-title" style="margin-bottom:0;">Model Info</div>
-          ${isAdmin?`<button id="sheet-preview-toggle" class="btn btn-ghost btn-sm" onclick="toggleSheetPreview()">👁 Preview chatter view</button>`:''}
+          ${isAdmin?`<button id="sheet-mode-toggle" class="btn btn-ghost btn-sm" onclick="toggleSheetMode()">✏️ Edit</button>`:''}
         </div>
         ${isAdmin
-          ?`<textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Paste onboarding response here — emoji format, pricing, personality, content offered etc.">${sheet.onboarding_text||''}</textarea>
-             <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip in the searchable/pop-out views.</div>
-             <div id="sheet-preview-area" style="display:none;"></div>`
+          ?`<div id="sheet-preview-area">${renderSheetSearchable(sheet.onboarding_text,'sheet')}</div>
+             <div id="sheet-edit-area" style="display:none;">
+               <textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Paste onboarding response here — emoji format, pricing, personality, content offered etc.">${sheet.onboarding_text||''}</textarea>
+               <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip in the searchable/pop-out views. Click "👁 Preview" to see it as a chatter would — matches Save automatically.</div>
+             </div>`
           :renderSheetSearchable(sheet.onboarding_text,'sheet')}
       </div>
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
     </div>`;
 }
 
-// Lets an admin preview exactly what a chatter sees (search box + jump-chips) without
-// logging out — reads live from the textarea so it reflects unsaved edits too.
-function toggleSheetPreview(){
-  const ta=document.getElementById('sheet-onboarding');
+// Admins land on the same searchable view chatters see by default — editing is one click
+// away via "✏️ Edit". The textarea stays in the DOM at all times (just hidden while in
+// preview mode) so Save always has a value to read, even if the admin never opened it.
+function toggleSheetMode(){
   const previewArea=document.getElementById('sheet-preview-area');
-  const btn=document.getElementById('sheet-preview-toggle');
-  if(!ta||!previewArea||!btn)return;
-  const showingPreview=previewArea.style.display!=='none';
-  if(showingPreview){
-    previewArea.style.display='none'; previewArea.innerHTML='';
-    ta.style.display=''; btn.textContent='👁 Preview chatter view';
-  } else {
-    previewArea.innerHTML=renderSheetSearchable(ta.value,'sheetpreview');
+  const editArea=document.getElementById('sheet-edit-area');
+  const btn=document.getElementById('sheet-mode-toggle');
+  if(!previewArea||!editArea||!btn)return;
+  const inEditMode=editArea.style.display!=='none';
+  if(inEditMode){
+    const ta=document.getElementById('sheet-onboarding');
+    previewArea.innerHTML=renderSheetSearchable(ta?ta.value:'','sheet');
     previewArea.style.display='block';
-    ta.style.display='none'; btn.textContent='✏️ Back to editing';
+    editArea.style.display='none';
+    btn.textContent='✏️ Edit';
+  } else {
+    previewArea.style.display='none';
+    editArea.style.display='block';
+    btn.textContent='👁 Preview';
   }
 }
 
