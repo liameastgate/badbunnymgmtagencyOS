@@ -5501,6 +5501,117 @@ async function saveEditExpense(){
 }
 
 // ── Model Sheets ─────────────────────────────────────────────
+// ── Model Sheet quick-reference (search + jump-to-section + pop-out window) ──
+// Works on the existing free-text onboarding_text with zero format changes required;
+// admins can optionally start a line with "## " to make it a clickable quick-jump chip.
+function escapeHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function extractSheetSections(lines){
+  const headers=[];
+  lines.forEach((l,i)=>{ const t=l.trim(); if(t.startsWith('## ')&&t.length>3) headers.push({i,label:t.slice(3).trim()}); });
+  return headers;
+}
+var _sheetLinesStore={};
+function renderSheetSearchable(text,idPrefix){
+  const lines=(text||'').split('\n');
+  _sheetLinesStore[idPrefix]=lines;
+  const headers=extractSheetSections(lines);
+  const chipsHtml=headers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${headers.map(h=>`<span onclick="jumpSheetLine('${idPrefix}',${h.i})" style="cursor:pointer;font-size:11px;padding:3px 9px;border-radius:20px;background:var(--surface2);color:var(--blue);border:1px solid var(--border);">${escapeHtml(h.label)}</span>`).join('')}</div>`:'';
+  const linesHtml=lines.map((l,i)=>`<div class="sheet-line" id="${idPrefix}-line-${i}" style="padding:2px 0;">${escapeHtml(l)||'&nbsp;'}</div>`).join('');
+  return `
+    <div style="position:sticky;top:0;background:var(--surface);padding:8px 0 10px;margin-bottom:6px;z-index:2;">
+      ${chipsHtml}
+      <input type="text" id="${idPrefix}-search" placeholder="🔎 Search this sheet (e.g. pricing, boundaries, kinks)..." oninput="filterSheetLines('${idPrefix}')" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;outline:none;">
+      <div id="${idPrefix}-matchcount" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>
+    </div>
+    <div id="${idPrefix}-lines" style="white-space:pre-wrap;font-size:13px;line-height:1.9;color:var(--text);">${linesHtml}</div>`;
+}
+function filterSheetLines(idPrefix){
+  const input=document.getElementById(idPrefix+'-search'); if(!input)return;
+  const q=input.value.trim().toLowerCase();
+  const lines=_sheetLinesStore[idPrefix]||[];
+  let matches=0,first=null;
+  lines.forEach((raw,i)=>{
+    const el=document.getElementById(idPrefix+'-line-'+i); if(!el)return;
+    if(!q){ el.innerHTML=escapeHtml(raw)||'&nbsp;'; el.style.background=''; el.style.display=''; return; }
+    const idx=raw.toLowerCase().indexOf(q);
+    if(idx===-1){ el.style.display='none'; }
+    else{
+      el.style.display='';
+      el.style.background='rgba(255,214,0,0.18)';
+      el.innerHTML=escapeHtml(raw.slice(0,idx))+'<mark style="background:#ffd600;color:#000;border-radius:2px;">'+escapeHtml(raw.slice(idx,idx+q.length))+'</mark>'+escapeHtml(raw.slice(idx+q.length));
+      matches++; if(!first)first=el;
+    }
+  });
+  const cnt=document.getElementById(idPrefix+'-matchcount');
+  if(cnt) cnt.textContent=q?`${matches} matching line${matches===1?'':'s'}`:'';
+  if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function jumpSheetLine(idPrefix,i){
+  const input=document.getElementById(idPrefix+'-search'); if(input){input.value='';filterSheetLines(idPrefix);}
+  const el=document.getElementById(idPrefix+'-line-'+i);
+  if(el){ el.scrollIntoView({block:'center',behavior:'smooth'}); const orig=el.style.background; el.style.background='var(--surface2)'; setTimeout(()=>{el.style.background=orig;},1200); }
+}
+// Pop-out: a small standalone window a chatter can keep open alongside the actual
+// chat platform, so they're never stuck alt-tabbing to find pricing/boundaries mid-conversation.
+async function popoutModelSheet(modelId){
+  const model=STATE.models.find(m=>m.id===modelId); if(!model)return;
+  const{data:sheet}=await sb.from('model_sheets').select('onboarding_text').eq('model_id',modelId).single();
+  const text=(sheet&&sheet.onboarding_text)||'';
+  if(!text.trim()){ alert('No info sheet content yet for '+model.name+' — add one under Model Sheets first.'); return; }
+  const w=window.open('','sheetpopout_'+modelId,'width=440,height=760,resizable=yes,scrollbars=yes');
+  if(!w){ alert('Pop-out blocked — allow pop-ups for this site to use the quick-reference window.'); return; }
+  const lines=text.split('\n');
+  const headers=extractSheetSections(lines);
+  const chipsHtml=headers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${headers.map(h=>`<span onclick="jump(${h.i})" style="cursor:pointer;font-size:11px;padding:3px 9px;border-radius:20px;background:#1c2436;color:#8fb3ff;border:1px solid #2a3550;">${escapeHtml(h.label)}</span>`).join('')}</div>`:'';
+  const linesHtml=lines.map((l,i)=>`<div class="sl" id="l${i}" style="padding:2px 0;">${escapeHtml(l)||'&nbsp;'}</div>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(model.name)} — Quick Reference</title>
+<style>
+  body{margin:0;background:#0b0e14;color:#e8eaf0;font:13px/1.7 -apple-system,Segoe UI,Roboto,sans-serif;}
+  .wrap{padding:16px;}
+  .hd{font-size:17px;font-weight:800;margin-bottom:2px;}
+  .sub{font-size:11px;color:#8a92a6;margin-bottom:12px;}
+  input{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #263047;background:#141a26;color:#e8eaf0;font-size:13px;margin-bottom:6px;outline:none;}
+  .cnt{font-size:11px;color:#8a92a6;margin-bottom:10px;}
+  mark{background:#ffd600;color:#000;border-radius:2px;}
+</style></head>
+<body><div class="wrap">
+  <div class="hd">${escapeHtml(model.name)}</div>
+  <div class="sub">Quick reference — keep this window open while chatting</div>
+  ${chipsHtml}
+  <input id="q" placeholder="🔎 Search (pricing, boundaries, kinks...)" oninput="filt()">
+  <div class="cnt" id="cnt"></div>
+  <div id="lines">${linesHtml}</div>
+</div>
+<script>
+  var raw=${JSON.stringify(lines)};
+  function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function filt(){
+    var q=(document.getElementById('q').value||'').trim().toLowerCase();
+    var n=0, first=null;
+    raw.forEach(function(line,i){
+      var el=document.getElementById('l'+i); if(!el)return;
+      if(!q){ el.innerHTML=esc(line)||'&nbsp;'; el.style.background=''; el.style.display=''; return; }
+      var idx=line.toLowerCase().indexOf(q);
+      if(idx===-1){ el.style.display='none'; }
+      else{
+        el.style.display='';
+        el.style.background='rgba(255,214,0,0.15)';
+        el.innerHTML=esc(line.slice(0,idx))+'<mark>'+esc(line.slice(idx,idx+q.length))+'</mark>'+esc(line.slice(idx+q.length));
+        n++; if(!first)first=el;
+      }
+    });
+    document.getElementById('cnt').textContent = q ? (n+' matching line'+(n===1?'':'s')) : '';
+    if(first) first.scrollIntoView({block:'center'});
+  }
+  function jump(i){
+    document.getElementById('q').value=''; filt();
+    var el=document.getElementById('l'+i);
+    if(el){ el.scrollIntoView({block:'center'}); el.style.background='#2a3550'; setTimeout(function(){el.style.background='';},1200); }
+  }
+<\/script></body></html>`);
+  w.document.close();
+}
+
 async function loadModelSheets(){
   const addBtn=document.getElementById('sheets-add-model-btn');
   if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
@@ -5541,6 +5652,7 @@ async function showModelSheet(model){
           <div style="font-size:12px;color:var(--text2);margin-top:4px;">${model.of_account||''} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${model.split||20}% split</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${sheet.onboarding_text?`<button onclick="popoutModelSheet('${model.id}')" class="btn btn-ghost" title="Open a small searchable window to keep open while chatting">🔎 Quick Reference</button>`:''}
           ${sheet.pdf_url?`<button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost">📄 View Info Sheet PDF</button>`:''}
           ${isAdmin?`<button class="btn btn-primary" onclick="saveSheet('${model.id}')">💾 Save</button>`:''}
         </div>
@@ -5562,8 +5674,9 @@ async function showModelSheet(model){
       <div class="card">
         <div class="card-title" style="margin-bottom:12px;">Model Info</div>
         ${isAdmin
-          ?`<textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Paste onboarding response here — emoji format, pricing, personality, content offered etc.">${sheet.onboarding_text||''}</textarea>`
-          :`<div style="white-space:pre-wrap;font-size:13px;line-height:1.9;color:var(--text);">${sheet.onboarding_text||'No info added yet.'}</div>`}
+          ?`<textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Paste onboarding response here — emoji format, pricing, personality, content offered etc.">${sheet.onboarding_text||''}</textarea>
+             <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip in the searchable/pop-out views.</div>`
+          :renderSheetSearchable(sheet.onboarding_text,'sheet')}
       </div>
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
     </div>`;
