@@ -6335,6 +6335,18 @@ async function openContractForModel(modelId){
     const{data:created}=await sb.from('model_contracts').insert(seed).select().single();
     data=created||seed;
   }
+  // Revenue split always tracks Model Settings (models.split) rather than being a separate,
+  // driftable number -- so if it's changed there after the contract row was created, re-sync
+  // it here every time the contract is opened. Only while unsigned: once locked, the split is
+  // a permanent part of the record and must stay exactly what was actually signed.
+  if(data.status!=='signed'){
+    const liveModelPct=100-parseFloat(model.split||20);
+    const liveAgencyPct=parseFloat(model.split||20);
+    if(data.model_split_pct!==liveModelPct||data.agency_split_pct!==liveAgencyPct){
+      data.model_split_pct=liveModelPct; data.agency_split_pct=liveAgencyPct;
+      await sb.from('model_contracts').update({model_split_pct:liveModelPct,agency_split_pct:liveAgencyPct}).eq('model_id',modelId);
+    }
+  }
   window._currentContract=data;
   const role=STATE.profile?.role;
   const isStaff=['admin','va'].includes(role);
@@ -6352,8 +6364,7 @@ async function openContractForModel(modelId){
           <div class="form-group"><label>Model Legal Name</label><input type="text" id="cf-model-legal-name" value="${escapeHtml(data.model_legal_name||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','model_legal_name',this.value)"></div>
           <div class="form-group"><label>Model Stage Name</label><input type="text" id="cf-model-stage-name" value="${escapeHtml(data.model_stage_name||model.name||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','model_stage_name',this.value)"></div>
           <div class="form-group"><label>Agreement Date</label><input type="date" id="cf-agreement-date" value="${data.agreement_date||''}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','agreement_date',this.value)"></div>
-          <div class="form-group"><label>Model Split %</label><input type="number" step="0.1" id="cf-model-split" value="${data.model_split_pct??''}" ${locked?'disabled':''} onchange="saveContractSplit('${modelId}',this.value)"></div>
-          <div class="form-group"><label>Agency Split %</label><input type="number" id="cf-agency-split" value="${data.agency_split_pct??''}" disabled></div>
+          <div class="form-group"><label>Revenue Split</label><input type="text" value="${data.model_split_pct??'—'}% Model / ${data.agency_split_pct??'—'}% Agency" disabled title="Pulled live from this model's split in Model Settings — change it there, not here."></div>
           <div class="form-group"><label>Governing State/Territory</label><input type="text" id="cf-gov-state" value="${escapeHtml(data.governing_state||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','governing_state',this.value)"></div>
           <div class="form-group"><label>Payment Method</label><input type="text" id="cf-payment-method" value="${escapeHtml(data.payment_method||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payment_method',this.value)"></div>
           <div class="form-group full"><label>Payout Schedule Wording</label><input type="text" id="cf-payout-schedule" value="${escapeHtml(data.payout_schedule||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payout_schedule',this.value)"></div>
@@ -6364,7 +6375,7 @@ async function openContractForModel(modelId){
               <button class="btn btn-ghost btn-sm" onclick="resetContract('${modelId}')" style="color:var(--red);">↺ Reset &amp; Allow Re-signing</button>
             </div>
             <div id="contract-pdf-view" style="display:none;margin-top:12px;"></div>`
-          :`<div style="font-size:11px;color:var(--text2);margin-top:10px;">Leave Legal Name / Stage Name blank to let the model fill them in themselves — anything set here is still editable by the model until they sign.</div>`}
+          :`<div style="font-size:11px;color:var(--text2);margin-top:10px;">Leave Legal Name / Stage Name blank to let the model fill them in themselves — anything set here is still editable by the model until they sign. Revenue Split updates automatically if you change the model's split in Model Settings.</div>`}
       </div>`;
   }
 
@@ -6411,15 +6422,6 @@ async function saveContractField(modelId,key,value){
     const c=document.getElementById('contract-doc-container');
     if(c) c.innerHTML=buildContractDocHtml(window._currentContract);
   }
-}
-async function saveContractSplit(modelId,modelPct){
-  const mp=parseFloat(modelPct); if(isNaN(mp))return;
-  const ap=100-mp;
-  await sb.from('model_contracts').update({model_split_pct:mp,agency_split_pct:ap}).eq('model_id',modelId);
-  const apInput=document.getElementById('cf-agency-split'); if(apInput) apInput.value=ap;
-  if(window._currentContract){ window._currentContract.model_split_pct=mp; window._currentContract.agency_split_pct=ap; }
-  const c=document.getElementById('contract-doc-container');
-  if(c) c.innerHTML=buildContractDocHtml(window._currentContract);
 }
 async function resetContract(modelId){
   if(!confirm('This unlocks the contract for editing and re-signing — the model will need to sign again. Continue?'))return;
