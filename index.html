@@ -138,9 +138,11 @@
   .mh-title { position: relative; z-index: 1; font-size: clamp(28px,4vw,42px); font-weight: 800; letter-spacing: -0.02em; color: #fff; margin-bottom: 10px; }
   .mh-title .accent { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .mh-sub { position: relative; z-index: 1; font-size: 14px; color: var(--text2); max-width: 460px; margin: 0 auto 40px; line-height: 1.6; }
-  .mh-cards { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 760px; }
+  .mh-cards { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 980px; }
   .mh-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; width: 168px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; animation: mh-float 4s ease-in-out infinite; }
-  .mh-card:nth-child(2) { animation-delay: 0.4s; } .mh-card:nth-child(3) { animation-delay: 0.8s; } .mh-card:nth-child(4) { animation-delay: 1.2s; } .mh-card:nth-child(5) { animation-delay: 1.6s; } .mh-card:nth-child(6) { animation-delay: 2s; }
+  /* Repeating 5-phase stagger (instead of a fixed nth-child list) so the float animation
+     still looks staggered no matter how many cards a given user's permissions produce. */
+  .mh-card:nth-child(5n+2) { animation-delay: 0.4s; } .mh-card:nth-child(5n+3) { animation-delay: 0.8s; } .mh-card:nth-child(5n+4) { animation-delay: 1.2s; } .mh-card:nth-child(5n+5) { animation-delay: 1.6s; } .mh-card:nth-child(5n+6) { animation-delay: 2s; }
   @keyframes mh-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   .mh-card:hover { transform: translateY(-4px); border-color: rgba(30,79,255,0.5); box-shadow: 0 8px 32px rgba(30,79,255,0.28); }
   .mh-card-icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 18px; margin: 0 auto 12px; box-shadow: 0 4px 16px rgba(30,79,255,0.4); }
@@ -158,18 +160,14 @@
   .guide-back { font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; margin-bottom: 16px; display: inline-block; }
   .guide-back:hover { color: var(--accent2); }
 
-  /* Chatting Script hub — one big tappable tile per model, icon-forward per Liam's spec
-     (as opposed to .guide-hub-card's wider description-card layout). */
-  .sheet-hub-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap: 14px; max-width: 900px; }
-  .sheet-hub-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 16px; cursor: pointer; text-align: center; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
-  .sheet-hub-card:hover { transform: translateY(-3px); border-color: rgba(30,79,255,0.5); box-shadow: 0 8px 32px rgba(30,79,255,0.22); }
-  .sheet-hub-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #fff; margin: 0 auto 12px; box-shadow: 0 4px 16px rgba(30,79,255,0.35); }
-  .sheet-hub-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 3px; }
-  .sheet-hub-sub { font-size: 11px; color: var(--text2); }
-
-  /* Full-screen chatting-script overlay — covers the sidebar too (z-index above #sidebar's
-     100, below .modal-overlay's 1000) so the model/chatter can focus on the script alone. */
-  #sheets-fullscreen.active { position: fixed; inset: 0; z-index: 500; background: var(--bg); overflow-y: auto; padding: 28px 32px 60px; }
+  /* Chatting Script sidebar — models stacked top to bottom (SOPs-page pattern), each a
+     compact row with a small avatar, rather than the wide description-card style of
+     .guide-hub-card. */
+  .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
+  .sheet-side-item:hover { background: var(--surface2); }
+  .sheet-side-item.active { background: rgba(30,79,255,0.14); border-color: rgba(30,79,255,0.4); }
+  .sheet-side-avatar { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; }
+  .sheet-side-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sheet-zoom-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
   .sheet-zoom-btn:hover { color: var(--text); border-color: var(--accent2); }
 
@@ -1148,7 +1146,7 @@
           <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openModal('model-modal')">➕ Add Model</button></div>
           <div class="card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Niche</th><th>Split %</th><th>Chatters</th><th>Sheet</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>OF Account</th><th>Status</th><th>Type</th><th>Niche</th><th title="The agency's cut — the model keeps the rest">Agency Split %</th><th>Chatters</th><th>Sheet</th><th></th></tr></thead>
               <tbody id="models-body"></tbody>
             </table></div>
             <div id="models-empty" class="empty" style="display:none;"><div class="empty-icon">👤</div><p>No models added yet</p></div>
@@ -1274,7 +1272,7 @@
           <div id="invoices-sync-alert" class="alert" style="margin-bottom:12px;"></div>
           <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">Approving an invoice automatically logs it as a Staff expense for that week and moves it down to Processed; rejecting or marking it Processing moves it down too.</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>From</th><th>Role</th><th title="The Monday the invoiced week starts">Week Starting</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-pending-body"></tbody>
           </table></div>
           <div id="invoices-pending-empty" class="empty" style="display:none;"><div class="empty-icon">🎉</div><p>Nothing waiting on review</p></div>
@@ -1286,7 +1284,7 @@
             <button class="btn btn-sm btn-ghost" onclick="backfillInvoiceExpenseSync()" title="Catches any already-approved invoices from before this sync existed">🔄 Sync Approved → Expenses</button>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th>From</th><th>Role</th><th>Week</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>From</th><th>Role</th><th title="The Monday the invoiced week starts">Week Starting</th><th>Salary</th><th>Commission</th><th>Total</th><th>Invoice</th><th>Chatter</th><th>Labels</th><th>Status</th><th></th></tr></thead>
             <tbody id="invoices-body"></tbody>
           </table></div>
           <div id="invoices-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>Nothing processed yet</p></div>
@@ -1295,7 +1293,7 @@
         <div class="card">
           <div class="card-title">My Invoices</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Week</th><th>Amount</th><th>Chatter</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+            <thead><tr><th title="The Monday the invoiced week starts">Week Starting</th><th>Amount</th><th>Chatter</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
             <tbody id="my-invoices-body"></tbody>
           </table></div>
           <div id="my-invoices-empty" class="empty" style="display:none;"><div class="empty-icon">📄</div><p>No invoices yet</p></div>
@@ -1418,20 +1416,22 @@
 
     <!-- Chatting Script -->
     <div class="page" id="page-sheets">
-      <!-- Hub: search + one big tile per model. Model-role users never see this -- they're
-           dropped straight into their own sheet in renderSheetsHub()/loadModelSheets(). -->
-      <div id="sheets-hub">
-        <div class="page-title">Chatting Script</div>
-        <div class="page-sub">Click a model to open their full chatting script</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;max-width:900px;margin-bottom:18px;">
-          <input type="text" id="sheets-search" placeholder="🔎 Search models..." oninput="filterSheetsHub()" style="flex:1;min-width:220px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;outline:none;">
-          <button id="sheets-add-model-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openModal('model-modal')">➕ Add Model</button>
+      <div style="display:flex;gap:0;height:calc(100vh - 120px);overflow:hidden;border:1px solid var(--border);border-radius:8px;">
+        <!-- Model sidebar: models stacked top to bottom, search on top. A 'model' role
+             account never sees this -- loadModelSheets() hides it and drops them straight
+             into their own script in the content pane, full width. -->
+        <div id="sheets-sidebar" style="width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:14px 12px 10px;border-bottom:1px solid var(--border);">
+            <input type="text" id="sheets-search" placeholder="🔎 Search models..." oninput="renderSheetsSidebar()" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;outline:none;margin-bottom:8px;">
+            <button id="sheets-add-model-btn" class="btn btn-primary btn-sm" style="width:100%;display:none;" onclick="openModal('model-modal')">➕ Add Model</button>
+          </div>
+          <div id="sheets-model-list" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;"></div>
         </div>
-        <div class="sheet-hub-grid" id="sheets-model-grid"></div>
-        <div id="sheets-hub-empty" class="empty" style="display:none;"><div class="empty-icon">📋</div><p>No models added yet — use + Add Model to create one</p></div>
+        <!-- Script content -->
+        <div style="flex:1;overflow-y:auto;padding:28px 32px;" id="sheets-content">
+          <div class="empty" style="margin-top:80px;"><div class="empty-icon">📋</div><p>Select a model to view their chatting script</p></div>
+        </div>
       </div>
-      <!-- Full-screen single-model view, toggled to .active via openSheetFullscreen(). -->
-      <div id="sheets-fullscreen"></div>
     </div>
 
     <!-- Chatting SOPs -->
@@ -1663,6 +1663,16 @@
   </div>
 </div>
 
+<!-- Generic file-preview modal — reused by invoiceRowHtml()/invoice tables for the same
+     inline-viewing UX Chatting Script uses (togglePdfPreview), just in a modal since a
+     <table> row doesn't have anywhere to expand an iframe into. -->
+<div class="modal-overlay" id="file-preview-modal">
+  <div class="modal" style="width:820px;max-width:95vw;">
+    <div class="modal-title">Attachment<button class="modal-close" onclick="closeModal('file-preview-modal')">✕</button></div>
+    <div id="file-preview-modal-body"></div>
+  </div>
+</div>
+
 <!-- Model Modal -->
 <div class="modal-overlay" id="model-modal">
   <div class="modal">
@@ -1673,7 +1683,7 @@
       <div class="form-group"><label>OF Account Handle</label><input type="text" id="model-of" placeholder="@handle"></div>
       <div class="form-group"><label>Status</label><select id="model-platform"><option>Active</option><option>Onboarding</option><option>Paused</option><option>Offboarded</option></select></div>
       <div class="form-group"><label>Management Type</label><select id="model-mgmt-type"><option value="full_scale">Full Scale</option><option value="chatting">Chatting</option></select></div>
-      <div class="form-group"><label>Model Split %</label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
+      <div class="form-group"><label>Agency Split % <span style="font-weight:400;color:var(--text2);">(agency's cut — model keeps the rest)</span></label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
       <div class="form-group"><label>Niche</label><input type="text" id="model-niche" placeholder="e.g. Fitness, Cosplay, Gaming" list="niche-suggestions"></div>
       <datalist id="niche-suggestions"></datalist>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
@@ -2047,23 +2057,36 @@ function renderModelHome(){
   const welcomeEl=document.getElementById('mh-welcome');
   if(welcomeEl){
     const mine=STATE.models.find(m=>(m.email||'').toLowerCase()===(STATE.profile?.email||'').toLowerCase());
-    const firstName=mine?.name ? String(mine.name).trim().split(/\s+/)[0] : '';
+    const firstName=mine?.name ? String(mine.name).trim().split(/\s+/)[0] : (STATE.profile?.name?String(STATE.profile.name).trim().split(/\s+/)[0]:'');
     welcomeEl.innerHTML = firstName ? `Welcome, <span class="accent">${firstName}</span>` : 'Welcome';
   }
   const cardsEl=document.getElementById('mh-cards');
   if(!cardsEl) return;
-  const shortcuts=[
-    { id:'content',          icon:'📹', label:'Content Orders',       desc:'Submit & track your content' },
-    { id:'contentperf',      icon:'📈', label:'Content Performance',  desc:'See how your posts are doing' },
-    { id:'ideas',             icon:'💡', label:'Content Ideas',        desc:'Fresh ideas for your niche' },
-    { id:'guides',            icon:'📚', label:'Guides',               desc:'Drip sets & weekly requirements' },
-    { id:'model-invoices',    icon:'💵', label:'My Invoices',          desc:'See your weekly payouts' },
-  ];
+  // Friendlier one-line blurbs for the handful of pages a model most commonly lands here
+  // for; everything else falls back to its NAV section name, so a brand new page never
+  // needs an entry added here to show up correctly.
+  const DESCS={
+    content:'Submit & track your content', contentperf:'See how your posts are doing',
+    ideas:'Fresh ideas for your niche', guides:'Drip sets & weekly requirements',
+    'model-invoices':'See your weekly payouts', sheets:'View or edit your chatting script'
+  };
+  const role=STATE.profile?.role;
+  const customPerms=STATE.profile?.permissions;
+  const isOwner=(STATE.profile?.email||'').trim().toLowerCase()==='liameastgate@hotmail.com';
+  // Same permission check buildNav()/pageAllowed() use -- this is what keeps the grid
+  // "exclusive to them": each user only ever sees a card for a page their own role (or
+  // their custom Team Access permission overrides) actually grants, nothing hardcoded or
+  // shared across accounts. Excludes this page itself (no point linking to where you are).
+  const shortcuts=NAV.filter(item=>{
+    if(item.id==='model-home'||item.id==='overview') return false;
+    if(item.secret) return isOwner;
+    return customPerms ? customPerms.includes(item.id) : item.roles.includes(role);
+  }).map(item=>({id:item.id, icon:item.icon, label:item.label, desc:DESCS[item.id]||item.section}));
   cardsEl.innerHTML=shortcuts.map(s=>`
     <div class="mh-card" onclick="navigate('${s.id}')">
       <div class="mh-card-icon">${s.icon}</div>
-      <div class="mh-card-label">${s.label}</div>
-      <div class="mh-card-desc">${s.desc}</div>
+      <div class="mh-card-label">${escapeHtml(s.label)}</div>
+      <div class="mh-card-desc">${escapeHtml(s.desc||'')}</div>
     </div>`).join('');
 }
 
@@ -2565,6 +2588,21 @@ function togglePdfPreview(containerId,url){
     el.innerHTML=`<div class="alert alert-error">Could not preview PDF: ${e.message}</div>`;
     el.style.display='block';
   }
+}
+// Same idea as togglePdfPreview but in a modal -- used from table rows (invoices) where
+// there's no natural place to expand an inline panel. invoice_file_url is a real Supabase
+// Storage URL (not a data: URI, unlike model_sheets.pdf_url), and can be a PDF or an image
+// (the upload input accepts both) -- pdfSrcFor()/an <iframe> handle either fine either way.
+function previewFileInModal(url){
+  const body=document.getElementById('file-preview-modal-body');
+  if(!body||!url)return;
+  try{
+    const src=pdfSrcFor(url);
+    body.innerHTML=`<iframe src="${src}" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>`;
+  }catch(e){
+    body.innerHTML=`<div class="alert alert-error">Could not preview file: ${e.message}</div>`;
+  }
+  openModal('file-preview-modal');
 }
 function readPdfFile(file,cb){
   if(!file)return;
@@ -3996,7 +4034,7 @@ function renderReportPreview(){
   const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
   const modelOptions=(m,selectedId)=>`<option value=""${!selectedId?' selected':''}>— Unmatched (20% default) —</option>`+
     STATE.models.map(mo=>`<option value="${mo.id}"${mo.id===selectedId?' selected':''}>${mo.name}</option>`).join('');
-  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} accounts · ${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}</div><div class="table-wrap"><table><thead><tr><th>Creator (from CSV)</th><th>Matched Model</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th>Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} accounts · ${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}</div><div class="table-wrap"><table><thead><tr><th>Creator (from CSV)</th><th>Matched Model</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th title="The agency's cut">Agency Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
   parsed.forEach((r,i)=>{
     const matchBadge = r.match_type==='exact'?'':
       r.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
@@ -4441,7 +4479,7 @@ function renderModels(){
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Total Models</span><strong>${STATE.models.length}</strong></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Full Scale</span><strong style="color:var(--accent2);">${fullScale}</strong></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);font-size:12px;">Chatting Only</span><strong style="color:var(--blue);">${chatting}</strong></div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text2);font-size:12px;">Avg Split %</span><strong>${STATE.models.length?(STATE.models.reduce((s,m)=>s+parseFloat(m.split||20),0)/STATE.models.length).toFixed(1):0}%</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text2);font-size:12px;" title="The agency's cut — models keep the rest">Avg Agency Split %</span><strong>${STATE.models.length?(STATE.models.reduce((s,m)=>s+parseFloat(m.split||20),0)/STATE.models.length).toFixed(1):0}%</strong></div>
       </div>`;
   }
 }
@@ -4904,7 +4942,7 @@ function invoiceRowHtml(inv){
     <td>$${fmt(inv.salary_amount||0)}</td>
     <td>$${fmt(inv.commission_amount||0)}</td>
     <td><strong>$${fmt(inv.amount)}</strong></td>
-    <td>${inv.invoice_file_url?`<a href="${inv.invoice_file_url}" target="_blank" class="btn btn-sm btn-ghost">📄 View</a>`:'—'}</td>
+    <td>${inv.invoice_file_url?`<button onclick="previewFileInModal(decodeURIComponent('${pdfUrlEscape(inv.invoice_file_url)}'))" class="btn btn-sm btn-ghost">👁 Preview</button>`:'—'}</td>
     <td style="font-size:12px;color:var(--text2);max-width:120px;">${inv.description||'—'}</td>
     <td style="font-size:12px;color:var(--text2);max-width:150px;">${inv.admin_notes||'—'}</td>
     <td><span class="badge ${inv.status}">${inv.status}</span></td>
@@ -5681,50 +5719,44 @@ function defaultSheetTemplate(){
 // reading another model's row server-side -- this is just the UX to match.
 async function loadModelSheets(){
   const isModelRole=STATE.profile?.role==='model';
-  const hub=document.getElementById('sheets-hub');
-  const full=document.getElementById('sheets-fullscreen');
+  const sidebar=document.getElementById('sheets-sidebar');
   if(isModelRole){
-    hub.style.display='none';
+    sidebar.style.display='none';
     const mine=myOwnModel();
     if(!mine){
-      full.className='active';
-      full.innerHTML='<div class="empty" style="margin-top:60px;"><div class="empty-icon">📋</div><p>No model profile is linked to your account yet — ask an admin to set your login email on your model profile.</p></div>';
+      document.getElementById('sheets-content').innerHTML='<div class="empty" style="margin-top:60px;"><div class="empty-icon">📋</div><p>No model profile is linked to your account yet — ask an admin to set your login email on your model profile.</p></div>';
       return;
     }
-    await openSheetFullscreen(mine,{showBack:false});
+    await openSheetForModel(mine);
     return;
   }
-  hub.style.display='block';
-  full.className=''; full.innerHTML='';
+  sidebar.style.display='flex';
   const addBtn=document.getElementById('sheets-add-model-btn');
   if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
-  renderSheetsHubGrid();
+  renderSheetsSidebar();
 }
 
-function renderSheetsHubGrid(){
-  const grid=document.getElementById('sheets-model-grid');
-  const emptyEl=document.getElementById('sheets-hub-empty');
-  if(!grid||!emptyEl)return;
-  if(!STATE.models.length){ grid.innerHTML=''; emptyEl.style.display='block'; return; }
-  emptyEl.style.display='none';
+function renderSheetsSidebar(){
+  const list=document.getElementById('sheets-model-list');
+  if(!list)return;
+  if(!STATE.models.length){ list.innerHTML='<div style="color:var(--text2);font-size:12px;padding:8px;">No models yet — use + Add Model.</div>'; return; }
   const q=(document.getElementById('sheets-search')?.value||'').trim().toLowerCase();
   const models=STATE.models.filter(m=>!q||(m.name||'').toLowerCase().includes(q));
-  if(!models.length){ grid.innerHTML=`<div style="color:var(--text2);font-size:13px;">No models match "${escapeHtml(q)}".</div>`; return; }
-  grid.innerHTML=models.map(m=>`
-    <div class="sheet-hub-card" data-model-id="${escapeHtml(m.id)}">
-      <div class="sheet-hub-avatar">${escapeHtml((m.name||'?').trim().charAt(0).toUpperCase())}</div>
-      <div class="sheet-hub-name">${escapeHtml(m.name)}</div>
-      <div class="sheet-hub-sub">${escapeHtml(m.of_account||(m.mgmt_type==='chatting'?'Chatting':'Full Scale'))}</div>
+  if(!models.length){ list.innerHTML=`<div style="color:var(--text2);font-size:12px;padding:8px;">No models match "${escapeHtml(q)}".</div>`; return; }
+  list.innerHTML=models.map(m=>`
+    <div class="sheet-side-item${m.id===window._currentSheetModelId?' active':''}" data-model-id="${escapeHtml(m.id)}">
+      <div class="sheet-side-avatar">${escapeHtml((m.name||'?').trim().charAt(0).toUpperCase())}</div>
+      <div class="sheet-side-name">${escapeHtml(m.name)}</div>
     </div>`).join('');
-  grid.querySelectorAll('.sheet-hub-card').forEach(card=>{
-    card.onclick=()=>{ const m=STATE.models.find(x=>x.id===card.dataset.modelId); if(m) openSheetFullscreen(m,{showBack:true}); };
+  list.querySelectorAll('.sheet-side-item').forEach(item=>{
+    item.onclick=()=>{ const m=STATE.models.find(x=>x.id===item.dataset.modelId); if(m) openSheetForModel(m); };
   });
 }
-function filterSheetsHub(){ renderSheetsHubGrid(); }
+// Kept as the search box's oninput target name from before the layout change -- just an
+// alias so nothing else needs to know the sidebar was rebuilt.
+function filterSheetsHub(){ renderSheetsSidebar(); }
 
-async function openSheetFullscreen(model,opts){
-  opts=opts||{};
-  _sheetPdfDataUrl=null;
+async function openSheetForModel(model){
   const{data}=await sb.from('model_sheets').select('*').eq('model_id',model.id).single();
   const sheet=data||{};
   const role=STATE.profile?.role;
@@ -5733,16 +5765,13 @@ async function openSheetFullscreen(model,opts){
   const canEdit=isStaffEdit||isOwnModel;
   window._currentSheetModelId=model.id;
   window._currentSheetId=sheet.id||null;
-  const full=document.getElementById('sheets-fullscreen');
-  document.getElementById('sheets-hub').style.display='none';
-  full.className='active';
-  full.innerHTML=`
-    <div style="max-width:820px;margin:0 auto;">
-      ${opts.showBack?'<div class="guide-back" onclick="closeSheetFullscreen()">← Back to models</div>':''}
+  if(role!=='model') renderSheetsSidebar(); // refresh to highlight the newly-selected row
+  document.getElementById('sheets-content').innerHTML=`
+    <div style="max-width:820px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
         <div>
           <div style="font-size:24px;font-weight:800;">${escapeHtml(model.name)}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:4px;">${escapeHtml(model.of_account||'')} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${model.split||20}% split</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px;">${escapeHtml(model.of_account||'')} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${100-parseFloat(model.split||20)}% to model / ${model.split||20}% agency</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <span style="display:inline-flex;gap:4px;align-items:center;margin-right:4px;" title="Text size">
@@ -5750,12 +5779,9 @@ async function openSheetFullscreen(model,opts){
             <button class="sheet-zoom-btn" onclick="adjustSheetZoom(1)">A+</button>
           </span>
           ${sheet.onboarding_text?`<button onclick="popoutModelSheet('${model.id}')" class="btn btn-ghost" title="Open a small searchable window to keep open while chatting">🔎 Pop Out</button>`:''}
-          ${sheet.pdf_url?`<button onclick="togglePdfPreview('sheet-pdf-preview',decodeURIComponent('${pdfUrlEscape(sheet.pdf_url)}'))" class="btn btn-ghost">📄 Legacy PDF</button>`:''}
           ${canEdit?`<button class="btn btn-primary" onclick="saveSheet('${model.id}')">💾 Save</button>`:''}
         </div>
       </div>
-      <div id="sheet-pdf-preview" style="display:none;margin-bottom:16px;"></div>
-      ${isStaffEdit&&sheet.pdf_url?`<div style="font-size:11px;color:var(--text2);margin-bottom:16px;">Legacy uploaded PDF still on file. <button class="btn btn-ghost btn-sm" onclick="clearSheetPdf()">🗑️ Remove it</button> — new scripts use the template below instead of a PDF upload.</div>`:''}
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div class="card-title" style="margin-bottom:0;">Chatting Script</div>
@@ -5764,7 +5790,7 @@ async function openSheetFullscreen(model,opts){
         ${canEdit
           ?`<div id="sheet-preview-area">${renderSheetSearchable(sheet.onboarding_text,'sheet')}</div>
              <div id="sheet-edit-area" style="display:none;">
-               <textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Pricing, personality, boundaries, content offered etc.">${escapeHtml(sheet.onboarding_text||'')}</textarea>
+               <textarea id="sheet-onboarding" style="width:100%;min-height:500px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.9;color:var(--text);font-family:inherit;resize:vertical;" placeholder="Pricing, personality, boundaries, content offered etc. Emoji are fine — type or paste them straight in.">${escapeHtml(sheet.onboarding_text||'')}</textarea>
                <div style="font-size:11px;color:var(--text2);margin-top:6px;">Tip: start a line with <code>## </code> (e.g. <code>## Pricing</code>) to turn it into a clickable quick-jump chip. Click "👁 Preview" to see it as a chatter would — matches Save automatically.</div>
              </div>`
           :renderSheetSearchable(sheet.onboarding_text,'sheet')}
@@ -5772,15 +5798,6 @@ async function openSheetFullscreen(model,opts){
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
     </div>`;
   applySheetZoom();
-}
-
-// Only reachable for admin/va/chatter/traffic (opts.showBack is false for the model role's
-// own-sheet view, so this button is never rendered there in the first place).
-function closeSheetFullscreen(){
-  const full=document.getElementById('sheets-fullscreen');
-  full.className=''; full.innerHTML='';
-  document.getElementById('sheets-hub').style.display='block';
-  renderSheetsHubGrid();
 }
 
 // "Allow resizing" -- a simple text-size zoom on the actual script content (the part people
@@ -5818,29 +5835,16 @@ function toggleSheetMode(){
   }
 }
 
-var _sheetPdfDataUrl=null;
-// No upload UI anymore (see openSheetFullscreen) -- this only ever gets set to the
-// '__clear__' sentinel via the legacy-PDF "Remove it" button above.
-function clearSheetPdf(){
-  _sheetPdfDataUrl='__clear__';
-  showAlert('sheet-alert','PDF will be removed when you hit Save.','success');
-}
+// No PDFs anymore, anywhere in this feature -- just the in-app template. onboarding_text is
+// plain UTF-8 text end to end (textarea -> Postgres text column -> back out again), so emoji
+// round-trip with zero special handling needed; escapeHtml() only touches &/</>.
 async function saveSheet(modelId){
-  // pdf_url can now only ever be cleared (via clearSheetPdf's '__clear__' sentinel) since
-  // there's no upload input anymore -- otherwise preserve whatever's already cached in
-  // STATE.modelSheetPdfs (kept in sync by the app-load query and by this function itself).
-  const pdfUrl=_sheetPdfDataUrl==='__clear__'?null:(STATE.modelSheetPdfs?.[modelId]||null);
   const payload={
     model_id:modelId,
-    pdf_url:pdfUrl,
     onboarding_text:document.getElementById('sheet-onboarding')?.value||''
   };
   if(window._currentSheetId){await sb.from('model_sheets').update(payload).eq('id',window._currentSheetId);}
   else{const{data}=await sb.from('model_sheets').insert(payload).select().single();window._currentSheetId=data?.id;}
-  if(!STATE.modelSheetPdfs) STATE.modelSheetPdfs={};
-  if(payload.pdf_url) STATE.modelSheetPdfs[modelId]=payload.pdf_url; else delete STATE.modelSheetPdfs[modelId];
-  _sheetPdfDataUrl=null;
-  if(['admin','va'].includes(STATE.profile?.role)){ renderModels(); populateModelDropdowns(); }
   showAlert('sheet-alert','Saved!','success');
 }
 
