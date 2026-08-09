@@ -1342,6 +1342,31 @@
     <div class="page" id="page-invoices">
       <div class="page-title">Invoice Submission</div>
       <div class="page-sub">Submit your invoice — admin reviews and processes payment</div>
+
+      <!-- Date filter for the admin-facing tables below (Needs Review / Processed / Models) --
+           same From/To + quick-preset pattern used across Weekly Reports, Leaderboard, etc.
+           Blank From/To = All Time, so nothing is hidden until a period is actively picked. -->
+      <div id="inv-view-filter" style="display:none;margin-bottom:16px;">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="inv-view-start" onchange="applyInvoicesDateFilter()"></div>
+          <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="inv-view-end" onchange="applyInvoicesDateFilter()"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-ghost" onclick="setInvoicesViewPeriod('last')">Last Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setInvoicesViewPeriod('week')">This Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setInvoicesViewPeriod('month')">This Month</button>
+            <button class="btn btn-sm btn-ghost" onclick="setInvoicesViewPeriod('all')">All Time</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee / Models section toggle -- admin-only (model payout data stays out of va's
+           view here too, matching the restrict_va_from_model_invoices RLS boundary). -->
+      <div class="tabs" id="inv-section-tabs" style="display:none;">
+        <div class="tab active" id="inv-sec-tab-employee" onclick="setInvoicesSection('employee')">Employee</div>
+        <div class="tab" id="inv-sec-tab-models" onclick="setInvoicesSection('models')">Models</div>
+      </div>
+
+      <div id="inv-section-employee">
       <div class="two-col-wide" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-title">Submit Invoice</div>
@@ -1406,6 +1431,26 @@
         </div>
       </div>
     </div><!-- close two-col-wide -->
+    </div><!-- close inv-section-employee -->
+
+      <!-- Models section -- embedded view of the same 'invoices' rows used by the standalone
+           Model Invoices page (role='model'), just filtered by the date range above and shown
+           inline here so admin doesn't have to bounce to a separate nav item. Mark-paid/unpaid,
+           edit and the manual-add modal are all shared with that page (same STATE_MODEL_INVOICES
+           array + modal), so the two views stay in sync automatically. -->
+      <div id="inv-section-models" style="display:none;">
+        <div id="inv-models-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;max-width:620px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <div class="tabs" style="margin-bottom:0;">
+            <div class="tab active" id="inv-minv-tab-unpaid" onclick="setInvoicesModelFilter('unpaid')">Unpaid</div>
+            <div class="tab" id="inv-minv-tab-paid" onclick="setInvoicesModelFilter('paid')">Paid</div>
+            <div class="tab" id="inv-minv-tab-all" onclick="setInvoicesModelFilter('')">All</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="openManualInvoiceModal()">➕ Add Invoice Manually</button>
+        </div>
+        <div id="inv-models-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
+        <div id="inv-models-empty" class="empty" style="display:none;"><div class="empty-icon">🧾</div><p>No model invoices for this period</p></div>
+      </div>
     </div><!-- close page-invoices -->
 
     <!-- Model Invoices -- kept fully separate from the chatter/traffic/VA Invoices page
@@ -5159,8 +5204,11 @@ async function loadHoursSummary(){
 
 // ── Invoices ─────────────────────────────────────────────────
 async function renderInvoicePage(){
-  const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va';
+  const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va'; const isFullAdmin=role==='admin';
   document.getElementById('invoice-admin-panel').style.display=isAdmin?'block':'none';
+  const filterBar=document.getElementById('inv-view-filter'); if(filterBar) filterBar.style.display=isAdmin?'block':'none';
+  const tabsEl=document.getElementById('inv-section-tabs'); if(tabsEl) tabsEl.style.display=isFullAdmin?'flex':'none';
+  setInvoicesSection('employee'); // always land on Employee — predictable each visit, and the only section va/chatter/traffic ever see
   const wkStart=document.getElementById('inv-week-start');
   const wkEnd=document.getElementById('inv-week-end');
   // Monday-of-this-week, computed so Sunday (getDay()===0) doesn't roll forward into next week.
@@ -5170,10 +5218,50 @@ async function renderInvoicePage(){
   renderMyInvoices();
 }
 
+// Reads the shared From/To date filter above the admin tables. Blank = All Time (no filtering).
+function getInvoicesDateRange(){
+  return {start:document.getElementById('inv-view-start')?.value||'', end:document.getElementById('inv-view-end')?.value||''};
+}
+
+// Quick-preset buttons (Last Week / This Week / This Month / All Time) for the shared date
+// filter — same computePeriodRange helper the rest of the app's Summary panels use.
+function setInvoicesViewPeriod(kind){
+  if(kind==='all'){
+    document.getElementById('inv-view-start').value='';
+    document.getElementById('inv-view-end').value='';
+    applyInvoicesDateFilter();
+    return;
+  }
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('inv-view-start').value=start;
+  document.getElementById('inv-view-end').value=end;
+  applyInvoicesDateFilter();
+}
+
+// Re-renders whichever tables/cards are currently affected by the date filter — both sections
+// at once is cheap (pure client-side array filtering) and keeps Employee/Models in sync even
+// if the filter is changed while the other tab is the one currently hidden.
+function applyInvoicesDateFilter(){
+  renderPendingInvoices();
+  filterInvoices();
+  renderInvoiceModelsSection();
+}
+
+// Employee / Models section toggle (admin-only tabs — see inv-section-tabs).
+function setInvoicesSection(section){
+  document.getElementById('inv-sec-tab-employee')?.classList.toggle('active',section==='employee');
+  document.getElementById('inv-sec-tab-models')?.classList.toggle('active',section==='models');
+  const empEl=document.getElementById('inv-section-employee'); if(empEl) empEl.style.display=section==='employee'?'block':'none';
+  const modEl=document.getElementById('inv-section-models'); if(modEl) modEl.style.display=section==='models'?'block':'none';
+  if(section==='models') loadInvoicesModelsSection();
+}
+
 // "Needs Review" — pending invoices only, so approving/rejecting visibly clears them from this list.
 function renderPendingInvoices(){
   const tbody=document.getElementById('invoices-pending-body'); const empty=document.getElementById('invoices-pending-empty');
-  const invs=STATE.invoices.filter(i=>i.status==='pending');
+  const{start,end}=getInvoicesDateRange();
+  let invs=STATE.invoices.filter(i=>i.status==='pending');
+  if(start||end) invs=invs.filter(i=>overlaps(i.week_of,i.week_end,start||end,end||start));
   tbody.innerHTML='';
   if(!invs.length){empty.style.display='block';return;} empty.style.display='none';
   invs.forEach(inv=>{tbody.innerHTML+=invoiceRowHtml(inv);});
@@ -5209,7 +5297,9 @@ function invoiceRowHtml(inv){
 
 function filterInvoices(){
   const s=document.getElementById('inv-filter').value;
-  const processed=STATE.invoices.filter(i=>i.status!=='pending');
+  const{start,end}=getInvoicesDateRange();
+  let processed=STATE.invoices.filter(i=>i.status!=='pending');
+  if(start||end) processed=processed.filter(i=>overlaps(i.week_of,i.week_end,start||end,end||start));
   renderInvoicesTable(s?processed.filter(i=>i.status===s):processed);
 }
 
@@ -5462,6 +5552,42 @@ async function backfillInvoiceExpenseSync(){
 var STATE_MODEL_INVOICES=[];
 var MODEL_INVOICE_FILTER='unpaid';
 
+// ── Models section embedded in the Invoices page (see inv-section-models) ─────
+// Shares STATE_MODEL_INVOICES + the mark-paid/edit/delete functions and modal below with the
+// standalone Model Invoices page — only the container ids and the date-range filter differ.
+var INV_MODEL_FILTER='unpaid';
+
+async function loadInvoicesModelsSection(){
+  const{data,error}=await sb.from('invoices').select('*').eq('role','model').order('week_of',{ascending:false});
+  if(error){console.error('loadInvoicesModelsSection',error);return;}
+  STATE_MODEL_INVOICES=data||[];
+  renderInvoiceModelsSection();
+}
+
+function setInvoicesModelFilter(status){
+  INV_MODEL_FILTER=status;
+  document.getElementById('inv-minv-tab-unpaid')?.classList.toggle('active',status==='unpaid');
+  document.getElementById('inv-minv-tab-paid')?.classList.toggle('active',status==='paid');
+  document.getElementById('inv-minv-tab-all')?.classList.toggle('active',status==='');
+  renderInvoiceModelsSection();
+}
+
+function renderInvoiceModelsSection(){
+  const wrap=document.getElementById('inv-models-cards'); if(!wrap) return; // Invoices page not on screen — nothing to update
+  const{start,end}=getInvoicesDateRange();
+  let list=STATE_MODEL_INVOICES;
+  if(start||end) list=list.filter(i=>overlaps(i.week_of,i.week_end,start||end,end||start));
+  if(INV_MODEL_FILTER) list=list.filter(i=>i.status===INV_MODEL_FILTER);
+  const unpaidTotal=list.filter(i=>i.status!=='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  const paidTotal=list.filter(i=>i.status==='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  const sumEl=document.getElementById('inv-models-summary');
+  if(sumEl) sumEl.innerHTML=statCard('Unpaid','$'+fmt(unpaidTotal),'accent','red')+statCard('Paid','$'+fmt(paidTotal),'accent','green')+statCard('Invoices',list.length,'white','purple');
+  const empty=document.getElementById('inv-models-empty');
+  wrap.innerHTML='';
+  if(!list.length){empty.style.display='block';return;} empty.style.display='none';
+  list.forEach(inv=>{wrap.innerHTML+=modelInvoiceCardHtml(inv,true);});
+}
+
 async function renderModelInvoicePage(){
   // Admin-only, deliberately excludes 'va' -- model payout data is more sensitive than
   // chatter/traffic invoices, and this is also enforced at the RLS level (see
@@ -5540,14 +5666,14 @@ async function markModelInvoicePaid(id){
   const{error}=await sb.from('invoices').update({status:'paid',paid_at:paidAt}).eq('id',id);
   if(error) return alert(error.message);
   const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='paid';inv.paid_at=paidAt;}
-  renderModelInvoiceSummary(); renderModelInvoiceCards();
+  renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
 }
 
 async function markModelInvoiceUnpaid(id){
   const{error}=await sb.from('invoices').update({status:'unpaid',paid_at:null}).eq('id',id);
   if(error) return alert(error.message);
   const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='unpaid';inv.paid_at=null;}
-  renderModelInvoiceSummary(); renderModelInvoiceCards();
+  renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
 }
 
 async function delModelInvoice(id){
@@ -5555,7 +5681,7 @@ async function delModelInvoice(id){
   const{error,data}=await sb.from('invoices').delete().eq('id',id).select();
   if(error||!data||!data.length){alert('Could not delete this invoice — you may be missing delete permission.');return;}
   STATE_MODEL_INVOICES=STATE_MODEL_INVOICES.filter(i=>i.id!==id);
-  renderModelInvoiceSummary(); renderModelInvoiceCards();
+  renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
 }
 
 function openManualInvoiceModal(){
@@ -5621,7 +5747,7 @@ async function saveEditModelInvoice(){
     if(error) return showAlert('minv-edit-alert',error.message,'error');
     const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv) Object.assign(inv,updates);
   }
-  renderModelInvoiceSummary(); renderModelInvoiceCards();
+  renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
   closeModal('model-inv-edit-modal');
 }
 
