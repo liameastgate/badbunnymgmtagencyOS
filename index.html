@@ -1592,8 +1592,16 @@
       </div>
       <div class="card">
         <div class="card-title">All Expenses</div>
-        <div style="margin-bottom:12px;display:flex;gap:8px;">
+        <div style="margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
           <select id="exp-filter-cat" onchange="filterExpenses()" style="width:160px;"><option value="">All Categories</option><option value="tools">Tools</option><option value="ads">Ad Spend</option><option value="staff">Staff</option><option value="other">Other</option></select>
+          <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="exp-filter-start" onchange="filterExpenses()"></div>
+          <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="exp-filter-end" onchange="filterExpenses()"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-ghost" onclick="setExpensesFilterPeriod('last')">Last Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setExpensesFilterPeriod('week')">This Week</button>
+            <button class="btn btn-sm btn-ghost" onclick="setExpensesFilterPeriod('month')">This Month</button>
+            <button class="btn btn-sm btn-ghost" onclick="setExpensesFilterPeriod('all')">All Time</button>
+          </div>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Type</th><th></th></tr></thead>
@@ -5214,7 +5222,11 @@ async function renderInvoicePage(){
   // Monday-of-this-week, computed so Sunday (getDay()===0) doesn't roll forward into next week.
   if(!wkStart.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));wkStart.value=d.toISOString().split('T')[0];}
   if(!wkEnd.value){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+6);wkEnd.value=d.toISOString().split('T')[0];}
-  if(isAdmin){const{data}=await sb.from('invoices').select('*').order('created_at',{ascending:false});STATE.invoices=data||[];renderPendingInvoices();filterInvoices();}
+  // Employee tab is chatter/traffic/VA invoices only — role='model' rows are handled entirely
+  // by the Models tab (loadInvoicesModelsSection), so exclude them here or they'd double up in
+  // Processed Invoices (their unpaid/paid statuses aren't 'pending', so they'd otherwise slip
+  // straight into the "processed" bucket alongside approved/rejected employee invoices).
+  if(isAdmin){const{data}=await sb.from('invoices').select('*').neq('role','model').order('created_at',{ascending:false});STATE.invoices=data||[];renderPendingInvoices();filterInvoices();}
   renderMyInvoices();
 }
 
@@ -5879,9 +5891,29 @@ function renderExpenses(data){
   });
 }
 
+// Quick-preset buttons (Last Week / This Week / This Month / All Time) for the expenses
+// list — same computePeriodRange helper used across Weekly Reports, Leaderboard, Invoices etc.
+function setExpensesFilterPeriod(kind){
+  if(kind==='all'){
+    document.getElementById('exp-filter-start').value='';
+    document.getElementById('exp-filter-end').value='';
+    filterExpenses();
+    return;
+  }
+  const{start,end}=computePeriodRange(kind);
+  document.getElementById('exp-filter-start').value=start;
+  document.getElementById('exp-filter-end').value=end;
+  filterExpenses();
+}
+
 function filterExpenses(){
   const cat=document.getElementById('exp-filter-cat').value;
-  renderExpenses(cat?EXPENSES_DATA.filter(e=>e.category===cat):EXPENSES_DATA);
+  const start=document.getElementById('exp-filter-start')?.value||'';
+  const end=document.getElementById('exp-filter-end')?.value||'';
+  let list=EXPENSES_DATA;
+  if(cat) list=list.filter(e=>e.category===cat);
+  if(start||end) list=list.filter(e=>overlaps(e.expense_date,e.week_end,start||end,end||start));
+  renderExpenses(list);
 }
 
 async function addExpense(){
