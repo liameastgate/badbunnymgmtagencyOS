@@ -509,6 +509,13 @@
       </div>
     </div>
 
+    <!-- Content Upload -->
+    <div class="page" id="page-content-upload">
+      <div class="page-title">Content Upload</div>
+      <div class="page-sub">Your Drive folder — where finished content goes</div>
+      <div id="cu-body"></div>
+    </div>
+
     <!-- Content Ideas -->
     <div class="page" id="page-ideas">
       <div class="page-title">Content Ideas</div>
@@ -2166,6 +2173,7 @@ var NAV = [
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'content-upload', icon: '📤', label: 'Content Upload',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
@@ -2280,6 +2288,7 @@ function navigate(page) {
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
+  if (page === 'content-upload') renderContentUpload();
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
@@ -2307,7 +2316,7 @@ function renderModelHome(){
   // for; everything else falls back to its NAV section name, so a brand new page never
   // needs an entry added here to show up correctly.
   const DESCS={
-    content:'Submit & track your content', contentperf:'See how your posts are doing',
+    content:'Submit & track your content', 'content-upload':'Your Drive folder for finished content', contentperf:'See how your posts are doing',
     ideas:'Fresh ideas for your niche', guides:'Drip sets & weekly requirements',
     'model-invoices':'See your weekly payouts', sheets:'View or edit your chatting script'
   };
@@ -2608,7 +2617,10 @@ function populateModelDropdowns() {
   if(coSelectTh) coSelectTh.style.display = STATE.profile?.role==='admin' ? '' : 'none';
   // Drive link banners
   const bannerEl=document.getElementById('co-drive-banners');
-  if(bannerEl){
+  // Models now have a dedicated Content Upload page for their own Drive folder, so this
+  // Content Orders banner is admin/va-only — keeps the model's Orders page uncluttered.
+  if(bannerEl && STATE.profile?.role==='model'){ bannerEl.innerHTML=''; }
+  else if(bannerEl){
     // Info Sheet PDF link intentionally excluded here — Model Sheets is the correct home for
     // that, this banner is just for the Drive link content is actually uploaded to.
     const withLinks=visibleModels.filter(m=>m.drive_link);
@@ -2720,6 +2732,56 @@ async function bulkAddContentOrders(){
   clearBulkThumbs();
   [...sel.options].forEach(o=>o.selected=false);
   syncBulkModelSelect();
+}
+
+// Content Upload page — a dedicated home for a model's Drive upload folder. Models see
+// their own folder (matched by email, same as everywhere else) plus the upload rules;
+// admin/va see every model's folder at a glance (mirrors the old Content Orders banner).
+function renderContentUpload(){
+  const el=document.getElementById('cu-body');
+  if(!el) return;
+  const uploadTips=`
+    <div class="card">
+      <div class="card-title">📌 How to upload</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+        Folders in your Drive are labelled by category — upload each piece into the folder that matches. Mirror that same structure in your camera roll as you film, so you're not sorting it all at once later.
+        <br><br>
+        <strong style="color:var(--text);">Upload content ready to publish</strong> — already edited, trimmed and cut. We don't have time to edit everything that comes in.
+        <br><br>
+        <strong style="color:var(--text);">Don't let content build up over multiple days</strong> — upload as you go.
+      </div>
+    </div>`;
+  if(STATE.profile?.role==='model'){
+    const mine=STATE.models.find(m=>(m.email||'').toLowerCase()===(STATE.profile?.email||'').toLowerCase());
+    const link=mine?.drive_link;
+    const folderCard = link
+      ? `<div class="card" style="text-align:center;">
+           <div class="card-title" style="justify-content:center;">📁 Your upload folder</div>
+           <p style="font-size:13px;color:var(--text2);margin:6px 0 16px;">This is where all your finished content goes.</p>
+           <a href="${link}" target="_blank" class="btn btn-primary" style="font-size:15px;padding:12px 28px;text-decoration:none;display:inline-block;">Open Your Drive Folder ↗</a>
+         </div>`
+      : `<div class="card" style="text-align:center;">
+           <div class="card-title" style="justify-content:center;">Upload folder not set up yet</div>
+           <p style="font-size:13px;color:var(--text2);margin-top:6px;">Your Drive folder hasn't been linked to your account yet. Message the team and we'll get it sorted for you.</p>
+         </div>`;
+    el.innerHTML=folderCard+uploadTips;
+  } else {
+    const rows=STATE.models.map(m=>{
+      const link=m.drive_link
+        ? `<a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-weight:600;text-decoration:none;">📁 Open ↗</a>`
+        : `<span style="color:var(--text2);">Not set</span>`;
+      return `<tr><td style="font-weight:600;">${escapeHtml(m.name)}</td><td>${link}</td></tr>`;
+    }).join('');
+    el.innerHTML=`
+      <div class="card">
+        <div class="card-title">Model upload folders</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Each model sees only their own folder here. Set or edit these links in Model Settings.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Model</th><th>Drive folder</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="2" style="color:var(--text2);">No models yet.</td></tr>'}</tbody>
+        </table></div>
+      </div>`;
+  }
 }
 
 function renderContentOrders(filtered) {
