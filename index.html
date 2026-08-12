@@ -3003,8 +3003,11 @@ async function submitContentOrder() {
   (data||[]).forEach(d=>STATE.contentOrders.unshift(d)); filterContentOrders();
   showAlert('co-alert',`${inserts.length} order${inserts.length>1?'s':''} added!`,'success');
   document.getElementById('co-url').value=''; document.getElementById('co-drive').value=''; document.getElementById('co-notes').value='';
-  // Deselect all
-  [...sel.options].forEach(o=>o.selected=false);
+  // Keep the model selection sticky so you can add several orders for the same model(s)
+  // back-to-back without re-ticking. The visual checkboxes and the hidden <select> were left
+  // in sync by syncModelSelect() when they were ticked; clearing ONLY the hidden select here
+  // (as we used to) desynced them — the boxes stayed visually ticked but the select went empty,
+  // so the next add read zero models and forced a re-tick. Leaving both as-is keeps them honest.
   clearThumb();
 }
 
