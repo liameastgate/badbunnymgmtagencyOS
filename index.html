@@ -544,6 +544,50 @@
       </div>
     </div>
 
+    <!-- Content Scheduling -->
+    <div class="page" id="page-content-schedule">
+      <div class="page-title">Content Scheduling</div>
+      <div class="page-sub">Plan what's going out and when — then see your best-performing posting times from your own results</div>
+
+      <div class="card">
+        <div class="card-title">Schedule a post</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-group" style="margin:0;min-width:150px;"><label>Model</label><select id="cs-qa-model"></select></div>
+          <div class="form-group" style="margin:0;min-width:130px;"><label>Platform</label><select id="cs-qa-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="snapchat">Snapchat</option><option value="twitter">Twitter / X</option><option value="onlyfans">OnlyFans</option><option value="other">Other</option></select></div>
+          <div class="form-group" style="margin:0;"><label>Date</label><input type="date" id="cs-qa-date"></div>
+          <div class="form-group" style="margin:0;"><label>Time</label><input type="time" id="cs-qa-time"></div>
+          <div class="form-group" style="margin:0;flex:1;min-width:180px;"><label>Caption / note</label><input type="text" id="cs-qa-caption" placeholder="Optional — caption, hook, or content ref" onkeydown="if(event.key==='Enter')quickAddSchedule()"></div>
+          <button class="btn btn-primary" onclick="quickAddSchedule()">➕ Add</button>
+        </div>
+        <div id="cs-qa-alert" class="alert"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <div class="card-title" style="margin:0;">Scheduled queue</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="cs-filter-model" onchange="filterSchedule()" style="width:150px;"><option value="">All Models</option></select>
+            <select id="cs-filter-platform" onchange="filterSchedule()" style="width:140px;"><option value="">All Platforms</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="snapchat">Snapchat</option><option value="twitter">Twitter / X</option><option value="onlyfans">OnlyFans</option><option value="other">Other</option></select>
+            <select id="cs-filter-status" onchange="filterSchedule()" style="width:170px;"><option value="upcoming">Upcoming + overdue</option><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="posted">Posted</option><option value="skipped">Skipped</option></select>
+          </div>
+        </div>
+        <div id="cs-queue"></div>
+        <div id="cs-queue-empty" class="empty" style="display:none;"><div class="empty-icon">🗓️</div><p>Nothing scheduled yet — add your first post above</p></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <div class="card-title" style="margin:0;">Best time to post</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="cs-heat-model" onchange="renderBestTimeHeatmap()" style="width:150px;"><option value="">All Models</option></select>
+            <select id="cs-heat-metric" onchange="renderBestTimeHeatmap()" style="width:150px;"><option value="views">Avg views</option><option value="engagement">Avg engagement</option></select>
+          </div>
+        </div>
+        <div class="page-sub" style="margin-bottom:12px;">Built from your Content Performance history — darker = stronger. Empty cells mean no posts in that slot yet.</div>
+        <div id="cs-heatmap" style="overflow-x:auto;"></div>
+      </div>
+    </div>
+
     <!-- Content Performance -->
     <div class="page" id="page-contentperf">
       <div class="page-title">Content Performance</div>
@@ -1951,6 +1995,29 @@
   </div>
 </div>
 
+<!-- Content Scheduling Modal -->
+<div class="modal-overlay" id="cs-modal">
+  <div class="modal">
+    <div class="modal-title"><span>Edit scheduled post</span><button class="modal-close" onclick="closeModal('cs-modal')">✕</button></div>
+    <input type="hidden" id="cs-edit-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Model</label><select id="cs-model"></select></div>
+      <div class="form-group"><label>Platform</label><select id="cs-platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="snapchat">Snapchat</option><option value="twitter">Twitter / X</option><option value="onlyfans">OnlyFans</option><option value="other">Other</option></select></div>
+      <div class="form-group"><label>Scheduled date</label><input type="date" id="cs-date"></div>
+      <div class="form-group"><label>Scheduled time</label><input type="time" id="cs-time"></div>
+      <div class="form-group"><label>Status</label><select id="cs-status"><option value="scheduled">Scheduled</option><option value="posted">Posted</option><option value="skipped">Skipped</option></select></div>
+      <div class="form-group"><label>Posted at (actual)</label><input type="datetime-local" id="cs-posted-at"></div>
+      <div class="form-group full"><label>Caption / note</label><textarea id="cs-caption" placeholder="Caption, hook, or content reference"></textarea></div>
+      <div class="form-group full"><label>Notes</label><input type="text" id="cs-notes" placeholder="Internal notes (optional)"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveScheduleEdit()">💾 Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('cs-modal')">Cancel</button>
+    </div>
+    <div id="cs-alert" class="alert"></div>
+  </div>
+</div>
+
 <!-- Content Performance Modal -->
 <div class="modal-overlay" id="cp-modal">
   <div class="modal">
@@ -2151,7 +2218,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [], personalModels: [], personalReports: [], personalContentPerf: [], personalChatterPerformance: [], personalSalesRecords: [] };
+var STATE = { user: null, profile: null, models: [], chatters: [], contentOrders: [], reports: [], hours: [], invoices: [], contentIdeas: [], contentPerf: [], contentSchedule: [], personalModels: [], personalReports: [], personalContentPerf: [], personalChatterPerformance: [], personalSalesRecords: [] };
 var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-admin submitter can edit their own pending invoice (STATE.invoices is only populated for admins)
 
 // Grouped into General / Chatting / Models / Management per Liam's requested layout.
@@ -2175,6 +2242,7 @@ var NAV = [
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-upload', icon: '📤', label: 'Content Upload',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
@@ -2290,6 +2358,7 @@ function navigate(page) {
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
   if (page === 'contentperf') loadContentPerformance();
+  if (page === 'content-schedule') loadContentSchedule();
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
   if (page === 'contract') loadContract();
@@ -6534,6 +6603,223 @@ async function deleteContentIdea(id){
   const{error,data}=await sb.from('content_ideas').delete().eq('id',id).select();
   if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_ideas table.');return;}
   STATE.contentIdeas=STATE.contentIdeas.filter(x=>x.id!==id); filterContentIdeas();
+}
+
+// ── Content Scheduling ───────────────────────────────────────
+// Forward-looking posting queue (content_schedule table) PLUS a "best time to post"
+// heatmap derived from the EXISTING content_performance data. The two tables stay fully
+// separate per spec -- marking a post 'posted' here never writes a content_performance
+// row. Admin/va only (models never see this page), so no per-role model filtering needed.
+const CS_PLATFORM_LABEL={instagram:'📸 Instagram',tiktok:'🎵 TikTok',snapchat:'👻 Snapchat',twitter:'𝕏 Twitter',onlyfans:'🔒 OnlyFans',other:'📎 Other'};
+const CS_STATUS_BADGE={scheduled:'pending',posted:'approved',skipped:'rejected'};
+const CS_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+async function loadContentSchedule(){
+  populateScheduleModelSelects();
+  const{data,error}=await sb.from('content_schedule').select('*').order('scheduled_date',{ascending:true});
+  if(error){console.error('loadContentSchedule',error);return;}
+  STATE.contentSchedule=data||[];
+  const qd=document.getElementById('cs-qa-date'); if(qd&&!qd.value) qd.value=toLocalISO(new Date());
+  filterSchedule();
+  renderBestTimeHeatmap();
+}
+
+function populateScheduleModelSelects(){
+  const opts=STATE.models.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  const qa=document.getElementById('cs-qa-model'); if(qa) qa.innerHTML=opts;
+  const ed=document.getElementById('cs-model'); if(ed) ed.innerHTML=opts;
+  const fOpts='<option value="">All Models</option>'+opts;
+  const fm=document.getElementById('cs-filter-model'); if(fm){const v=fm.value; fm.innerHTML=fOpts; fm.value=v;}
+  const hm=document.getElementById('cs-heat-model'); if(hm){const v=hm.value; hm.innerHTML=fOpts; hm.value=v;}
+}
+
+async function quickAddSchedule(){
+  const al=document.getElementById('cs-qa-alert'); al.textContent='';
+  const modelId=document.getElementById('cs-qa-model').value;
+  const date=document.getElementById('cs-qa-date').value;
+  if(!modelId||!date){al.textContent='Model and date are required';return;}
+  const model=STATE.models.find(m=>m.id===modelId);
+  const p={
+    model_id:modelId, model_name:model?model.name:null,
+    platform:document.getElementById('cs-qa-platform').value,
+    scheduled_date:date,
+    scheduled_time:document.getElementById('cs-qa-time').value||null,
+    caption:document.getElementById('cs-qa-caption').value.trim()||null,
+    status:'scheduled'
+  };
+  const{data,error}=await sb.from('content_schedule').insert(p).select().single();
+  if(error){al.textContent='Could not save — check permissions.';return;}
+  STATE.contentSchedule.push(data);
+  // Clear only caption+time so batch-scheduling the same model/day stays fast.
+  document.getElementById('cs-qa-caption').value='';
+  document.getElementById('cs-qa-time').value='';
+  filterSchedule(); renderBestTimeHeatmap();
+}
+
+function filterSchedule(){
+  const model=document.getElementById('cs-filter-model')?.value||'';
+  const platform=document.getElementById('cs-filter-platform')?.value||'';
+  const statusEl=document.getElementById('cs-filter-status');
+  const status=statusEl?statusEl.value:'upcoming';
+  const today=toLocalISO(new Date());
+  let rows=STATE.contentSchedule.slice();
+  if(model) rows=rows.filter(r=>r.model_id===model);
+  if(platform) rows=rows.filter(r=>r.platform===platform);
+  if(status==='upcoming') rows=rows.filter(r=>r.status==='scheduled'); // scheduled incl. overdue; hides posted/skipped
+  else if(status) rows=rows.filter(r=>r.status===status);
+  renderScheduleQueue(rows, today);
+}
+
+function renderScheduleQueue(rows, today){
+  const wrap=document.getElementById('cs-queue'); const empty=document.getElementById('cs-queue-empty');
+  if(!wrap)return;
+  if(!rows.length){wrap.innerHTML=''; if(empty)empty.style.display='block'; return;} if(empty)empty.style.display='none';
+  const g={}; rows.forEach(r=>{(g[r.scheduled_date]=g[r.scheduled_date]||[]).push(r);});
+  const days=Object.keys(g).sort();
+  wrap.innerHTML=days.map(date=>{
+    const list=g[date].sort((a,b)=>{
+      if(!a.scheduled_time&&!b.scheduled_time)return 0;
+      if(!a.scheduled_time)return 1; if(!b.scheduled_time)return -1;
+      return a.scheduled_time.localeCompare(b.scheduled_time);
+    });
+    const isPast=date<today;
+    return `
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">${fmtDate(date)}${date===today?' · Today':''}</div>
+        ${list.map(r=>{
+          const overdue=r.status==='scheduled'&&isPast;
+          return `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid ${overdue?'rgba(245,158,11,0.4)':'var(--border)'};background:${overdue?'rgba(245,158,11,0.06)':'var(--surface2)'};border-radius:8px;margin-bottom:6px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:700;min-width:52px;color:var(--text);">${r.scheduled_time?r.scheduled_time.slice(0,5):'—'}</span>
+            <span style="font-size:12px;font-weight:600;min-width:90px;">${escapeHtml(r.model_name||'—')}</span>
+            <span style="font-size:12px;min-width:96px;">${CS_PLATFORM_LABEL[r.platform]||r.platform||'—'}</span>
+            <span style="font-size:12px;color:var(--text2);flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.caption||'')}</span>
+            ${overdue?'<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;">overdue</span>':`<span class="badge ${CS_STATUS_BADGE[r.status]||'pending'}">${r.status}</span>`}
+            <button class="btn btn-sm ${r.status==='posted'?'btn-ghost':'btn-primary'}" onclick="toggleSchedulePosted('${r.id}')" title="Toggle posted">${r.status==='posted'?'↩ Undo':'✓ Posted'}</button>
+            <button class="btn btn-sm btn-ghost" onclick="openScheduleModal('${r.id}')">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteScheduleRow('${r.id}')">✕</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+}
+
+async function toggleSchedulePosted(id){
+  const row=STATE.contentSchedule.find(r=>r.id===id); if(!row)return;
+  const nowPosted=row.status!=='posted';
+  const patch=nowPosted?{status:'posted',posted_at:new Date().toISOString()}:{status:'scheduled',posted_at:null};
+  const{data,error}=await sb.from('content_schedule').update(patch).eq('id',id).select().single();
+  if(error){alert('Could not update — you may be missing write permission on content_schedule.');return;}
+  const i=STATE.contentSchedule.findIndex(r=>r.id===id); if(i>-1) STATE.contentSchedule[i]=data;
+  filterSchedule();
+}
+
+function openScheduleModal(id){
+  const r=STATE.contentSchedule.find(x=>x.id===id); if(!r)return;
+  populateScheduleModelSelects();
+  document.getElementById('cs-alert').textContent='';
+  document.getElementById('cs-edit-id').value=r.id;
+  document.getElementById('cs-model').value=r.model_id||'';
+  document.getElementById('cs-platform').value=r.platform||'instagram';
+  document.getElementById('cs-date').value=r.scheduled_date||'';
+  document.getElementById('cs-time').value=r.scheduled_time?r.scheduled_time.slice(0,5):'';
+  document.getElementById('cs-status').value=r.status||'scheduled';
+  document.getElementById('cs-posted-at').value=r.posted_at?toLocalDatetimeInput(r.posted_at):'';
+  document.getElementById('cs-caption').value=r.caption||'';
+  document.getElementById('cs-notes').value=r.notes||'';
+  openModal('cs-modal');
+}
+
+async function saveScheduleEdit(){
+  const id=document.getElementById('cs-edit-id').value;
+  const modelId=document.getElementById('cs-model').value;
+  const date=document.getElementById('cs-date').value;
+  if(!modelId||!date){document.getElementById('cs-alert').textContent='Model and date are required';return;}
+  const model=STATE.models.find(m=>m.id===modelId);
+  const postedLocal=document.getElementById('cs-posted-at').value;
+  const patch={
+    model_id:modelId, model_name:model?model.name:null,
+    platform:document.getElementById('cs-platform').value,
+    scheduled_date:date,
+    scheduled_time:document.getElementById('cs-time').value||null,
+    status:document.getElementById('cs-status').value,
+    posted_at:postedLocal?new Date(postedLocal).toISOString():null,
+    caption:document.getElementById('cs-caption').value.trim()||null,
+    notes:document.getElementById('cs-notes').value.trim()||null
+  };
+  const{data,error}=await sb.from('content_schedule').update(patch).eq('id',id).select().single();
+  if(error){document.getElementById('cs-alert').textContent='Could not save — check permissions.';return;}
+  const i=STATE.contentSchedule.findIndex(r=>r.id===id); if(i>-1) STATE.contentSchedule[i]=data;
+  closeModal('cs-modal'); filterSchedule(); renderBestTimeHeatmap();
+}
+
+async function deleteScheduleRow(id){
+  if(!confirm('Delete this scheduled post?'))return;
+  const{error,data}=await sb.from('content_schedule').delete().eq('id',id).select();
+  if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_schedule table.');return;}
+  STATE.contentSchedule=STATE.contentSchedule.filter(r=>r.id!==id); filterSchedule();
+}
+
+// datetime-local round-trips as local wall-clock; toLocalISO+manual HH:MM avoids the
+// toISOString() UTC shift that would show a UTC+10 user the wrong posted-at time.
+function toLocalDatetimeInput(ts){
+  const d=new Date(ts); if(isNaN(d))return'';
+  return toLocalISO(d)+'T'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+// ---- Best-time heatmap: reads content_performance, never writes ----
+// 7 rows (Mon..Sun) x 12 two-hour buckets; each cell = AVG of the chosen metric across
+// posts that landed in that day/slot. Averaging (not summing) so a slot with one big post
+// doesn't outrank a consistently strong slot just by volume.
+function bestTimeMatrix(rows, metric){
+  const sums=Array.from({length:7},()=>Array(12).fill(0));
+  const counts=Array.from({length:7},()=>Array(12).fill(0));
+  rows.forEach(r=>{
+    if(!r.post_date||!r.post_time) return;
+    const d=new Date(r.post_date+'T00:00:00'); // local midnight -> correct local weekday
+    if(isNaN(d)) return;
+    const dow=(d.getDay()+6)%7; // Mon=0 .. Sun=6
+    const hour=parseInt(String(r.post_time).split(':')[0],10);
+    if(isNaN(hour)||hour<0||hour>23) return;
+    const bucket=Math.floor(hour/2); // 0..11
+    let val;
+    if(metric==='engagement') val=(+r.likes||0)+(+r.comments||0)+(+r.shares||0)+(+r.saves||0);
+    else val=(+r.views||0);
+    sums[dow][bucket]+=val; counts[dow][bucket]+=1;
+  });
+  const avg=sums.map((row,i)=>row.map((s,j)=>counts[i][j]?s/counts[i][j]:null));
+  return {avg,counts};
+}
+
+function renderBestTimeHeatmap(){
+  const wrap=document.getElementById('cs-heatmap'); if(!wrap)return;
+  const modelId=document.getElementById('cs-heat-model')?.value||'';
+  const metric=document.getElementById('cs-heat-metric')?.value||'views';
+  let src=(STATE.contentPerf||[]).slice();
+  if(modelId) src=src.filter(r=>r.model_id===modelId);
+  if(!src.length){wrap.innerHTML='<div class="empty" style="padding:20px;"><p style="color:var(--text2);font-size:12px;">No Content Performance data yet — add posts on the Content Performance page and the best-time grid fills in automatically.</p></div>';return;}
+  const{avg,counts}=bestTimeMatrix(src,metric);
+  let max=0; avg.forEach(row=>row.forEach(v=>{if(v!=null&&v>max)max=v;}));
+  const fmtVal=v=>v>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
+  const ampm=x=>{const p=x<12?'a':'p'; let hh=x%12; if(hh===0)hh=12; return hh+p;};
+  const bucketLabel=b=>ampm(b*2);
+  let html='<table style="border-collapse:collapse;font-size:11px;min-width:640px;"><thead><tr><th style="padding:4px 6px;"></th>';
+  for(let b=0;b<12;b++) html+=`<th style="padding:4px 4px;color:var(--text2);font-weight:600;text-align:center;">${bucketLabel(b)}</th>`;
+  html+='</tr></thead><tbody>';
+  for(let d=0;d<7;d++){
+    html+=`<tr><td style="padding:4px 8px;color:var(--text2);font-weight:700;">${CS_DOW[d]}</td>`;
+    for(let b=0;b<12;b++){
+      const v=avg[d][b]; const c=counts[d][b];
+      if(v==null){html+='<td style="padding:0;"><div style="margin:2px;height:30px;border-radius:4px;background:var(--surface2);"></div></td>';continue;}
+      const intensity=max?v/max:0;
+      const alpha=(0.12+intensity*0.78).toFixed(2);
+      const strong=intensity>0.55;
+      html+=`<td style="padding:0;"><div title="${CS_DOW[d]} ${bucketLabel(b)} · ${c} post${c===1?'':'s'} · avg ${fmtVal(v)}" style="margin:2px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(30,79,255,${alpha});color:${strong?'#fff':'var(--text2)'};font-weight:600;font-size:10px;cursor:default;">${fmtVal(v)}</div></td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
 }
 
 // ── Contract ─────────────────────────────────────────────────
