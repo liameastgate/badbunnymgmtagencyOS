@@ -249,6 +249,34 @@
   .guide-summary-title { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent2); margin-bottom: 12px; }
   .guide-summary ul { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; line-height: 1.9; }
   .guide-summary .guide-note { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(30,79,255,0.25); font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+  /* ── Model Hub ──────────────────────────────────────────── */
+  #mh2-orbs { display: flex; flex-wrap: wrap; gap: 30px 26px; justify-content: center; padding: 34px 8px 60px; }
+  .mh2-orb { display: flex; flex-direction: column; align-items: center; gap: 11px; cursor: pointer; width: 118px; animation: mh2Float 6s ease-in-out infinite; }
+  .mh2-orb:nth-child(3n)   { animation-duration: 7.4s; }
+  .mh2-orb:nth-child(3n+1) { animation-duration: 5.4s; }
+  .mh2-orb:nth-child(4n)   { animation-delay: -2.1s; }
+  .mh2-orb:nth-child(2n)   { animation-delay: -1.1s; }
+  .mh2-orb:nth-child(5n)   { animation-delay: -3.3s; }
+  .mh2-disc { width: 94px; height: 94px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 31px; font-weight: 800; color: #fff; letter-spacing: 1px; transition: transform .25s ease, filter .25s ease; border: 2px solid rgba(255,255,255,0.16); text-shadow: 0 1px 4px rgba(0,0,0,0.35); }
+  .mh2-orb:hover .mh2-disc { transform: scale(1.13) translateY(-5px); filter: brightness(1.12); }
+  .mh2-name { font-size: 13px; font-weight: 600; color: var(--text); text-align: center; max-width: 118px; line-height: 1.25; }
+  .mh2-sub { font-size: 9.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+  @keyframes mh2Float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
+  @keyframes mh2FlyIn { 0% { opacity: 0; transform: scale(.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+  #mh2-profile { animation: mh2FlyIn .4s cubic-bezier(.2,.8,.2,1); }
+  .mh2-hero { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .mh2-hero-disc { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; color: #fff; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.16); text-shadow: 0 1px 4px rgba(0,0,0,0.35); }
+  .mh2-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 18px; }
+  .mh2-tabbtn { padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .mh2-tabbtn:hover { color: var(--text); }
+  .mh2-tabbtn.active { background: rgba(30,79,255,0.15); border-color: var(--accent); color: #fff; }
+  .mh2-pane { display: none; }
+  .mh2-pane.active { display: block; animation: mh2FlyIn .3s ease; }
+  .mh2-infogrid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 10px; }
+  .mh2-infocell { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; }
+  .mh2-infocell .k { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+  .mh2-infocell .v { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 3px; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -1294,6 +1322,39 @@
       </div>
     </div>
 
+    <!-- Model Hub -->
+    <div class="page" id="page-model-hub">
+      <!-- Wall of floating model orbs -->
+      <div id="mh2-wall">
+        <div class="page-title">Model Hub</div>
+        <div class="page-sub">Tap a model to dive into everything about them — revenue, scheduling, performance and orders in one place</div>
+        <div style="max-width:340px;margin:18px 0 4px;">
+          <input id="mh2-search" type="text" placeholder="🔍 Search models…" oninput="mh2FilterWall()" style="width:100%;">
+        </div>
+        <div id="mh2-orbs"></div>
+      </div>
+
+      <!-- Per-model profile (fly-in) -->
+      <div id="mh2-profile" style="display:none;">
+        <button class="btn btn-sm btn-ghost" onclick="showModelHubWall()" style="margin-bottom:16px;">← All Models</button>
+        <div class="card" style="padding:20px 22px;">
+          <div id="mh2-hero" class="mh2-hero"></div>
+        </div>
+        <div class="mh2-tabs">
+          <button class="mh2-tabbtn active" id="mh2-tab-overview" onclick="mh2ShowPane('overview')">📊 Overview</button>
+          <button class="mh2-tabbtn" id="mh2-tab-revenue" onclick="mh2ShowPane('revenue')">💰 Revenue</button>
+          <button class="mh2-tabbtn" id="mh2-tab-schedule" onclick="mh2ShowPane('schedule')">🗓️ Scheduling</button>
+          <button class="mh2-tabbtn" id="mh2-tab-perf" onclick="mh2ShowPane('perf')">📈 Performance</button>
+          <button class="mh2-tabbtn" id="mh2-tab-orders" onclick="mh2ShowPane('orders')">📹 Orders</button>
+        </div>
+        <div class="mh2-pane active" id="mh2-pane-overview"></div>
+        <div class="mh2-pane" id="mh2-pane-revenue"></div>
+        <div class="mh2-pane" id="mh2-pane-schedule"></div>
+        <div class="mh2-pane" id="mh2-pane-perf"></div>
+        <div class="mh2-pane" id="mh2-pane-orders"></div>
+      </div>
+    </div>
+
     <!-- Model Settings -->
     <div class="page" id="page-models">
       <div class="page-title">Model Settings</div>
@@ -2247,6 +2308,7 @@ var NAV = [
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
   { id: 'contract',   icon: '✍️', label: 'Contract',            roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'model-hub',  icon: '🌌', label: 'Model Hub',           roles: ['admin','va'],                             section: 'Models' },
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
   { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
@@ -2359,6 +2421,7 @@ function navigate(page) {
   if (page === 'content-upload') renderContentUpload();
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'content-schedule') loadContentSchedule();
+  if (page === 'model-hub') renderModelHub();
   if (page === 'model-home') renderModelHome();
   if (page === 'model-invoices') renderModelInvoicePage();
   if (page === 'contract') loadContract();
@@ -4917,6 +4980,186 @@ function renderModels(){
         <div style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text2);font-size:12px;" title="The agency's cut — models keep the rest">Avg Agency Split %</span><strong>${STATE.models.length?(STATE.models.reduce((s,m)=>s+parseFloat(m.split||20),0)/STATE.models.length).toFixed(1):0}%</strong></div>
       </div>`;
   }
+}
+
+// ── Model Hub ────────────────────────────────────────────────
+// A visual "dive" into a single model: a wall of floating monogram orbs that flies into a
+// full per-model profile (revenue from weekly_reports, scheduling + best-time heatmap,
+// content performance, and content orders). Self-contained (mh2* namespace) so it never
+// collides with the model-home landing page (mh*) or the standalone feature pages it mirrors.
+// Data is fetched fresh per open (scoped to the model) rather than reusing the page-level
+// STATE arrays, which aren't guaranteed loaded unless those pages have been visited.
+function mh2Hue(str){let h=0;str=String(str||'');for(let i=0;i<str.length;i++){h=(h*31+str.charCodeAt(i))%360;}return h;}
+function mh2Initials(name){const p=String(name||'').trim().split(/\s+/).filter(Boolean);if(!p.length)return '?';return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase();}
+function mh2Grad(name){const h=mh2Hue(name);return `linear-gradient(135deg,hsl(${h},70%,56%),hsl(${(h+42)%360},72%,42%))`;}
+function mh2Glow(name){const h=mh2Hue(name);return `hsla(${h},80%,55%,0.5)`;}
+
+function renderModelHub(){
+  showModelHubWall();
+  const wall=document.getElementById('mh2-orbs'); if(!wall) return;
+  const models=(STATE.models||[]).filter(Boolean);
+  const search=(document.getElementById('mh2-search')?.value||'').toLowerCase().trim();
+  const shown=search?models.filter(m=>String(m.name||'').toLowerCase().includes(search)):models;
+  if(!shown.length){wall.innerHTML=`<div style="color:var(--text2);font-size:13px;padding:40px;width:100%;text-align:center;">No models${search?' match your search':' yet'}.</div>`;return;}
+  wall.innerHTML=shown.map(m=>`
+    <div class="mh2-orb" onclick="openModelProfile('${m.id}')" title="Open ${escapeHtml(m.name||'')}">
+      <div class="mh2-disc" style="background:${mh2Grad(m.name)};box-shadow:0 10px 30px ${mh2Glow(m.name)};">${escapeHtml(mh2Initials(m.name))}</div>
+      <div class="mh2-name">${escapeHtml(m.name||'—')}</div>
+      <div class="mh2-sub">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</div>
+    </div>`).join('');
+}
+function mh2FilterWall(){renderModelHub();}
+function showModelHubWall(){const w=document.getElementById('mh2-wall'),p=document.getElementById('mh2-profile');if(w)w.style.display='block';if(p)p.style.display='none';}
+
+function mh2ShowPane(name){
+  ['overview','revenue','schedule','perf','orders'].forEach(p=>{
+    document.getElementById('mh2-pane-'+p)?.classList.toggle('active',p===name);
+    document.getElementById('mh2-tab-'+p)?.classList.toggle('active',p===name);
+  });
+}
+
+async function openModelProfile(id){
+  const m=(STATE.models||[]).find(x=>x.id===id); if(!m) return;
+  STATE._hubModel=m;
+  const w=document.getElementById('mh2-wall'); if(w) w.style.display='none';
+  const prof=document.getElementById('mh2-profile'); if(!prof) return;
+  prof.style.display='block'; prof.style.animation='none'; void prof.offsetWidth; prof.style.animation='';
+  const pdf=STATE.modelSheetPdfs?.[m.id];
+  document.getElementById('mh2-hero').innerHTML=`
+    <div class="mh2-hero-disc" style="background:${mh2Grad(m.name)};box-shadow:0 8px 24px ${mh2Glow(m.name)};">${escapeHtml(mh2Initials(m.name))}</div>
+    <div style="flex:1;min-width:200px;">
+      <div style="font-size:23px;font-weight:800;">${escapeHtml(m.name||'—')}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:3px;">${[m.of_account?('@'+m.of_account):null,m.niche,m.platform].filter(Boolean).map(escapeHtml).join(' · ')||'—'}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span class="badge" style="background:${m.mgmt_type==='chatting'?'#0f1a2a':'#2a1a40'};color:${m.mgmt_type==='chatting'?'var(--blue)':'var(--accent2)'};">${m.mgmt_type==='chatting'?'Chatting':'Full Scale'}</span>
+      <span class="badge pending">Split ${m.split||20}%</span>
+      ${pdf?`<button class="btn btn-sm btn-ghost" onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(pdf)}'))" title="Info Sheet">📄 Info Sheet</button>`:''}
+      ${m.drive_link?`<a class="btn btn-sm btn-ghost" href="${m.drive_link}" target="_blank">📁 Drive</a>`:''}
+    </div>`;
+  mh2ShowPane('overview');
+  const loading='<div class="card"><div style="color:var(--text2);font-size:13px;">Loading…</div></div>';
+  ['overview','revenue','schedule','perf','orders'].forEach(p=>{const e=document.getElementById('mh2-pane-'+p);if(e)e.innerHTML=loading;});
+  try{
+    const nameLc=String(m.name||'').toLowerCase();
+    const [wrAll,cp,cs,co,srAll]=await Promise.all([
+      sb.from('weekly_reports').select('*'),
+      sb.from('content_performance').select('*').eq('model_id',id).order('post_date',{ascending:false}),
+      sb.from('content_schedule').select('*').eq('model_id',id).order('scheduled_date',{ascending:true}),
+      sb.from('content_orders').select('*').eq('model_id',id).order('created_at',{ascending:false}),
+      sb.from('sales_records').select('*')
+    ]);
+    // weekly_reports & sales_records are CSV-imported and matched by name as well as id, so
+    // fall back to a case-insensitive name match when model_id wasn't captured on the row.
+    const D={
+      wr:(wrAll.data||[]).filter(r=>r.model_id===id||String(r.model_name||'').toLowerCase()===nameLc),
+      cp:cp.data||[], cs:cs.data||[], co:co.data||[],
+      sr:(srAll.data||[]).filter(r=>r.model_id===id||String(r.model_name||'').toLowerCase()===nameLc)
+    };
+    if(STATE._hubModel!==m) return; // a different model was opened while this awaited
+    STATE._hubData=D;
+    mh2RenderOverview(m,D); mh2RenderRevenue(D); mh2RenderSchedule(D); mh2RenderPerf(D); mh2RenderOrders(D);
+  }catch(e){
+    console.error('openModelProfile',e);
+    document.getElementById('mh2-pane-overview').innerHTML='<div class="card"><div style="color:var(--red);font-size:13px;">Could not load this model’s data. Check your connection and try again.</div></div>';
+  }
+}
+
+function mh2RenderOverview(m,D){
+  const el=document.getElementById('mh2-pane-overview'); if(!el) return;
+  const earn=D.wr.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const pay=D.wr.reduce((s,r)=>s+parseFloat(r.model_payout||0),0);
+  const net=D.wr.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
+  const views=D.cp.reduce((s,r)=>s+(parseInt(r.views)||0),0);
+  const queued=D.cs.filter(r=>r.status==='scheduled').length;
+  const openOrders=D.co.filter(r=>r.status!=='done').length;
+  const stats=statCard('Lifetime Earnings','$'+fmt(earn),'white','purple')+statCard('Model Payouts','$'+fmt(pay))+statCard('Agency Net','$'+fmt(net),'accent','blue')+statCard('Total Views',views.toLocaleString())+statCard('Posts Tracked',D.cp.length,'accent')+statCard('Queued',queued)+statCard('Open Orders',openOrders);
+  const info=[
+    ['OnlyFans',m.of_account?('@'+m.of_account):'—'],['Platform',m.platform||'—'],
+    ['Management',m.mgmt_type==='chatting'?'Chatting':'Full Scale'],['Agency Split',(m.split||20)+'%'],
+    ['Niche',m.niche||'—'],['Chatters',m.chatters||'—'],
+    ['Instagram',(m.instagram_handles&&m.instagram_handles.length)?m.instagram_handles.join(', '):'—'],['Email',m.email||'—']
+  ];
+  el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">${stats}</div>
+    <div class="card"><div class="card-title">Model Details</div><div class="mh2-infogrid">${info.map(([k,v])=>`<div class="mh2-infocell"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div></div>`).join('')}</div></div>`;
+}
+
+function mh2RenderRevenue(D){
+  const el=document.getElementById('mh2-pane-revenue'); if(!el) return;
+  const rows=D.wr.slice().sort((a,b)=>String(b.week_of||'').localeCompare(String(a.week_of||'')));
+  if(!rows.length){el.innerHTML='<div class="card"><div style="color:var(--text2);font-size:13px;">No weekly reports for this model yet.</div></div>';return;}
+  const tot=rows.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
+  const pay=rows.reduce((s,r)=>s+parseFloat(r.model_payout||0),0);
+  const net=rows.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
+  const segs=[{label:'Subscriptions',key:'subscription_earnings',color:'#6b8fff'},{label:'Recurring',key:'recurring_subscription_earnings',color:'#4a9eff'},{label:'Tips',key:'tips_earnings',color:'#4ade80'},{label:'Messages/PPV',key:'message_earnings',color:'#facc15'},{label:'Streams',key:'streams_earnings',color:'#f472b6'},{label:'Posts',key:'posts_earnings',color:'#a78bfa'}];
+  const segTot=segs.map(s=>({label:s.label,color:s.color,total:rows.reduce((sum,r)=>sum+parseFloat(r[s.key]||0),0)}));
+  const grand=segTot.reduce((s,t)=>s+t.total,0);
+  const vis=segTot.filter(t=>t.total>0);
+  const bar=grand?vis.map(t=>`<div style="width:${(t.total/grand*100).toFixed(2)}%;background:${t.color};height:100%;" title="${t.label}: $${fmt(t.total)}"></div>`).join(''):'';
+  const legend=grand?vis.map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block;"></span>${t.label}: $${fmt(t.total)} (${(t.total/grand*100).toFixed(1)}%)</div>`).join(''):'<div style="color:var(--text2);font-size:12px;">No revenue breakdown available for this model.</div>';
+  const tbl=rows.map(r=>`<tr><td>${fmtDate(r.week_of)}${r.week_end?(' – '+fmtDate(r.week_end)):''}</td><td>$${fmt(r.total_earnings)}</td><td>$${fmt(r.model_payout)}</td><td class="profit">$${fmt(r.agency_net)}</td><td>${(parseFloat(r.renew_pct||0)*100).toFixed(1)}%</td></tr>`).join('');
+  el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">${statCard('Total Earnings','$'+fmt(tot),'white','purple')+statCard('Model Payouts','$'+fmt(pay))+statCard('Agency Net','$'+fmt(net),'accent','blue')}</div>
+    <div class="card"><div class="card-title">Revenue Mix</div><div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;background:var(--surface2);">${bar}</div><div style="display:flex;flex-wrap:wrap;gap:5px 16px;">${legend}</div></div>
+    <div class="card"><div class="card-title">Weekly Breakdown (${rows.length})</div><div class="table-wrap"><table><thead><tr><th>Week</th><th>Earnings</th><th>Payout</th><th>Agency Net</th><th>Renew %</th></tr></thead><tbody>${tbl}</tbody></table></div></div>`;
+}
+
+function mh2RenderSchedule(D){
+  const el=document.getElementById('mh2-pane-schedule'); if(!el) return;
+  const today=toLocalISO(new Date());
+  const rows=D.cs.slice();
+  const upcoming=rows.filter(r=>r.status==='scheduled').sort((a,b)=>String(a.scheduled_date).localeCompare(String(b.scheduled_date)));
+  const posted=rows.filter(r=>r.status==='posted').length;
+  const g={}; upcoming.forEach(r=>{(g[r.scheduled_date]=g[r.scheduled_date]||[]).push(r);});
+  const days=Object.keys(g).sort();
+  const queueHtml=days.length?days.map(date=>{
+    const list=g[date].sort((a,b)=>{if(!a.scheduled_time&&!b.scheduled_time)return 0;if(!a.scheduled_time)return 1;if(!b.scheduled_time)return -1;return a.scheduled_time.localeCompare(b.scheduled_time);});
+    const isPast=date<today;
+    return `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">${fmtDate(date)}${date===today?' · Today':''}</div>`+list.map(r=>{const overdue=isPast;return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid ${overdue?'rgba(245,158,11,0.4)':'var(--border)'};background:${overdue?'rgba(245,158,11,0.06)':'var(--surface2)'};border-radius:8px;margin-bottom:6px;flex-wrap:wrap;"><span style="font-size:13px;font-weight:700;min-width:48px;">${r.scheduled_time?r.scheduled_time.slice(0,5):'—'}</span><span style="font-size:12px;min-width:96px;">${CS_PLATFORM_LABEL[r.platform]||r.platform||'—'}</span><span style="font-size:12px;color:var(--text2);flex:1;min-width:120px;">${escapeHtml(r.caption||'')}</span>${overdue?'<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;">overdue</span>':'<span class="badge pending">scheduled</span>'}</div>`;}).join('')+`</div>`;
+  }).join(''):'<div style="color:var(--text2);font-size:13px;">Nothing scheduled right now.</div>';
+  let heatHtml;
+  const src=D.cp.slice();
+  if(src.length){
+    const{avg,counts}=bestTimeMatrix(src,'views');
+    let max=0; avg.forEach(row=>row.forEach(v=>{if(v!=null&&v>max)max=v;}));
+    const fmtVal=v=>v>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
+    const ampm=x=>{const p=x<12?'a':'p';let hh=x%12;if(hh===0)hh=12;return hh+p;};
+    let h='<table style="border-collapse:collapse;font-size:11px;min-width:640px;"><thead><tr><th></th>';
+    for(let b=0;b<12;b++)h+=`<th style="padding:4px;color:var(--text2);font-weight:600;">${ampm(b*2)}</th>`;
+    h+='</tr></thead><tbody>';
+    for(let d=0;d<7;d++){h+=`<tr><td style="padding:4px 8px;color:var(--text2);font-weight:700;">${CS_DOW[d]}</td>`;for(let b=0;b<12;b++){const v=avg[d][b];const c=counts[d][b];if(v==null){h+='<td style="padding:0;"><div style="margin:2px;height:28px;border-radius:4px;background:var(--surface2);"></div></td>';continue;}const intensity=max?v/max:0;const alpha=(0.12+intensity*0.78).toFixed(2);const strong=intensity>0.55;h+=`<td style="padding:0;"><div title="${CS_DOW[d]} ${ampm(b*2)} · ${c} post${c===1?'':'s'} · avg ${fmtVal(v)}" style="margin:2px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(30,79,255,${alpha});color:${strong?'#fff':'var(--text2)'};font-weight:600;font-size:10px;">${fmtVal(v)}</div></td>`;}h+='</tr>';}
+    h+='</tbody></table>';
+    heatHtml=`<div class="card"><div class="card-title">Best Time To Post · avg views</div><div style="overflow-x:auto;">${h}</div></div>`;
+  }else{
+    heatHtml='<div class="card"><div class="card-title">Best Time To Post</div><div style="color:var(--text2);font-size:12px;">Add Content Performance posts to unlock the best-time grid.</div></div>';
+  }
+  el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">${statCard('Upcoming',upcoming.length,'accent')+statCard('Posted',posted)+statCard('Total Scheduled',rows.length)}</div>
+    ${heatHtml}
+    <div class="card"><div class="card-title">Upcoming Queue</div>${queueHtml}</div>`;
+}
+
+function mh2RenderPerf(D){
+  const el=document.getElementById('mh2-pane-perf'); if(!el) return;
+  const rows=D.cp.slice();
+  if(!rows.length){el.innerHTML='<div class="card"><div style="color:var(--text2);font-size:13px;">No content performance data for this model yet.</div></div>';return;}
+  const views=rows.reduce((s,r)=>s+(parseInt(r.views)||0),0);
+  const follows=rows.reduce((s,r)=>s+(parseInt(r.new_followers)||0),0);
+  const saves=rows.reduce((s,r)=>s+(parseInt(r.saves)||0),0);
+  const cards=rows.map(r=>{
+    const thumb=r.thumbnail_url?`<img src="${r.thumbnail_url}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;">`:`<div style="width:100%;aspect-ratio:1/1;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;">${(r.post_type==='IG reel'||r.post_type==='IG video')?'🎬':(r.post_type==='IG carousel'?'🖼️':'📷')}</div>`;
+    return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);"><div style="border-radius:8px 8px 0 0;overflow:hidden;">${thumb}</div><div style="padding:9px 10px;"><div style="font-size:10px;color:var(--text2);">${fmtDate(r.post_date)}</div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;"><span title="Views">👁 ${(parseInt(r.views)||0).toLocaleString()}</span><span title="New followers">➕ ${(parseInt(r.new_followers)||0).toLocaleString()}</span><span title="Saves">🔖 ${(parseInt(r.saves)||0).toLocaleString()}</span></div></div></div>`;
+  }).join('');
+  el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">${statCard('Posts',rows.length,'accent')+statCard('Total Views',views.toLocaleString())+statCard('New Followers',follows.toLocaleString(),'accent')+statCard('Total Saves',saves.toLocaleString())}</div>
+    <div class="card"><div class="card-title">Posts (${rows.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">${cards}</div></div>`;
+}
+
+function mh2RenderOrders(D){
+  const el=document.getElementById('mh2-pane-orders'); if(!el) return;
+  const rows=D.co.slice();
+  if(!rows.length){el.innerHTML='<div class="card"><div style="color:var(--text2);font-size:13px;">No content orders for this model yet.</div></div>';return;}
+  const open=rows.filter(r=>r.status!=='done').length;
+  const body=rows.map(o=>{const pl=o.platform==='instagram'?'<span class="platform-ig">IG</span>':o.platform==='tiktok'?'<span class="platform-tt">TT</span>':(escapeHtml(o.platform||'—'));return `<tr><td>${pl}</td><td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td><td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td><td style="max-width:200px;">${escapeHtml(o.notes||'—')}</td><td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td><td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td></tr>`;}).join('');
+  el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">${statCard('Total Orders',rows.length,'accent')+statCard('Open',open)+statCard('Done',rows.length-open)}</div>
+    <div class="card"><div class="card-title">Content Orders</div><div class="table-wrap"><table><thead><tr><th>Platform</th><th>Link</th><th>Drive</th><th>Notes</th><th>Status</th><th>Created</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
