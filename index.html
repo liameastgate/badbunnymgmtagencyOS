@@ -2079,6 +2079,7 @@
           <div class="form-group"><label>Proxy IP</label><input id="acc-proxy-ip" placeholder="e.g. 192.0.2.14:8080"></div>
           <div class="form-group"><label>Proxy location</label><input id="acc-proxy-location" placeholder="e.g. London, UK"></div>
         </div>
+        <div class="form-group full"><label>Role in funnel</label><select id="acc-tier"><option value="">— none —</option><option value="mother">👑 Mother (protect)</option><option value="slave">🎬 Slave (expendable)</option></select></div>
         <div class="form-group full"><label>Notes</label><textarea id="acc-notes" rows="2" placeholder="Anything else worth remembering…"></textarea></div>
         <div id="acc-modal-alert" style="color:var(--red);font-size:13px;margin:2px 0 8px;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -5329,7 +5330,7 @@ function renderAccounts(){
   const wrap=document.getElementById('acc-cards'); const empty=document.getElementById('acc-empty'); if(!wrap)return;
   const ent=STATE._accEntity; const q=((document.getElementById('acc-search')||{}).value||'').toLowerCase().trim();
   var rows=(STATE.accounts||[]).filter(function(a){ return ent==='agency'?a.owner_type==='agency':a.model_id===ent; });
-  if(q) rows=rows.filter(function(a){ return [a.platform,a.handle,a.email,a.proxy_ip,a.proxy_location,a.phone_device,a.operator,a.notes,ACC_PLAT_LABEL[a.platform]].some(function(v){return String(v||'').toLowerCase().includes(q);}); });
+  if(q) rows=rows.filter(function(a){ return [a.platform,a.handle,a.email,a.proxy_ip,a.proxy_location,a.phone_device,a.operator,a.notes,a.tier,ACC_PLAT_LABEL[a.platform]].some(function(v){return String(v||'').toLowerCase().includes(q);}); });
   var total=rows.length, active=rows.filter(function(a){return a.status==='active';}).length, attn=rows.filter(function(a){return ['banned','shadowbanned'].includes(a.status);}).length, proxied=rows.filter(function(a){return a.proxy_enabled;}).length;
   const sum=document.getElementById('acc-summary'); if(sum) sum.innerHTML=statCard('Accounts',total,'accent')+statCard('Active',active)+statCard('Need attention',attn,'',attn?'red':'')+statCard('Behind proxy',proxied);
   if(!rows.length){ wrap.innerHTML=''; if(empty)empty.style.display='block'; return; } if(empty)empty.style.display='none';
@@ -5341,12 +5342,13 @@ function renderAccounts(){
     var st=a.status||'active';
     var stcls={active:'st-active',banned:'st-banned',warming:'st-warming',shadowbanned:'st-shadow',disabled:'st-disabled'}[st]||'st-active';
     var needs=['banned','shadowbanned'].includes(st);
+    var tierChip=a.tier==='mother'?'<span class="acc-status" style="background:rgba(74,222,128,.16);color:#4ade80;">👑 Mother</span>':a.tier==='slave'?'<span class="acc-status" style="background:rgba(245,158,11,.16);color:#fbbf24;">🎬 Slave</span>':'';
     var pwRow='';
     if(a.password){ pwRow= isAdmin ? '<div class="acc-row"><span class="k">Password</span><span class="v mono pw-val" onclick="togglePw(this)" title="click to reveal / hide">'+escapeHtml(a.password)+'</span>'+cbtn(a.password)+'</div>' : '<div class="acc-row"><span class="k">Password</span><span class="v" style="color:var(--text3);">•••••• admin only</span></div>'; }
     var proxyRow;
     if(a.proxy_enabled){ var pv=[a.proxy_ip,a.proxy_location].filter(Boolean).join(' · '); proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-yes">● On</span>'+(pv?' — '+escapeHtml(pv):'')+'</span>'+cbtn(a.proxy_ip)+'</div>'; }
     else proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-no">○ None</span></span></div>';
-    return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span class="acc-status '+stcls+'">'+st+'</span></div><div class="acc-rows">'+line('Handle',a.handle)+line('Email',a.email)+pwRow+proxyRow+plain('Phone',a.phone_device)+plain('Operator',a.operator)+plain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
+    return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+line('Handle',a.handle)+line('Email',a.email)+pwRow+proxyRow+plain('Phone',a.phone_device)+plain('Operator',a.operator)+plain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
   }).join('');
 }
 function openAccountModal(id){
@@ -5357,12 +5359,12 @@ function openAccountModal(id){
   if(id){
     var a=(STATE.accounts||[]).find(function(x){return x.id===id;}); if(!a)return;
     document.getElementById('account-modal-title').textContent='Edit Account · '+entName;
-    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');
+    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');
     document.getElementById('acc-proxy-enabled').checked=!!a.proxy_enabled;
     document.getElementById('acc-proxy-fields').style.display=a.proxy_enabled?'grid':'none';
   } else {
     document.getElementById('account-modal-title').textContent='Add Account · '+entName;
-    ['acc-id','acc-handle','acc-email','acc-password','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes'].forEach(function(x){set(x,'');});
+    ['acc-id','acc-handle','acc-email','acc-password','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
     set('acc-platform', ent==='agency'?'other':'onlyfans'); set('acc-status','active');
     document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none';
   }
@@ -5371,7 +5373,7 @@ function openAccountModal(id){
 async function saveAccount(){
   var g=function(x){return ((document.getElementById(x)||{}).value||'').trim();};
   var ent=STATE._accEntity;
-  var p={ owner_type: ent==='agency'?'agency':'model', model_id: ent==='agency'?null:ent, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, notes:g('acc-notes')||null };
+  var p={ owner_type: ent==='agency'?'agency':'model', model_id: ent==='agency'?null:ent, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
   var id=g('acc-id'); var al=document.getElementById('acc-modal-alert');
   var res = id ? await sb.from('accounts').update(p).eq('id',id).select() : await sb.from('accounts').insert(p).select();
   if(res.error){ if(al)al.textContent='Could not save — '+res.error.message; return; }
