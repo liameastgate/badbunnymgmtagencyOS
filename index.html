@@ -1663,8 +1663,8 @@
          Settings. Admin gets the same list plus mark-paid/unpaid and a manual "add invoice"
          fallback for anything the auto-generation didn't cover (bonuses, corrections, etc). -->
     <div class="page" id="page-model-invoices">
-      <div class="page-title" id="minv-page-title">My Invoices</div>
-      <div class="page-sub" id="minv-page-sub">Your weekly payouts — generated automatically each week</div>
+      <div class="page-title" id="minv-page-title">Agency Commissions</div>
+      <div class="page-sub" id="minv-page-sub">The agency’s weekly cut — generated automatically each week</div>
 
       <div id="minv-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;max-width:620px;"></div>
 
@@ -2591,7 +2591,7 @@ function renderModelHome(){
   const DESCS={
     content:'Submit & track your content', 'content-upload':'Your Drive folder for finished content', contentperf:'See how your posts are doing',
     ideas:'Fresh ideas for your niche', guides:'Drip sets & weekly requirements',
-    'model-invoices':'See your weekly payouts', sheets:'View or edit your chatting script'
+    'model-invoices':'See the agency’s weekly commission', sheets:'View or edit your chatting script'
   };
   const role=STATE.profile?.role;
   const customPerms=STATE.profile?.permissions;
@@ -4732,9 +4732,9 @@ async function saveReportRows(){
     const{error:dailyError}=await sb.from('creator_stats_daily').insert(dailyRows);
     msg+= dailyError ? ` (Daily breakdown did not save: ${dailyError.message})` : ` +${dailyRows.length} daily rows.`;
   }
-  // Auto-generate this week's model payout invoices straight off the numbers just saved --
-  // reuses row.model_payout (== gross earnings minus the agency's split cut) so the invoice
-  // amount always matches what was just shown in the preview table above, no separate math.
+  // Auto-generate this week's agency-commission invoices straight off the numbers just saved --
+  // reuses row.agency_net (the agency's split cut of the earnings) so the invoice amount is
+  // the agency's cut, matching the Agency Net column shown in the preview table above.
   const invResult=await generateModelInvoicesFromReport(raw,weekOf,weekEnd);
   if(invResult.error) msg+=` (Invoices did not auto-generate: ${invResult.error.message})`;
   else if(invResult.generated) msg+=` · ${invResult.generated} model invoice${invResult.generated!==1?'s':''} generated${invResult.skippedPaid?`, ${invResult.skippedPaid} skipped (already paid)`:''}.`;
@@ -4765,7 +4765,7 @@ async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
   // so every week's invoice lands on the same predictable schedule (e.g. the week of Jul
   // 20-26 becomes payable Aug 3, always the Monday two weeks after the week's own Monday).
   const payoutDate=addDays(weekOf,14);
-  const eligible=rows.filter(r=>r.model_id && r.model_payout>0);
+  const eligible=rows.filter(r=>r.model_id && r.agency_net>0);
   if(!eligible.length) return {generated:0, skippedPaid:0};
 
   // Re-uploading the same week (a correction) should replace any invoice for it that's
@@ -4788,13 +4788,13 @@ async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
       submitted_by_name:r.model_name,
       role:'model',
       week_of:weekOf, week_end:weekEnd,
-      amount:r.model_payout,
+      amount:r.agency_net,
       gross_earnings:r.total_earnings,
       split_pct:r.model_split,
       source:'auto',
       status:'unpaid',
       payout_date:payoutDate,
-      description:'Weekly earnings payout'
+      description:'Weekly agency commission'
     });
   });
 
@@ -6215,8 +6215,8 @@ async function renderModelInvoicePage(){
   if(actionsEl) actionsEl.style.display=isAdmin?'block':'none';
   const titleEl=document.getElementById('minv-page-title');
   const subEl=document.getElementById('minv-page-sub');
-  if(titleEl) titleEl.textContent=isAdmin?'Model Invoices':'My Invoices';
-  if(subEl) subEl.textContent=isAdmin?'Weekly payouts generated automatically from Creator Stats uploads, plus anything added manually':'Your weekly payouts — generated automatically each week';
+  if(titleEl) titleEl.textContent=isAdmin?'Agency Commissions':'My Invoices';
+  if(subEl) subEl.textContent=isAdmin?'The agency’s weekly cut, generated automatically from Creator Stats uploads, plus anything added manually':'Your weekly agency commission — generated automatically each week';
 
   let query=sb.from('invoices').select('*').eq('role','model').order('week_of',{ascending:false});
   if(!isAdmin) query=query.eq('submitted_by_email',STATE.profile.email);
@@ -6255,7 +6255,7 @@ function renderModelInvoiceCards(){
 function modelInvoiceCardHtml(inv,isAdmin){
   const period=inv.week_end?`${fmtDate(inv.week_of)} – ${fmtDate(inv.week_end)}`:fmtDate(inv.week_of);
   const isPaid=inv.status==='paid';
-  const modelSharePct=inv.split_pct!=null?(100-parseFloat(inv.split_pct)):null;
+  const agencyPct=inv.split_pct!=null?parseFloat(inv.split_pct):null;
   return `<div class="card minv-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
       <div>
@@ -6265,7 +6265,7 @@ function modelInvoiceCardHtml(inv,isAdmin){
       <span style="background:${isPaid?'rgba(46,196,120,.15)':'rgba(230,180,40,.15)'};color:${isPaid?'var(--green)':'#e6b428'};text-transform:uppercase;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.05em;white-space:nowrap;">${inv.status}</span>
     </div>
     <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px;">$${fmt(inv.amount)}</div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">${modelSharePct!=null?`${modelSharePct}% of $${fmt(inv.gross_earnings||0)} gross earnings`:(inv.description||'Payout')}</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">${agencyPct!=null?`Agency cut · ${agencyPct}% split of $${fmt(inv.gross_earnings||0)} gross`:(inv.description||'Agency commission')}</div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;">
       <span>${isPaid?`Paid ${fmtDate(inv.paid_at)}`:`Payable ${fmtDate(inv.payout_date)}`}</span>
       <span>${inv.source==='auto'?'Auto-generated':'Manual'}</span>
