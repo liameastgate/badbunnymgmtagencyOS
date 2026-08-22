@@ -1470,15 +1470,15 @@
 
     <!-- Chatter Management -->
     <div class="page" id="page-chatters">
-      <div class="page-title">Chatter Management</div>
-      <div class="page-sub">Track hours, wages and commission per chatter</div>
-      <div class="tabs">
+      <div class="page-title" id="schedule-page-title">Schedule</div>
+      <div class="page-sub" id="schedule-page-sub">Track hours, wages and commission per chatter</div>
+      <div class="tabs" id="chatter-tabs">
         <div class="tab active" onclick="switchChatterTab('roster')">Roster</div>
         <div class="tab" onclick="switchChatterTab('hours')">Log Hours</div>
         <div class="tab" onclick="switchChatterTab('summary')">Weekly Summary</div>
       </div>
       <div id="chatter-tab-roster">
-        <div class="two-col">
+        <div class="two-col" id="chatter-admin-tools">
           <div>
             <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openAddChatterModal()">➕ Add Chatter</button></div>
             <div class="card"><div class="table-wrap"><table>
@@ -2428,14 +2428,14 @@ var MY_INVOICES_DATA=[]; // the current user's own invoices — needed so a non-
 // Mgmt, but still needs the "Chatting" header to appear above Chatting SOPs.
 var NAV = [
   { id: 'model-home', icon: '🏠', label: 'Overview',            roles: ['model'],                                  section: 'General' },
-  { id: 'overview',   icon: '🏠', label: 'Dashboard',           roles: ['admin','va','chatter','traffic'],         section: 'General' },
-  { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',         roles: ['admin','va','chatter','traffic'],         section: 'General' },
+  { id: 'overview',   icon: '🏠', label: 'Dashboard',           roles: ['admin','va','traffic'],                   section: 'General' },
+  { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',         roles: ['admin','va','traffic'],                   section: 'General' },
   { id: 'reports',    icon: '📊', label: 'Weekly Reports',      roles: ['admin','va'],                             section: 'General' },
 
-  { id: 'chatters',   icon: '💬', label: 'Chatter Mgmt',        roles: ['admin','va'],                             section: 'Chatting' },
+  { id: 'chatters',   icon: '📅', label: 'Schedule',            roles: ['admin','va','chatter'],                   section: 'Chatting' },
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',       roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
   { id: 'sheets',     icon: '📋', label: 'Chatting Script',      roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
-  { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
+  { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','traffic'],                   section: 'Chatting' },
 
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
@@ -2500,7 +2500,7 @@ async function initApp(user) {
   buildNav(profile.role);
   await loadAllData();
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
-  const defaultPage = profile.role === 'model' ? 'model-home' : 'overview';
+  const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'chatters' : 'overview';
   let savedPage=null;
   try{ savedPage=localStorage.getItem('agencyos_page'); }catch(e){}
   navigate(savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage);
@@ -2559,7 +2559,7 @@ function navigate(page) {
   if (page === 'traffic-sops') { SOP_CATEGORY='traffic'; loadSOPs(); }
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
-  if (page === 'chatters') { loadChatterShifts(); loadRosterSlots(); }
+  if (page === 'chatters') renderSchedulePage();
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -5499,6 +5499,27 @@ function shiftDaysLabel(days){
   if(sorted.join(',')==='1,2,3,4,5') return 'Mon–Fri';
   return sorted.map(d=>labels[d]).join(', ');
 }
+// Schedule page (formerly Chatter Mgmt). Staff see the full tool (roster + hours + summary);
+// a 'chatter' sees ONLY the read-only Weekly Roster grid -- renderRosterGrid() already omits
+// the edit/+Add controls for non-admin roles, so we just hide the admin tabs and tools here.
+function renderSchedulePage(){
+  const isStaff=['admin','va'].includes(STATE.profile?.role);
+  const tabs=document.getElementById('chatter-tabs');
+  const tools=document.getElementById('chatter-admin-tools');
+  const tabRoster=document.getElementById('chatter-tab-roster');
+  const tabHours=document.getElementById('chatter-tab-hours');
+  const tabSummary=document.getElementById('chatter-tab-summary');
+  const sub=document.getElementById('schedule-page-sub');
+  if(tabs) tabs.style.display=isStaff?'':'none';
+  if(tools) tools.style.display=isStaff?'':'none';
+  if(tabHours&&!isStaff) tabHours.style.display='none';
+  if(tabSummary&&!isStaff) tabSummary.style.display='none';
+  if(tabRoster) tabRoster.style.display='block';
+  if(sub) sub.textContent=isStaff?'Track hours, wages and commission per chatter':'Your weekly roster — all times AEST';
+  loadChatterShifts();
+  loadRosterSlots();
+}
+
 async function loadChatterShifts(){
   const{data,error}=await sb.from('chatter_shifts').select('*');
   if(error){ console.error('loadChatterShifts',error); return; }
@@ -6754,6 +6775,7 @@ async function loadModelSheets(){
   const addBtn=document.getElementById('sheets-add-model-btn');
   if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
   renderSheetsSidebar();
+  if(!window._currentSheetModelId) renderSheetsLanding();
 }
 
 function renderSheetsSidebar(){
@@ -6787,7 +6809,8 @@ async function openSheetForModel(model){
   window._currentSheetId=sheet.id||null;
   if(role!=='model') renderSheetsSidebar(); // refresh to highlight the newly-selected row
   document.getElementById('sheets-content').innerHTML=`
-    <div style="max-width:820px;">
+    <div style="display:flex;gap:20px;align-items:flex-start;">
+    <div style="flex:1;min-width:0;max-width:820px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
         <div>
           <div style="font-size:24px;font-weight:800;">${escapeHtml(model.name)}</div>
@@ -6816,8 +6839,11 @@ async function openSheetForModel(model){
           :renderSheetSearchable(sheet.onboarding_text,'sheet')}
       </div>
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
+    </div>
+    <div id="sheet-notes-panel" style="width:340px;flex-shrink:0;"></div>
     </div>`;
   applySheetZoom();
+  renderScriptNotes(model.id);
 }
 
 // "Allow resizing" -- a simple text-size zoom on the actual script content (the part people
@@ -6867,6 +6893,186 @@ async function saveSheet(modelId){
   else{const{data}=await sb.from('model_sheets').insert(payload).select().single();window._currentSheetId=data?.id;}
   showAlert('sheet-alert','Saved!','success');
 }
+
+// ── Script Notes (live model updates for chatters) ─────────────
+// Bubble-style notes shown beside an open Chatting Script. Models (own script) + admin/va
+// post/edit/delete; chatters view only. Images stored as downscaled base64 thumbnails.
+var _scriptNotes=[];
+var _editingNoteId=null;
+var _pendingNoteImg=null;
+
+function fmtDateTime(ts){
+  if(!ts) return '';
+  const d=new Date(ts); if(isNaN(d)) return '';
+  return d.toLocaleString(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+}
+function notesSeenMap(){ try{ return JSON.parse(localStorage.getItem('agencyos_notes_seen')||'{}'); }catch(e){ return {}; } }
+function markNotesSeen(modelId){ try{ const m=notesSeenMap(); m[modelId]=new Date().toISOString(); localStorage.setItem('agencyos_notes_seen',JSON.stringify(m)); }catch(e){} }
+function canManageNotes(modelId){
+  const role=STATE.profile?.role;
+  if(['admin','va'].includes(role)) return true;
+  return role==='model' && myOwnModel()?.id===modelId;
+}
+
+async function renderScriptNotes(modelId){
+  const panel=document.getElementById('sheet-notes-panel'); if(!panel) return;
+  _editingNoteId=null; _pendingNoteImg=null;
+  const{data}=await sb.from('script_notes').select('*').eq('model_id',modelId).order('created_at',{ascending:false});
+  _scriptNotes=data||[];
+  markNotesSeen(modelId); // opening a script clears its "new messages" flag for this user
+  renderNotesPanel(modelId);
+}
+
+function renderNotesPanel(modelId){
+  const panel=document.getElementById('sheet-notes-panel'); if(!panel) return;
+  const canManage=canManageNotes(modelId);
+  const composer=canManage?`
+    <div style="margin-bottom:14px;">
+      <textarea id="note-input" placeholder="Leave an update for the chatters — new PPV drop, description, page news…" style="width:100%;box-sizing:border-box;min-height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;color:var(--text);font-family:inherit;resize:vertical;"></textarea>
+      <div id="note-img-preview" style="margin-top:6px;"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;">📎 Photo<input type="file" accept="image/*" style="display:none;" onchange="handleNoteImg(this.files[0])"></label>
+        <button class="btn btn-primary btn-sm" onclick="postScriptNote('${modelId}')" style="margin-left:auto;">Post update</button>
+      </div>
+    </div>`:'';
+  const bubbles=_scriptNotes.length
+    ? _scriptNotes.map(n=>noteBubbleHtml(n,canManage)).join('')
+    : `<div style="color:var(--text2);font-size:12px;text-align:center;padding:20px 8px;">No updates yet.</div>`;
+  panel.innerHTML=`
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:15px;font-weight:800;">💬 Live Updates</span>
+        <span style="font-size:11px;color:var(--text2);">for chatters</span>
+      </div>
+      ${composer}
+      <div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow-y:auto;">${bubbles}</div>
+    </div>`;
+}
+
+function noteBubbleHtml(n,canManage){
+  if(_editingNoteId===n.id){
+    return `<div style="background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:10px;">
+      <textarea id="note-edit-input" style="width:100%;box-sizing:border-box;min-height:60px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;color:var(--text);font-family:inherit;">${(n.body||'').replace(/</g,'&lt;')}</textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm" onclick="cancelEditNote()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveEditNote('${n.id}')">Save</button>
+      </div>
+    </div>`;
+  }
+  const roleTag=n.author_role==='model'?'Model':(n.author_role==='admin'?'Admin':(n.author_role==='va'?'VA':(n.author_role||'')));
+  const img=n.image_url?`<img src="${n.image_url}" onclick="openImageLightbox('${n.id}')" style="margin-top:8px;width:88px;height:88px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--border);">`:'';
+  const controls=canManage?`
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <span onclick="startEditNote('${n.id}')" title="Edit" style="cursor:pointer;font-size:12px;opacity:.7;">✏️</span>
+      <span onclick="deleteScriptNote('${n.id}')" title="Delete" style="cursor:pointer;font-size:12px;opacity:.7;">🗑️</span>
+    </div>`:'';
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;border-top-left-radius:3px;padding:10px 12px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;">
+      <span style="font-size:12px;font-weight:700;">${escapeHtml(n.author_name||'—')}${roleTag?` <span style="font-weight:500;color:var(--text2);">· ${roleTag}</span>`:''}</span>
+      <span style="font-size:10px;color:var(--text2);white-space:nowrap;">${fmtDateTime(n.created_at)}</span>
+    </div>
+    <div style="font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--text);">${escapeHtml(n.body||'')}</div>
+    ${img}
+    ${controls}
+  </div>`;
+}
+
+function handleNoteImg(file){
+  if(!file) return;
+  readImageThumb(file,dataUrl=>{
+    _pendingNoteImg=dataUrl;
+    const p=document.getElementById('note-img-preview');
+    if(p) p.innerHTML=`<div style="position:relative;display:inline-block;"><img src="${dataUrl}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"><span onclick="clearNoteImg()" title="Remove" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;">✕</span></div>`;
+  });
+}
+function clearNoteImg(){ _pendingNoteImg=null; const p=document.getElementById('note-img-preview'); if(p)p.innerHTML=''; }
+
+// Downscale to <=900px and JPEG-compress so PPV covers stay small enough for a text column.
+function readImageThumb(file,cb){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=900; let w=img.width,h=img.height;
+      if(w>max||h>max){ const r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.72));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function postScriptNote(modelId){
+  const ta=document.getElementById('note-input');
+  const body=(ta?.value||'').trim();
+  if(!body&&!_pendingNoteImg) return;
+  const p=STATE.profile||{};
+  const{error}=await sb.from('script_notes').insert({
+    model_id:modelId, body, image_url:_pendingNoteImg||null,
+    author_email:p.email||null, author_name:(p.name||(p.email||'').split('@')[0]||'—'), author_role:p.role||null
+  });
+  if(error) return alert('Could not post: '+error.message);
+  _pendingNoteImg=null;
+  renderScriptNotes(modelId);
+}
+
+function startEditNote(id){ _editingNoteId=id; renderNotesPanel(window._currentSheetModelId); }
+function cancelEditNote(){ _editingNoteId=null; renderNotesPanel(window._currentSheetModelId); }
+async function saveEditNote(id){
+  const val=document.getElementById('note-edit-input')?.value||'';
+  const{error}=await sb.from('script_notes').update({body:val,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error) return alert('Could not save: '+error.message);
+  _editingNoteId=null;
+  const n=_scriptNotes.find(x=>x.id===id); if(n) n.body=val;
+  renderNotesPanel(window._currentSheetModelId);
+}
+async function deleteScriptNote(id){
+  if(!confirm('Delete this update?')) return;
+  const{error,data}=await sb.from('script_notes').delete().eq('id',id).select();
+  if(error||!data||!data.length) return alert('Could not delete — you may not have permission.');
+  _scriptNotes=_scriptNotes.filter(x=>x.id!==id);
+  renderNotesPanel(window._currentSheetModelId);
+}
+function openImageLightbox(id){
+  const n=_scriptNotes.find(x=>x.id===id); if(!n||!n.image_url) return;
+  let ov=document.getElementById('note-lightbox');
+  if(!ov){ ov=document.createElement('div'); ov.id='note-lightbox'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out;'; ov.onclick=()=>ov.remove(); document.body.appendChild(ov); }
+  ov.innerHTML=`<img src="${n.image_url}" style="max-width:92vw;max-height:92vh;border-radius:8px;">`;
+}
+
+// Staff/chatter landing when no script is open: show a "You have new messages" prompt ONLY
+// if a model has left a note this user hasn't opened since; otherwise the normal empty state.
+async function renderSheetsLanding(){
+  const content=document.getElementById('sheets-content'); if(!content) return;
+  const seen=notesSeenMap();
+  const{data}=await sb.from('script_notes').select('model_id,created_at,author_role').eq('author_role','model');
+  const newest={};
+  (data||[]).forEach(n=>{ if(!newest[n.model_id]||n.created_at>newest[n.model_id]) newest[n.model_id]=n.created_at; });
+  const withNew=Object.keys(newest).filter(mid=> !seen[mid] || newest[mid]>seen[mid]);
+  if(withNew.length){
+    const items=withNew.map(mid=>{
+      const m=STATE.models.find(x=>x.id===mid);
+      return `<div onclick="openSheetForModelById('${mid}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:8px;">
+        <div class="sheet-side-avatar">${escapeHtml((m&&m.name?m.name:'?').trim().charAt(0).toUpperCase())}</div>
+        <div style="flex:1;"><div style="font-weight:700;font-size:13px;">${escapeHtml(m&&m.name?m.name:'Unknown model')}</div><div style="font-size:11px;color:var(--text2);">New update ${fmtDateTime(newest[mid])}</div></div>
+        <span style="width:9px;height:9px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>
+      </div>`;
+    }).join('');
+    content.innerHTML=`<div style="max-width:520px;margin:40px auto 0;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <span style="font-size:20px;">📬</span>
+        <span style="font-size:18px;font-weight:800;">You have new messages</span>
+        <span style="background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:20px;padding:2px 9px;">${withNew.length}</span>
+      </div>
+      ${items}
+    </div>`;
+  } else {
+    content.innerHTML='<div class="empty" style="margin-top:80px;"><div class="empty-icon">📋</div><p>Select a model to view their chatting script</p></div>';
+  }
+}
+function openSheetForModelById(id){ const m=STATE.models.find(x=>x.id===id); if(m) openSheetForModel(m); }
 
 // ── SOPs ──────────────────────────────────────────────────────
 // One implementation serves two nav items: 'sops' (Chatting) and 'traffic-sops'
