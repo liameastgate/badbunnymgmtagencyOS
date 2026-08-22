@@ -97,6 +97,15 @@
   .card-title { font-size: 9px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 14px; }
   .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
   @media (max-width: 1100px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+  #roster-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Mobile: the fixed 220px sidebar is an overlay (position:fixed), so #main must NOT reserve
+     220px on a phone -- otherwise opening the sidebar crushes content to ~140px wide. Force
+     full-width content and stack all 2-col layouts so nothing clusters. */
+  @media (max-width: 768px) {
+    #main { margin-left: 0 !important; width: 100vw !important; padding: 16px 12px; }
+    .two-col, .two-col-wide { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; border-top: 2px solid var(--border); }
   .stat-card.accent { border-top-color: var(--accent); }
   .stat-card.white { border-top-color: #ffffff; }
@@ -5546,7 +5555,7 @@ function renderRosterGrid(){
   const el=document.getElementById('roster-grid'); if(!el) return;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
   const cellsFor=(weekday,slot)=>_rosterSlots.filter(s=>s.weekday===weekday&&s.slot===slot);
-  let html=`<div style="display:grid;grid-template-columns:110px repeat(7,1fr);gap:6px;">`;
+  let html=`<div style="display:grid;grid-template-columns:110px repeat(7,1fr);gap:6px;min-width:680px;">`;
   html+=`<div></div>`+ROSTER_WEEKDAYS.map(w=>`<div style="font-size:12px;font-weight:700;color:var(--text2);text-align:center;padding-bottom:4px;">${w.label}</div>`).join('');
   ROSTER_SLOTS.forEach(slot=>{
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;">${slot.label}</div>`;
@@ -6809,8 +6818,8 @@ async function openSheetForModel(model){
   window._currentSheetId=sheet.id||null;
   if(role!=='model') renderSheetsSidebar(); // refresh to highlight the newly-selected row
   document.getElementById('sheets-content').innerHTML=`
-    <div style="display:flex;gap:20px;align-items:flex-start;">
-    <div style="flex:1;min-width:0;max-width:820px;">
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
+    <div style="flex:1 1 420px;min-width:0;max-width:820px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
         <div>
           <div style="font-size:24px;font-weight:800;">${escapeHtml(model.name)}</div>
@@ -6840,7 +6849,7 @@ async function openSheetForModel(model){
       </div>
       <div id="sheet-alert" class="alert" style="margin-top:12px;"></div>
     </div>
-    <div id="sheet-notes-panel" style="width:340px;flex-shrink:0;"></div>
+    <div id="sheet-notes-panel" style="flex:1 1 300px;min-width:280px;"></div>
     </div>`;
   applySheetZoom();
   renderScriptNotes(model.id);
