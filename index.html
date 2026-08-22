@@ -4204,8 +4204,20 @@ function handleChatterCsvFile(file){
 
 var _parsedChatterPerf=null;
 
+// Infloww's date column is "Date/Time <tz>" (creator/employee exports) or "Date & time <tz>"
+// (sales export), where <tz> tracks the account's timezone setting. Match the column by shape
+// so changing the Infloww timezone (or any suffix variation) can never break an upload again.
+function infDateCol(row){
+  if(!row) return null;
+  const keys=Object.keys(row);
+  return keys.find(k=>/date\s*&\s*time/i.test(k))
+      || keys.find(k=>/date\s*\/?\s*time/i.test(k))
+      || keys.find(k=>/\bdate\b/i.test(k)) || null;
+}
+function infDateVal(row){ const k=infDateCol(row); return k?row[k]:''; }
+
 function previewChatterReport(rows) {
-  const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const dateRaw=infDateVal(rows[0]);
   const autoDate=parseInflowwDate(dateRaw);
   const wkStartEl=document.getElementById('chatters-week-start'); const wkEndEl=document.getElementById('chatters-week-end');
   if(autoDate.start && !wkStartEl.value) wkStartEl.value=autoDate.start;
@@ -4623,7 +4635,7 @@ var _parsedDailyRows=null;
 function parseDailyCreatorRows(detailRows){
   return (detailRows||[]).map(row=>{
     const name=getField(row,'Creator')||'';
-    const dateRaw=getField(row,'Date/Time Australia/Canberra','Date/Time')||'';
+    const dateRaw=infDateVal(row)||'';
     const statDate=String(dateRaw).trim().split(' ')[0];
     const {model}=findModelMatch(name);
     let renewPct=cleanAmount(getField(row,'Renew on %'));
@@ -4641,7 +4653,7 @@ function parseDailyCreatorRows(detailRows){
 }
 
 function previewReport(rows, detailRows) {
-  const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const firstDate = infDateVal(rows[0]);
   const autoDate = parseInflowwDate(firstDate);
   let weekStart = document.getElementById('report-week-start').value || autoDate.start;
   let weekEnd   = document.getElementById('report-week-end').value   || autoDate.end;
@@ -4908,7 +4920,7 @@ function handleSalesCsvFile(file){
 function extractDateOnly(raw){ return raw?String(raw).trim().split(' ')[0]:''; }
 
 function previewSales(rows){
-  const dateKey=r=>r['Date & time Australia/Canberra']||r['Date/Time Australia/Canberra']||r['Date/Time']||r['Date']||'';
+  const dateKey=r=>infDateVal(r);
   const validRows=rows.filter(r=>dateKey(r));
   if(!validRows.length) return showAlert('sales-alert','No valid rows found — expected a "Date & time" column like the Infloww Sales record export.','error');
 
@@ -8992,7 +9004,7 @@ function handlePersonalCsvFile(file){
 var _pParsedRows=null, _pParsedDailyRows=null;
 
 function previewPersonalReport(rows, detailRows){
-  const firstDate = rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const firstDate = infDateVal(rows[0]);
   const autoDate = parseInflowwDate(firstDate);
   const startEl=document.getElementById('p-report-week-start'), endEl=document.getElementById('p-report-week-end');
   let weekStart = startEl.value || autoDate.start;
@@ -9023,7 +9035,7 @@ function previewPersonalReport(rows, detailRows){
   _pParsedRows=parsed;
   _pParsedDailyRows=(detailRows||[]).map(row=>{
     const name=getField(row,'Creator')||'';
-    const dateRaw=getField(row,'Date/Time Australia/Canberra','Date/Time')||'';
+    const dateRaw=infDateVal(row)||'';
     const statDate=String(dateRaw).trim().split(' ')[0];
     const {model}=findPersonalModelMatch(name);
     return {
@@ -9900,7 +9912,7 @@ function handlePersonalEmpCsvFile(file){
 var _pParsedEmpPerf=null;
 
 function previewPersonalEmpReport(rows) {
-  const dateRaw=rows[0]?.['Date/Time Australia/Canberra']||rows[0]?.['Date/Time']||'';
+  const dateRaw=infDateVal(rows[0]);
   const autoDate=parseInflowwDate(dateRaw);
   const wkStartEl=document.getElementById('p-emp-week-start'); const wkEndEl=document.getElementById('p-emp-week-end');
   if(autoDate.start && !wkStartEl.value) wkStartEl.value=autoDate.start;
@@ -10087,7 +10099,7 @@ function handlePersonalSalesCsvFile(file){
 }
 
 function previewPersonalSales(rows){
-  const dateKey=r=>r['Date & time Australia/Canberra']||r['Date/Time Australia/Canberra']||r['Date/Time']||r['Date']||'';
+  const dateKey=r=>infDateVal(r);
   const validRows=rows.filter(r=>dateKey(r));
   if(!validRows.length) return showAlert('p-sales-alert','No valid rows found — expected a "Date & time" column like the Infloww Sales record export.','error');
 
