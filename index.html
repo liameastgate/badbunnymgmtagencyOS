@@ -651,10 +651,28 @@
 
     <!-- Content compliance detail (opened from a Content Order's scan pill) -->
     <div class="page" id="page-compliance">
-      <div class="guide-back" onclick="navigate('content')">← Back to Content Orders</div>
+      <div class="guide-back" onclick="navigate(_complianceReturn||'content')">← Back</div>
       <div class="page-title">🛡️ Meta Compliance</div>
       <div class="page-sub">Predicted reach outcome on Instagram &amp; Facebook</div>
       <div id="compliance-body"></div>
+    </div>
+
+    <!-- Compliance hub (nav page) -->
+    <div class="page" id="page-compliance-hub">
+      <div class="page-title">🛡️ Compliance</div>
+      <div class="page-sub">Meta reach outcomes across all uploaded content</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+        <select id="ch-filter-outcome" onchange="renderComplianceHub()" style="width:190px;">
+          <option value="">All outcomes</option>
+          <option value="distributed">✅ Reaches new people</option>
+          <option value="not_recommended">⚠ Followers only</option>
+          <option value="removed">⛔ Would be removed</option>
+          <option value="unscanned">🔍 Unscanned</option>
+        </select>
+        <select id="ch-filter-model" onchange="renderComplianceHub()" style="width:170px;"><option value="">All models</option></select>
+      </div>
+      <div id="ch-bulk" style="margin-bottom:14px;"></div>
+      <div id="ch-list"></div>
     </div>
 
     <!-- Content Upload -->
@@ -2571,6 +2589,7 @@ var NAV = [
   { id: 'content-upload', icon: '📤', label: 'Content Upload',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
+  { id: 'compliance-hub', icon: '🛡️', label: 'Compliance',           roles: ['admin','va'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
@@ -2691,6 +2710,7 @@ function navigate(page) {
   if (page === 'chatters') renderSchedulePage();
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
   if (page === 'compliance') renderCompliance();
+  if (page === 'compliance-hub') { loadContentScans(); renderComplianceHub(); }
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -3286,6 +3306,7 @@ var COMPLIANCE_META={
   removed:{cls:'cscan-red',short:'Would be removed',icon:'⛔'}
 };
 var _complianceOrderId=null;
+var _complianceReturn='content';
 async function loadContentScans(){
   const{data,error}=await sb.from('content_scans').select('*').order('scanned_at',{ascending:false,nullsFirst:false});
   if(error){ return; }
@@ -3316,7 +3337,7 @@ function compliancePillHtml(o){
   if(o.video_path) return '<span class="cscan cscan-grey" style="cursor:pointer;" onclick="triggerScan(\''+o.id+'\')">🔍 Scan Meta</span>';
   return '';
 }
-function openCompliance(orderId){ _complianceOrderId=orderId; navigate('compliance'); }
+function openCompliance(orderId,from){ _complianceOrderId=orderId; _complianceReturn=from||'content'; navigate('compliance'); }
 function jclean(obj){ var out=[]; if(!obj||typeof obj!=='object') return out; Object.keys(obj).forEach(function(k){ var v=obj[k]; if(v===false||v==='none'||v===''||v===0||v===null||v===undefined) return; out.push([k,v]); }); return out; }
 function fmtKey(k){ return String(k).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
 function outcomeCard(label,val){ var m=COMPLIANCE_META[val]||{cls:'cscan-grey',short:val||'—',icon:''}; return '<div style="flex:1;min-width:170px;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'+label+'</div><span class="cscan '+m.cls+'" style="font-size:13px;padding:6px 14px;">'+m.icon+' '+m.short+'</span></div>'; }
@@ -3369,10 +3390,8 @@ async function renderCompliance(){
 }
 
 // Per-model Meta-compliance summary — shows at a glance whose content is mostly unusable.
-function renderComplianceBulk(){
-  const el=document.getElementById('co-compliance-bulk'); if(!el) return;
-  const scans=STATE.scansByOrder||{};
-  const byModel={};
+function complianceBulkHtml(){
+  const scans=STATE.scansByOrder||{}; const byModel={};
   (STATE.contentOrders||[]).forEach(function(o){
     const s=scans[o.id]; if(!s||s.scan_error) return;
     const key=o.model_name||'—';
@@ -3383,17 +3402,40 @@ function renderComplianceBulk(){
     else if(s.instagram_outcome==='removed')g.removed++;
   });
   const list=Object.values(byModel).sort(function(a,b){return (b.removed+b.not_recommended)-(a.removed+a.not_recommended);});
-  if(!list.length){ el.innerHTML=''; return; }
+  if(!list.length) return '';
   const rows=list.map(function(g){
     const bad=g.removed+g.not_recommended; const pct=g.total?Math.round(bad/g.total*100):0;
     const col=pct>=50?'var(--red)':pct>=25?'#e6b428':'var(--text2)';
-    return '<tr><td><strong>'+escapeHtml(g.model)+'</strong></td>'
-      +'<td><span class="cscan cscan-green">'+g.distributed+'</span></td>'
-      +'<td><span class="cscan cscan-amber">'+g.not_recommended+'</span></td>'
-      +'<td><span class="cscan cscan-red">'+g.removed+'</span></td>'
-      +'<td style="font-weight:800;color:'+col+';">'+pct+'% capped/removed</td></tr>';
+    return '<tr><td><strong>'+escapeHtml(g.model)+'</strong></td><td><span class="cscan cscan-green">'+g.distributed+'</span></td><td><span class="cscan cscan-amber">'+g.not_recommended+'</span></td><td><span class="cscan cscan-red">'+g.removed+'</span></td><td style="font-weight:800;color:'+col+';">'+pct+'% capped/removed</td></tr>';
   }).join('');
-  el.innerHTML='<div class="card"><div class="card-title">🛡️ Meta compliance by model <span style="font-weight:400;color:var(--text3);">(scanned items)</span></div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Reaches new</th><th>Followers-only</th><th>Removed</th><th>Unusable</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="card"><div class="card-title">🛡️ Meta compliance by model <span style="font-weight:400;color:var(--text3);">(scanned items)</span></div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Reaches new</th><th>Followers-only</th><th>Removed</th><th>Unusable</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function renderComplianceBulk(){ const el=document.getElementById('co-compliance-bulk'); if(el) el.innerHTML=complianceBulkHtml(); }
+
+// Dedicated Compliance hub page: filterable list of everything + the per-model summary.
+function renderComplianceHub(){
+  const bulk=document.getElementById('ch-bulk'); const list=document.getElementById('ch-list'); if(!list) return;
+  const msel=document.getElementById('ch-filter-model');
+  if(msel){ const cur=msel.value; const names=Array.from(new Set((STATE.contentOrders||[]).map(function(o){return o.model_name;}).filter(Boolean))).sort(); msel.innerHTML='<option value="">All models</option>'+names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join(''); msel.value=cur; }
+  if(bulk) bulk.innerHTML=complianceBulkHtml();
+  const outcome=(document.getElementById('ch-filter-outcome')||{}).value||'';
+  const mfilter=(document.getElementById('ch-filter-model')||{}).value||'';
+  const scans=STATE.scansByOrder||{};
+  let items=(STATE.contentOrders||[]).filter(function(o){return o.video_path||scans[o.id];});
+  if(mfilter) items=items.filter(function(o){return o.model_name===mfilter;});
+  if(outcome==='unscanned') items=items.filter(function(o){return !scans[o.id];});
+  else if(outcome) items=items.filter(function(o){return scans[o.id]&&scans[o.id].instagram_outcome===outcome;});
+  if(!items.length){ list.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">🛡️</div><p>No content matches. Upload videos to orders and scan them to populate this.</p></div>'; return; }
+  const rank={removed:0,not_recommended:1,distributed:2};
+  items.sort(function(a,b){ const sa=scans[a.id],sb=scans[b.id]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
+  list.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+items.map(function(o){
+    const s=scans[o.id]; const num=o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
+    let pill;
+    if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; }
+    else pill='<span class="cscan cscan-grey">🔍 Unscanned</span>';
+    const act=s?'<button class="btn btn-sm btn-ghost" onclick="openCompliance(\''+o.id+'\',\'compliance-hub\')">Open</button>':'<button class="btn btn-sm btn-ghost" onclick="triggerScan(\''+o.id+'\')">Scan</button>';
+    return '<tr><td style="color:var(--accent2);font-weight:700;">'+num+'</td><td>'+escapeHtml(o.model_name||'—')+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:340px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
+  }).join('')+'</tbody></table></div></div>';
 }
 
 function filterContentOrders() {
