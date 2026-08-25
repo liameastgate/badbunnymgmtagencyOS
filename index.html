@@ -3079,25 +3079,24 @@ function renderContentUpload(){
   }
 }
 
-function renderContentOrders(filtered) {
-  const orders = filtered!==undefined ? filtered : STATE.contentOrders;
-  const tbody=document.getElementById('content-orders-body'); const empty=document.getElementById('content-empty');
-  tbody.innerHTML='';
-  if(!orders.length){empty.style.display='block';updateOrderBulkBar();return;} empty.style.display='none';
-  const isAdmin=STATE.profile.role==='admin';
-  orders.forEach(o=>{
-    const pl=o.platform==='instagram'?'<span class="platform-ig">IG</span>':o.platform==='tiktok'?'<span class="platform-tt">TT</span>':o.platform;
-    const canEdit=['admin','va'].includes(STATE.profile.role)||STATE.profile.email===o.model_email;
-    const thumb=o.thumbnail_url
-      ?`<img src="${o.thumbnail_url}" style="width:80px;height:45px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
-      :`<div style="width:80px;height:45px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;">No thumb</div>`;
-    tbody.innerHTML+=`<tr>
+var _showCompletedOrders=false;
+function toggleCompletedOrders(){ _showCompletedOrders=!_showCompletedOrders; filterContentOrders(); }
+
+function contentOrderRowHtml(o,isAdmin,hidden){
+  const pl=o.platform==='instagram'?'<span class="platform-ig">IG</span>':o.platform==='tiktok'?'<span class="platform-tt">TT</span>':o.platform;
+  const canEdit=['admin','va'].includes(STATE.profile.role)||STATE.profile.email===o.model_email;
+  const num=o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
+  const thumb=o.thumbnail_url
+    ?`<img src="${o.thumbnail_url}" style="width:80px;height:45px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
+    :`<div style="width:80px;height:45px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;">No thumb</div>`;
+  const vid=o.video_url?`<a href="${o.video_url}" target="_blank" style="color:var(--green);font-size:11px;">🎬 Video ↗</a>`:'';
+  return `<tr${hidden?' style="display:none;"':''}>
       ${isAdmin?`<td><input type="checkbox" class="co-row-select" data-id="${o.id}" ${_selectedOrderIds.has(o.id)?'checked':''} onchange="toggleOrderSelect('${o.id}',this.checked)"></td>`:''}
       <td>${thumb}</td>
-      <td><strong>${o.model_name||'—'}</strong></td><td>${pl}</td>
+      <td><strong>${num?`<span style="color:var(--accent2);">${num}</span> · `:''}${o.model_name||'—'}</strong></td><td>${pl}</td>
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
-      <td style="max-width:180px;">${o.notes||'—'}</td>
+      <td style="max-width:180px;">${o.notes||'—'}${vid?'<br>'+vid:''}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -3106,7 +3105,27 @@ function renderContentOrders(filtered) {
         ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="editOrder('${o.id}')">✏ Edit</button>`:''}
         ${STATE.profile.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>`:''}
       </td></tr>`;
-  });
+}
+
+function renderContentOrders(filtered) {
+  const orders = filtered!==undefined ? filtered : STATE.contentOrders;
+  const tbody=document.getElementById('content-orders-body'); const empty=document.getElementById('content-empty');
+  tbody.innerHTML='';
+  if(!orders.length){empty.style.display='block';updateOrderBulkBar();return;} empty.style.display='none';
+  const isAdmin=STATE.profile.role==='admin';
+  // Ticked-off orders drop into a collapsible "Completed" group so they stay visible (never
+  // deleted) without cluttering the active list. Auto-expanded if there are no active orders
+  // (e.g. when the user has filtered to Done).
+  const active=orders.filter(o=>o.status!=='done');
+  const done=orders.filter(o=>o.status==='done');
+  const showDone=_showCompletedOrders||active.length===0;
+  let html=active.map(o=>contentOrderRowHtml(o,isAdmin,false)).join('');
+  if(done.length){
+    const colspan=isAdmin?10:9;
+    html+=`<tr><td colspan="${colspan}" onclick="toggleCompletedOrders()" style="cursor:pointer;background:var(--surface2);font-weight:700;font-size:12px;color:var(--text2);padding:10px 14px;user-select:none;">${showDone?'▾':'▸'} ✓ Completed (${done.length})</td></tr>`;
+    html+=done.map(o=>contentOrderRowHtml(o,isAdmin,!showDone)).join('');
+  }
+  tbody.innerHTML=html;
   updateOrderBulkBar();
 }
 
