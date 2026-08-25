@@ -547,6 +547,7 @@
       <div class="page-sub">Assign Instagram/TikTok content for models to copy and re-upload</div>
       <!-- Drive link banners — populated by populateModelDropdowns() -->
       <div id="co-drive-banners" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;"></div>
+      <div id="co-completions-banner" style="display:none;margin-bottom:14px;"></div>
       <div id="content-admin-panel" style="display:none;">
         <div class="card">
           <div class="card-title">New Content Order</div>
@@ -2576,6 +2577,7 @@ function navigate(page) {
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') renderSchedulePage();
+  if (page === 'content') checkOrderCompletions();
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -3419,8 +3421,26 @@ async function submitContentOrder() {
 }
 
 async function markDone(id) {
-  await sb.from('content_orders').update({status:'done'}).eq('id',id);
-  const o=STATE.contentOrders.find(x=>x.id===id); if(o)o.status='done'; filterContentOrders();
+  const now=new Date().toISOString();
+  await sb.from('content_orders').update({status:'done',completed_at:now}).eq('id',id);
+  const o=STATE.contentOrders.find(x=>x.id===id); if(o){o.status='done';o.completed_at=now;} filterContentOrders();
+}
+
+// Admin/VA in-app notifier: how many orders were completed since this user last opened the
+// page. Cross-device (read state in read_markers). Shown as a banner, then marked seen.
+async function checkOrderCompletions(){
+  const banner=document.getElementById('co-completions-banner'); if(!banner) return;
+  if(!['admin','va'].includes(STATE.profile?.role)){ banner.style.display='none'; return; }
+  const uid=STATE.user?.id; if(!uid) return;
+  let lastSeen=null;
+  try{ const{data}=await sb.from('read_markers').select('last_seen_at').eq('user_id',uid).eq('marker','content_completions').maybeSingle(); lastSeen=data&&data.last_seen_at; }catch(e){}
+  const newly=(STATE.contentOrders||[]).filter(o=>o.completed_at && (!lastSeen || o.completed_at>lastSeen));
+  if(newly.length){
+    const list=newly.slice(0,6).map(o=>'#'+String(o.order_number||'').padStart(3,'0')+' '+(o.model_name||'')).join(', ');
+    banner.style.display='block';
+    banner.innerHTML=`<div style="background:rgba(46,196,120,.12);border:1px solid rgba(46,196,120,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green);font-weight:600;">🔔 ${newly.length} order${newly.length>1?'s':''} completed since you last checked${newly.length<=6?': '+list:''}</div>`;
+  } else { banner.style.display='none'; }
+  try{ await sb.from('read_markers').upsert({user_id:uid, marker:'content_completions', last_seen_at:new Date().toISOString()},{onConflict:'user_id,marker'}); }catch(e){}
 }
 
 async function markPending(id) {
