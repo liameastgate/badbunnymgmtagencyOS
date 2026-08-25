@@ -2161,6 +2161,7 @@
         <button class="btn btn-primary" onclick="openAccountModal()">+ Add account</button>
       </div>
       <div id="acc-summary" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-top:14px;"></div>
+      <div id="acc-platbar" style="margin:12px 0 4px;"></div>
       <div id="acc-cards" class="acc-cards"></div>
       <div id="acc-empty" class="empty" style="display:none;padding:44px;text-align:center;color:var(--text2);"><p>Nothing stored here yet. Hit <strong>+ Add account</strong> to save the first one.</p></div>
     </div>
@@ -2181,9 +2182,10 @@
         </div>
         <div class="form-group full"><label>Password <span style="color:var(--text3);font-weight:400;">· stored masked, admin-only reveal</span></label><input id="acc-password" placeholder="password"></div>
         <div class="form-row">
+          <div class="form-group"><label>📞 Phone number</label><input id="acc-phone-number" placeholder="e.g. +44 7700 900123"></div>
           <div class="form-group"><label>Phone / Device</label><input id="acc-phone" placeholder="e.g. iPhone 12 · #3"></div>
-          <div class="form-group"><label>Operator (who runs it)</label><input id="acc-operator" placeholder="e.g. Maria"></div>
         </div>
+        <div class="form-group full"><label>Operator (who runs it)</label><input id="acc-operator" placeholder="e.g. Maria"></div>
         <div class="form-group full"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="acc-proxy-enabled" onchange="document.getElementById('acc-proxy-fields').style.display=this.checked?'grid':'none';" style="width:auto;"> Uses a proxy?</label></div>
         <div class="form-row" id="acc-proxy-fields" style="display:none;">
           <div class="form-group"><label>Proxy IP</label><input id="acc-proxy-ip" placeholder="e.g. 192.0.2.14:8080"></div>
@@ -5511,7 +5513,28 @@ function accEscapeAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').repl
 function accCopy(t,btn){ if(t==null||t==='')return; navigator.clipboard.writeText(t).then(function(){ if(btn){var o=btn.textContent;btn.textContent='✓';btn.style.color='#4ade80';setTimeout(function(){btn.textContent=o;btn.style.color='';},900);} }).catch(function(){}); }
 function accCopyBtn(btn){ accCopy(btn.getAttribute('data-copy'),btn); }
 function togglePw(el){ el.classList.toggle('show'); }
-function accCountFor(ent){ return (STATE.accounts||[]).filter(function(a){ return ent==='agency'?a.owner_type==='agency':a.model_id===ent; }).length; }
+function accCountFor(ent){
+  var A=STATE.accounts||[];
+  if(ent==='emails') return A.filter(function(a){return a.platform==='email';}).length;
+  if(ent==='agency') return A.filter(function(a){return a.owner_type==='agency'&&a.platform!=='email';}).length;
+  return A.filter(function(a){return a.model_id===ent&&a.platform!=='email';}).length;
+}
+function emailProvider(email){
+  var d=String(email||'').toLowerCase().split('@')[1]||'';
+  if(/proton|pm\.me/.test(d)) return 'Proton';
+  if(/gmail/.test(d)) return 'Gmail';
+  if(/icloud|me\.com|mac\.com/.test(d)) return 'iCloud';
+  if(/outlook|hotmail|live/.test(d)) return 'Outlook';
+  if(/yahoo/.test(d)) return 'Yahoo';
+  return 'Other';
+}
+function accEntityName(a){ if(a.owner_type==='agency') return 'Agency'; var m=(STATE.models||[]).find(function(x){return x.id===a.model_id;}); return m?(m.name||'Model'):'—'; }
+function togglePlatFilter(p){
+  if(!STATE._accPlatFilter) STATE._accPlatFilter=new Set();
+  if(STATE._accPlatFilter.has(p)) STATE._accPlatFilter.delete(p); else STATE._accPlatFilter.add(p);
+  if(STATE._accPlatFilter.size===0) STATE._accPlatFilter=null;
+  renderAccounts();
+}
 async function loadAccounts(){
   if(!['admin','va'].includes(STATE.profile&&STATE.profile.role)) return;
   const r=await sb.from('accounts').select('*').order('created_at',{ascending:true});
@@ -5523,34 +5546,67 @@ async function loadAccounts(){
 function renderAccEntities(){
   const el=document.getElementById('acc-entities'); if(!el)return;
   var html='<div class="acc-ent '+(STATE._accEntity==='agency'?'active':'')+'" onclick="selectAccEntity(\'agency\')">🏢 Agency <span class="cnt">'+accCountFor('agency')+'</span></div>';
+  html+='<div class="acc-ent '+(STATE._accEntity==='emails'?'active':'')+'" onclick="selectAccEntity(\'emails\')">✉️ Emails <span class="cnt">'+accCountFor('emails')+'</span></div>';
   (STATE.models||[]).forEach(function(m){ html+='<div class="acc-ent '+(STATE._accEntity===m.id?'active':'')+'" onclick="selectAccEntity(\''+m.id+'\')">'+escapeHtml(m.name||'—')+' <span class="cnt">'+accCountFor(m.id)+'</span></div>'; });
   el.innerHTML=html;
 }
-function selectAccEntity(e){ STATE._accEntity=e; renderAccEntities(); renderAccounts(); }
+function selectAccEntity(e){ STATE._accEntity=e; STATE._accPlatFilter=null; renderAccEntities(); renderAccounts(); }
+function _accCbtn(v){ return v?'<button class="acc-copy" data-copy="'+accEscapeAttr(v)+'" onclick="accCopyBtn(this)" title="copy">⧉</button>':''; }
+function _accLine(k,v,mono){ return v?'<div class="acc-row"><span class="k">'+k+'</span><span class="v'+(mono?' mono':'')+'">'+escapeHtml(v)+'</span>'+_accCbtn(v)+'</div>':''; }
+function _accPlain(k,v){ return v?'<div class="acc-row"><span class="k">'+k+'</span><span class="v">'+escapeHtml(v)+'</span></div>':''; }
+function _accMatch(a,q){ return !q || [a.platform,a.handle,a.email,a.proxy_ip,a.proxy_location,a.phone_device,a.phone_number,a.operator,a.notes,a.tier,ACC_PLAT_LABEL[a.platform]].some(function(v){return String(v||'').toLowerCase().includes(q);}); }
+function accCardHtml(a,isAdmin,showOwner){
+  var st=a.status||'active';
+  var stcls={active:'st-active',banned:'st-banned',warming:'st-warming',shadowbanned:'st-shadow',disabled:'st-disabled'}[st]||'st-active';
+  var needs=['banned','shadowbanned'].includes(st);
+  var tierChip=a.tier==='mother'?'<span class="acc-status" style="background:rgba(74,222,128,.16);color:#4ade80;">👑 Mother</span>':a.tier==='slave'?'<span class="acc-status" style="background:rgba(245,158,11,.16);color:#fbbf24;">🎬 Slave</span>':'';
+  var pwRow='';
+  if(a.password){ pwRow= isAdmin ? '<div class="acc-row"><span class="k">Password</span><span class="v mono pw-val" onclick="togglePw(this)" title="click to reveal / hide">'+escapeHtml(a.password)+'</span>'+_accCbtn(a.password)+'</div>' : '<div class="acc-row"><span class="k">Password</span><span class="v" style="color:var(--text3);">•••••• admin only</span></div>'; }
+  var proxyRow;
+  if(a.proxy_enabled){ var pv=[a.proxy_ip,a.proxy_location].filter(Boolean).join(' · '); proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-yes">● On</span>'+(pv?' — '+escapeHtml(pv):'')+'</span>'+_accCbtn(a.proxy_ip)+'</div>'; }
+  else proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-no">○ None</span></span></div>';
+  var ownerChip= showOwner ? '<span class="acc-status" style="background:var(--surface2);color:var(--text2);">'+escapeHtml(accEntityName(a))+'</span>' : '';
+  return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+ownerChip+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+_accLine('Handle',a.handle)+_accLine('Email',a.email)+pwRow+proxyRow+_accLine('Phone',a.phone_number)+_accPlain('Device',a.phone_device)+_accPlain('Operator',a.operator)+_accPlain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
+}
 function renderAccounts(){
   const wrap=document.getElementById('acc-cards'); const empty=document.getElementById('acc-empty'); if(!wrap)return;
   const ent=STATE._accEntity; const q=((document.getElementById('acc-search')||{}).value||'').toLowerCase().trim();
-  var rows=(STATE.accounts||[]).filter(function(a){ return ent==='agency'?a.owner_type==='agency':a.model_id===ent; });
-  if(q) rows=rows.filter(function(a){ return [a.platform,a.handle,a.email,a.proxy_ip,a.proxy_location,a.phone_device,a.operator,a.notes,a.tier,ACC_PLAT_LABEL[a.platform]].some(function(v){return String(v||'').toLowerCase().includes(q);}); });
-  var total=rows.length, active=rows.filter(function(a){return a.status==='active';}).length, attn=rows.filter(function(a){return ['banned','shadowbanned'].includes(a.status);}).length, proxied=rows.filter(function(a){return a.proxy_enabled;}).length;
-  const sum=document.getElementById('acc-summary'); if(sum) sum.innerHTML=statCard('Accounts',total,'accent')+statCard('Active',active)+statCard('Need attention',attn,'',attn?'red':'')+statCard('Behind proxy',proxied);
-  if(!rows.length){ wrap.innerHTML=''; if(empty)empty.style.display='block'; return; } if(empty)empty.style.display='none';
   const isAdmin=(STATE.profile&&STATE.profile.role)==='admin';
-  function cbtn(v){ return v?'<button class="acc-copy" data-copy="'+accEscapeAttr(v)+'" onclick="accCopyBtn(this)" title="copy">⧉</button>':''; }
-  function line(k,v,mono){ return v?'<div class="acc-row"><span class="k">'+k+'</span><span class="v'+(mono?' mono':'')+'">'+escapeHtml(v)+'</span>'+cbtn(v)+'</div>':''; }
-  function plain(k,v){ return v?'<div class="acc-row"><span class="k">'+k+'</span><span class="v">'+escapeHtml(v)+'</span></div>':''; }
-  wrap.innerHTML=rows.map(function(a){
-    var st=a.status||'active';
-    var stcls={active:'st-active',banned:'st-banned',warming:'st-warming',shadowbanned:'st-shadow',disabled:'st-disabled'}[st]||'st-active';
-    var needs=['banned','shadowbanned'].includes(st);
-    var tierChip=a.tier==='mother'?'<span class="acc-status" style="background:rgba(74,222,128,.16);color:#4ade80;">👑 Mother</span>':a.tier==='slave'?'<span class="acc-status" style="background:rgba(245,158,11,.16);color:#fbbf24;">🎬 Slave</span>':'';
-    var pwRow='';
-    if(a.password){ pwRow= isAdmin ? '<div class="acc-row"><span class="k">Password</span><span class="v mono pw-val" onclick="togglePw(this)" title="click to reveal / hide">'+escapeHtml(a.password)+'</span>'+cbtn(a.password)+'</div>' : '<div class="acc-row"><span class="k">Password</span><span class="v" style="color:var(--text3);">•••••• admin only</span></div>'; }
-    var proxyRow;
-    if(a.proxy_enabled){ var pv=[a.proxy_ip,a.proxy_location].filter(Boolean).join(' · '); proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-yes">● On</span>'+(pv?' — '+escapeHtml(pv):'')+'</span>'+cbtn(a.proxy_ip)+'</div>'; }
-    else proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-no">○ None</span></span></div>';
-    return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+line('Handle',a.handle)+line('Email',a.email)+pwRow+proxyRow+plain('Phone',a.phone_device)+plain('Operator',a.operator)+plain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
-  }).join('');
+  const platbar=document.getElementById('acc-platbar'); const sum=document.getElementById('acc-summary');
+
+  // Emails: their own category, grouped by provider (Gmail / Proton / iCloud …)
+  if(ent==='emails'){
+    if(platbar) platbar.innerHTML='';
+    var emails=(STATE.accounts||[]).filter(function(a){return a.platform==='email'&&_accMatch(a,q);});
+    if(sum) sum.innerHTML=statCard('Emails',emails.length,'accent')+statCard('Providers',new Set(emails.map(function(a){return emailProvider(a.email);})).size);
+    if(!emails.length){ wrap.innerHTML=''; if(empty)empty.style.display='block'; return; } if(empty)empty.style.display='none';
+    var groups={}; emails.forEach(function(a){ var p=emailProvider(a.email); (groups[p]=groups[p]||[]).push(a); });
+    var order=['Gmail','Proton','iCloud','Outlook','Yahoo','Other'].filter(function(p){return groups[p];});
+    wrap.innerHTML=order.map(function(p){
+      return '<div style="grid-column:1/-1;font-size:12px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:6px 0 2px;">✉️ '+p+' <span style="color:var(--text3);font-weight:600;">('+groups[p].length+')</span></div>'
+        + groups[p].map(function(a){return accCardHtml(a,isAdmin,true);}).join('');
+    }).join('');
+    return;
+  }
+
+  // Agency / model — non-email accounts, with a platform skim/filter bar
+  var all=(STATE.accounts||[]).filter(function(a){ return (ent==='agency'?a.owner_type==='agency':a.model_id===ent) && a.platform!=='email'; });
+  var platsPresent=Array.from(new Set(all.map(function(a){return a.platform;})));
+  if(platbar){
+    platbar.innerHTML = !platsPresent.length ? '' :
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:11px;color:var(--text2);margin-right:2px;">Platforms:</span>'
+      + platsPresent.map(function(p){
+          var on=!STATE._accPlatFilter||STATE._accPlatFilter.has(p);
+          return '<span onclick="togglePlatFilter(\''+p+'\')" style="cursor:pointer;user-select:none;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--border);'+(on?'background:var(--accent);color:#fff;border-color:var(--accent);':'background:var(--surface2);color:var(--text2);')+'">'+(ACC_PLAT[p]||'🔗')+' '+(ACC_PLAT_LABEL[p]||p)+'</span>';
+        }).join('')
+      + (STATE._accPlatFilter?'<span onclick="STATE._accPlatFilter=null;renderAccounts()" style="cursor:pointer;font-size:11px;color:var(--accent2);margin-left:4px;">clear</span>':'')
+      + '</div>';
+  }
+  var rows=all.filter(function(a){ return _accMatch(a,q) && (!STATE._accPlatFilter||STATE._accPlatFilter.has(a.platform)); });
+  var total=rows.length, active=rows.filter(function(a){return a.status==='active';}).length, attn=rows.filter(function(a){return ['banned','shadowbanned'].includes(a.status);}).length, proxied=rows.filter(function(a){return a.proxy_enabled;}).length;
+  if(sum) sum.innerHTML=statCard('Accounts',total,'accent')+statCard('Active',active)+statCard('Need attention',attn,'',attn?'red':'')+statCard('Behind proxy',proxied);
+  if(!rows.length){ wrap.innerHTML=''; if(empty)empty.style.display='block'; return; } if(empty)empty.style.display='none';
+  wrap.innerHTML=rows.map(function(a){return accCardHtml(a,isAdmin,false);}).join('');
 }
 function openAccountModal(id){
   var al=document.getElementById('acc-modal-alert'); if(al)al.textContent='';
@@ -5560,12 +5616,12 @@ function openAccountModal(id){
   if(id){
     var a=(STATE.accounts||[]).find(function(x){return x.id===id;}); if(!a)return;
     document.getElementById('account-modal-title').textContent='Edit Account · '+entName;
-    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');
+    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone-number',a.phone_number||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');
     document.getElementById('acc-proxy-enabled').checked=!!a.proxy_enabled;
     document.getElementById('acc-proxy-fields').style.display=a.proxy_enabled?'grid':'none';
   } else {
     document.getElementById('account-modal-title').textContent='Add Account · '+entName;
-    ['acc-id','acc-handle','acc-email','acc-password','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
+    ['acc-id','acc-handle','acc-email','acc-password','acc-phone-number','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
     set('acc-platform', ent==='agency'?'other':'onlyfans'); set('acc-status','active');
     document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none';
   }
@@ -5574,7 +5630,7 @@ function openAccountModal(id){
 async function saveAccount(){
   var g=function(x){return ((document.getElementById(x)||{}).value||'').trim();};
   var ent=STATE._accEntity;
-  var p={ owner_type: ent==='agency'?'agency':'model', model_id: ent==='agency'?null:ent, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
+  var p={ owner_type: ent==='agency'?'agency':'model', model_id: ent==='agency'?null:ent, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
   var id=g('acc-id'); var al=document.getElementById('acc-modal-alert');
   var res = id ? await sb.from('accounts').update(p).eq('id',id).select() : await sb.from('accounts').insert(p).select();
   if(res.error){ if(al)al.textContent='Could not save — '+res.error.message; return; }
