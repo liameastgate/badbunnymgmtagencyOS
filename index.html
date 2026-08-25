@@ -2586,7 +2586,7 @@ var NAV = [
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
-  { id: 'content-upload', icon: '📤', label: 'Content Upload',  roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
   { id: 'compliance-hub', icon: '🛡️', label: 'Compliance',           roles: ['admin','va'],                     section: 'Models' },
@@ -3168,51 +3168,87 @@ async function bulkAddContentOrders(){
 // Content Upload page — a dedicated home for a model's Drive upload folder. Models see
 // their own folder (matched by email, same as everywhere else) plus the upload rules;
 // admin/va see every model's folder at a glance (mirrors the old Content Orders banner).
+// ── Content Library (R2-backed, replaces the Drive folder workflow) ──────────
+async function r2SignedUrl(key,method){
+  const{data,error}=await sb.functions.invoke('r2-sign',{body:{key,method}});
+  if(error||!data||!data.url) throw new Error((error&&error.message)||(data&&data.error)||'Could not sign URL');
+  return data.url;
+}
+async function loadContentLibrary(){
+  const{data,error}=await sb.from('content_library').select('*').order('created_at',{ascending:false});
+  if(error){ console.error('loadContentLibrary',error); STATE.library=[]; return; }
+  STATE.library=data||[];
+}
 function renderContentUpload(){
-  const el=document.getElementById('cu-body');
-  if(!el) return;
-  const uploadTips=`
-    <div class="card">
-      <div class="card-title">📌 How to upload</div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.7;">
-        Folders in your Drive are labelled by category — upload each piece into the folder that matches. Mirror that same structure in your camera roll as you film, so you're not sorting it all at once later.
-        <br><br>
-        <strong style="color:var(--text);">Upload content ready to publish</strong> — already edited, trimmed and cut. We don't have time to edit everything that comes in.
-        <br><br>
-        <strong style="color:var(--text);">Don't let content build up over multiple days</strong> — upload as you go.
-      </div>
-    </div>`;
-  if(STATE.profile?.role==='model'){
-    const mine=STATE.models.find(m=>(m.email||'').toLowerCase()===(STATE.profile?.email||'').toLowerCase());
-    const link=mine?.drive_link;
-    const folderCard = link
-      ? `<div class="card" style="text-align:center;">
-           <div class="card-title" style="justify-content:center;">📁 Your upload folder</div>
-           <p style="font-size:13px;color:var(--text2);margin:6px 0 16px;">This is where all your finished content goes.</p>
-           <a href="${link}" target="_blank" class="btn btn-primary" style="font-size:15px;padding:12px 28px;text-decoration:none;display:inline-block;">Open Your Drive Folder ↗</a>
-         </div>`
-      : `<div class="card" style="text-align:center;">
-           <div class="card-title" style="justify-content:center;">Upload folder not set up yet</div>
-           <p style="font-size:13px;color:var(--text2);margin-top:6px;">Your Drive folder hasn't been linked to your account yet. Message the team and we'll get it sorted for you.</p>
-         </div>`;
-    el.innerHTML=folderCard+uploadTips;
-  } else {
-    const rows=STATE.models.map(m=>{
-      const link=m.drive_link
-        ? `<a href="${m.drive_link}" target="_blank" style="color:var(--accent2);font-weight:600;text-decoration:none;">📁 Open ↗</a>`
-        : `<span style="color:var(--text2);">Not set</span>`;
-      return `<tr><td style="font-weight:600;">${escapeHtml(m.name)}</td><td>${link}</td></tr>`;
-    }).join('');
-    el.innerHTML=`
-      <div class="card">
-        <div class="card-title">Model upload folders</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Each model sees only their own folder here. Set or edit these links in Model Settings.</p>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Model</th><th>Drive folder</th></tr></thead>
-          <tbody>${rows||'<tr><td colspan="2" style="color:var(--text2);">No models yet.</td></tr>'}</tbody>
-        </table></div>
-      </div>`;
-  }
+  const el=document.getElementById('cu-body'); if(!el) return;
+  const isModel=STATE.profile?.role==='model';
+  const modelPicker=isModel?'':'<select id="cl-upload-model" style="min-width:150px;"><option value="">🏢 Agency</option>'+(STATE.models||[]).map(m=>'<option value="'+m.id+'">'+escapeHtml(m.name||'')+'</option>').join('')+'</select>';
+  el.innerHTML=
+    '<div class="card"><div class="card-title">📁 Content Library</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Upload finished, ready-to-post content. Stored securely and downloadable at full quality anytime.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+modelPicker
+    +'<button id="cl-upload-btn" class="btn btn-primary" onclick="uploadLibraryFile()">📤 Upload content</button>'
+    +'<input id="cl-search" placeholder="🔎 Search title / tags" oninput="renderLibraryList()" style="flex:1;min-width:180px;"></div></div>'
+    +'<div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
+  loadContentLibrary().then(renderLibraryList);
+}
+function renderLibraryList(){
+  const wrap=document.getElementById('cl-list'); if(!wrap) return;
+  const q=((document.getElementById('cl-search')||{}).value||'').toLowerCase().trim();
+  let items=STATE.library||[];
+  if(q) items=items.filter(function(i){return ((i.title||'')+' '+(i.tags||'')).toLowerCase().includes(q);});
+  if(!items.length){ wrap.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>No content yet. Hit <strong>Upload content</strong> to add your first file.</p></div>'; return; }
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  wrap.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>Title</th>'+(isAdmin?'<th>Owner</th>':'')+'<th>Tags</th><th>Size</th><th>Added</th><th></th></tr></thead><tbody>'
+    +items.map(function(i){
+      const mdl=isAdmin?('<td>'+escapeHtml((STATE.models.find(function(m){return m.id===i.model_id;})||{}).name||(i.owner_type==='agency'?'Agency':'—'))+'</td>'):'';
+      const size=i.size_bytes?(i.size_bytes>1048576?(i.size_bytes/1048576).toFixed(1)+' MB':(i.size_bytes/1024).toFixed(0)+' KB'):'';
+      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td>'+mdl+'<td style="font-size:12px;color:var(--text2);">'+escapeHtml(i.tags||'')+'</td><td style="font-size:12px;white-space:nowrap;">'+size+'</td><td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+fmtDate(i.created_at)+'</td>'
+        +'<td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')">⬇ Download</button> <button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')">✏</button> <button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')">✕</button></td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+}
+async function uploadLibraryFile(){
+  const inp=document.createElement('input'); inp.type='file';
+  inp.onchange=async function(){
+    const file=inp.files&&inp.files[0]; if(!file) return;
+    let modelId,ownerType;
+    if(STATE.profile?.role==='model'){ modelId=(myOwnModel()||{}).id||null; ownerType='model'; }
+    else { modelId=(document.getElementById('cl-upload-model')||{}).value||null; ownerType=modelId?'model':'agency'; }
+    const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const key='library/'+(modelId||'agency')+'/'+Date.now()+'_'+safe;
+    const btn=document.getElementById('cl-upload-btn'); if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
+    try{
+      const url=await r2SignedUrl(key,'PUT');
+      const res=await fetch(url,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
+      if(!res.ok) throw new Error('upload failed ('+res.status+')');
+      const{error}=await sb.from('content_library').insert({model_id:modelId,owner_type:ownerType,title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,uploaded_by_email:STATE.profile?.email||null});
+      if(error) throw new Error(error.message);
+      await loadContentLibrary(); renderLibraryList();
+    }catch(e){ alert('Upload failed: '+e.message); }
+    if(btn){ btn.textContent='📤 Upload content'; btn.disabled=false; }
+  };
+  inp.click();
+}
+async function downloadLibraryItem(id){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  try{ const url=await r2SignedUrl(it.r2_key,'GET'); window.open(url,'_blank'); }catch(e){ alert('Could not get download link: '+e.message); }
+}
+function editLibraryItem(id){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  const title=prompt('Title:',it.title||''); if(title===null) return;
+  const tags=prompt('Tags (comma separated — e.g. bedroom, tease, feet):',it.tags||''); if(tags===null) return;
+  sb.from('content_library').update({title:title,tags:tags}).eq('id',id).select().then(function(r){
+    if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
+    it.title=title; it.tags=tags; renderLibraryList();
+  });
+}
+async function deleteLibraryItem(id){
+  if(!confirm('Delete this file permanently?')) return;
+  const it=(STATE.library||[]).find(function(x){return x.id===id;});
+  const{error,data}=await sb.from('content_library').delete().eq('id',id).select();
+  if(error||!data||!data.length){ alert('Could not delete — you may not have permission.'); return; }
+  if(it){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
+  STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
 }
 
 var _showCompletedOrders=false;
