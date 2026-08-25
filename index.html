@@ -130,6 +130,11 @@
   .badge.rejected { background: #2a0f0f; color: var(--red); }
   .badge.processing { background: #0f1a2a; color: var(--blue); }
   .badge.admin { background: #2a1a40; color: var(--accent2); }
+  .cscan { display: inline-block; font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 20px; white-space: nowrap; cursor: pointer; letter-spacing: 0.02em; }
+  .cscan-green { background: rgba(46,196,120,0.16); color: var(--green); }
+  .cscan-amber { background: rgba(230,180,40,0.22); color: #e6b428; border: 1px solid rgba(230,180,40,0.55); }
+  .cscan-red { background: rgba(220,60,60,0.16); color: var(--red); }
+  .cscan-grey { background: var(--surface2); color: var(--text2); }
   .badge.chatter { background: #0f2a1a; color: var(--green); }
   .badge.model { background: #0f1a2a; color: var(--blue); }
   .badge.traffic { background: #2a1a10; color: var(--yellow); }
@@ -641,6 +646,14 @@
         </table></div>
         <div id="content-empty" class="empty" style="display:none;"><div class="empty-icon">📭</div><p>No content orders yet</p></div>
       </div>
+    </div>
+
+    <!-- Content compliance detail (opened from a Content Order's scan pill) -->
+    <div class="page" id="page-compliance">
+      <div class="guide-back" onclick="navigate('content')">← Back to Content Orders</div>
+      <div class="page-title">🛡️ Meta Compliance</div>
+      <div class="page-sub">Predicted reach outcome on Instagram &amp; Facebook</div>
+      <div id="compliance-body"></div>
     </div>
 
     <!-- Content Upload -->
@@ -2675,7 +2688,8 @@ function navigate(page) {
   if (page === 'management') loadManagement();
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') renderSchedulePage();
-  if (page === 'content') checkOrderCompletions();
+  if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
+  if (page === 'compliance') renderCompliance();
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
@@ -2802,6 +2816,7 @@ async function loadAllData() {
   STATE.modelSheetPdfs = {};
   (sheets.data||[]).forEach(s=>{ if(s.pdf_url) STATE.modelSheetPdfs[s.model_id]=s.pdf_url; });
   renderModels(); renderChatters(); renderContentOrders(); populateModelDropdowns(); populateChatterDropdown();
+  loadContentScans();
 }
 
 // ── Overview ─────────────────────────────────────────────────
@@ -3197,7 +3212,7 @@ function contentOrderRowHtml(o,isAdmin,hidden){
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
       <td style="max-width:180px;">${o.notes||'—'}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
-      <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
+      <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span>${(function(){var c=compliancePillHtml(o);return c?'<div style="margin-top:5px;">'+c+'</div>':'';})()}</td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
         ${o.video_path?`<button class="btn btn-sm btn-ghost" onclick="openOrderVideo('${o.id}')" title="View uploaded video">🎬 Video</button>`:''}
@@ -3249,6 +3264,7 @@ async function uploadOrderVideo(orderId){
     if(error){ alert('Upload failed: '+error.message); if(btn){btn.textContent='📤 Upload';btn.disabled=false;} return; }
     await sb.from('content_orders').update({video_path:path}).eq('id',orderId);
     const co=STATE.contentOrders.find(x=>x.id===orderId); if(co) co.video_path=path;
+    triggerScan(orderId,path); // fire-and-forget Meta compliance scan
     filterContentOrders();
   };
   inp.click();
@@ -3258,6 +3274,97 @@ async function openOrderVideo(orderId){
   const{data,error}=await sb.storage.from('content-videos').createSignedUrl(o.video_path,3600);
   if(error||!data){ alert('Could not open video: '+(error?error.message:'unknown')); return; }
   window.open(data.signedUrl,'_blank');
+}
+
+// ── Content compliance (Meta reach scanner) ──────────────────────────────────
+// Reads verdicts the Railway scanner writes into content_scans. THREE Meta
+// outcomes: distributed / not_recommended (stays up, followers-only) / removed.
+var COMPLIANCE_META={
+  distributed:{cls:'cscan-green',short:'Will reach new people',icon:'✅'},
+  not_recommended:{cls:'cscan-amber',short:'Followers only',icon:'⚠'},
+  removed:{cls:'cscan-red',short:'Would be removed',icon:'⛔'}
+};
+var _complianceOrderId=null;
+async function loadContentScans(){
+  const{data,error}=await sb.from('content_scans').select('*').order('scanned_at',{ascending:false,nullsFirst:false});
+  if(error){ return; }
+  const map={}; (data||[]).forEach(s=>{ if(s.content_order_id && !map[s.content_order_id]) map[s.content_order_id]=s; });
+  STATE.scansByOrder=map;
+  const pc=document.getElementById('page-content'); if(pc&&pc.classList.contains('active')) filterContentOrders();
+  const pco=document.getElementById('page-compliance'); if(pco&&pco.classList.contains('active')) renderCompliance();
+}
+function scanForOrder(id){ return (STATE.scansByOrder||{})[id]; }
+async function triggerScan(orderId,path){
+  const o=STATE.contentOrders.find(x=>x.id===orderId);
+  const p=path||(o&&o.video_path); if(!p){ alert('Upload a video to this order first.'); return; }
+  STATE.scanning=STATE.scanning||new Set(); STATE.scanning.add(orderId);
+  const pc=document.getElementById('page-content'); if(pc&&pc.classList.contains('active')) filterContentOrders();
+  try{ await sb.functions.invoke('trigger-scan',{body:{bucket:'content-videos',path:p,content_order_id:orderId,frames:8}}); }
+  catch(e){ /* scanner writes the verdict asynchronously; ignore transport hiccups */ }
+  // verdict lands 30-90s later for video -- poll a few times, then stop showing "scanning"
+  [15000,35000,70000].forEach(function(t){ setTimeout(function(){ if(STATE.scanning) STATE.scanning.delete(orderId); loadContentScans(); }, t); });
+}
+function compliancePillHtml(o){
+  const s=scanForOrder(o.id);
+  if(s){
+    if(s.scan_error) return '<span class="cscan cscan-grey" onclick="openCompliance(\''+o.id+'\')" title="'+escapeHtml(s.scan_error||'')+'">⚠ Scan failed</span> <span onclick="triggerScan(\''+o.id+'\')" title="Retry" style="cursor:pointer;font-size:12px;">↻</span>';
+    const m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''};
+    return '<span class="cscan '+m.cls+'" onclick="openCompliance(\''+o.id+'\')" title="Open compliance detail">'+m.icon+' '+m.short+'</span>';
+  }
+  if(STATE.scanning&&STATE.scanning.has(o.id)) return '<span class="cscan cscan-grey">⏳ Scanning…</span>';
+  if(o.video_path) return '<span class="cscan cscan-grey" style="cursor:pointer;" onclick="triggerScan(\''+o.id+'\')">🔍 Scan Meta</span>';
+  return '';
+}
+function openCompliance(orderId){ _complianceOrderId=orderId; navigate('compliance'); }
+function jclean(obj){ var out=[]; if(!obj||typeof obj!=='object') return out; Object.keys(obj).forEach(function(k){ var v=obj[k]; if(v===false||v==='none'||v===''||v===0||v===null||v===undefined) return; out.push([k,v]); }); return out; }
+function fmtKey(k){ return String(k).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+function outcomeCard(label,val){ var m=COMPLIANCE_META[val]||{cls:'cscan-grey',short:val||'—',icon:''}; return '<div style="flex:1;min-width:170px;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'+label+'</div><span class="cscan '+m.cls+'" style="font-size:13px;padding:6px 14px;">'+m.icon+' '+m.short+'</span></div>'; }
+function findingsBlock(title,obj){ var items=jclean(obj); if(!items.length) return ''; return '<div class="card" style="margin-bottom:12px;"><div class="card-title">'+title+'</div><div style="display:flex;flex-direction:column;gap:6px;">'+items.map(function(kv){ return '<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;"><span style="color:var(--text2);">'+escapeHtml(fmtKey(kv[0]))+'</span><span style="font-weight:600;text-align:right;">'+escapeHtml(String(kv[1]))+'</span></div>'; }).join('')+'</div></div>'; }
+function complianceGroundTruthHtml(s){
+  var lbl={distributed:'✅ Reached new people',not_recommended:'⚠ Followers only',removed:'⛔ Removed'};
+  return '<div class="card" style="border:1px dashed var(--accent);"><div class="card-title" style="color:var(--accent2);">📊 What actually happened? (calibration)</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">The most valuable step — after this is posted, record the real result so predictions get calibrated to <i>our</i> content.</div>'
+    +(s.actual_outcome?'<div style="font-size:13px;">Recorded: <b>'+(lbl[s.actual_outcome]||s.actual_outcome)+'</b>'+(s.actual_noted_at?' · '+fmtDateTime(s.actual_noted_at):'')+' <button class="btn btn-sm btn-ghost" onclick="recordOutcome(\''+s.id+'\',null)">clear</button></div>'
+      :'<div class="btn-row"><button class="btn btn-sm btn-green" onclick="recordOutcome(\''+s.id+'\',\'distributed\')">Reached new people</button><button class="btn btn-sm" style="background:#e6b428;color:#111;" onclick="recordOutcome(\''+s.id+'\',\'not_recommended\')">Followers only</button><button class="btn btn-sm btn-danger" onclick="recordOutcome(\''+s.id+'\',\'removed\')">Removed</button></div>')
+    +'</div>';
+}
+async function recordOutcome(scanId,outcome){
+  const{data,error}=await sb.from('content_scans').update({actual_outcome:outcome, actual_noted_at:outcome?new Date().toISOString():null}).eq('id',scanId).select();
+  if(error||!data||!data.length){ alert('Could not save — content_scans is service-role-write only right now. It needs an admin update policy (I can add that).'); return; }
+  const s=Object.values(STATE.scansByOrder||{}).find(x=>x.id===scanId); if(s){ s.actual_outcome=outcome; s.actual_noted_at=data[0].actual_noted_at; }
+  renderCompliance();
+}
+async function renderCompliance(){
+  const el=document.getElementById('compliance-body'); if(!el) return;
+  const o=STATE.contentOrders.find(x=>x.id===_complianceOrderId);
+  const s=scanForOrder(_complianceOrderId);
+  const num=o&&o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
+  if(!s){ el.innerHTML='<div class="empty" style="margin-top:40px;"><div class="empty-icon">🔍</div><p>No scan yet for this order.'+(o&&o.video_path?' <button class="btn btn-sm btn-primary" onclick="triggerScan(\''+_complianceOrderId+'\')">Scan now</button>':' Upload a video first.')+'</p></div>'; return; }
+  const peak=(s.motion&&s.motion.peak_frame)?s.motion.peak_frame:null;
+  const fixHtml=s.fix?'<div class="card" style="border-left:3px solid var(--accent);"><div class="card-title" style="color:var(--accent2);">✏️ How to fix it</div><div style="font-size:14px;line-height:1.6;">'+escapeHtml(s.fix)+'</div></div>':'';
+  const reasonHtml=s.primary_reason?'<div style="font-size:14px;color:var(--text);margin:6px 0 14px;">'+escapeHtml(s.primary_reason)+(s.confidence!=null?' <span style="color:var(--text2);font-size:12px;">· '+s.confidence+'% confidence</span>':'')+'</div>':'';
+  const se=s.sightengine?('<details class="card"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);">🔬 Technical — Sightengine scores</summary><pre style="font-size:11px;white-space:pre-wrap;color:var(--text2);margin-top:10px;">'+escapeHtml(JSON.stringify(s.sightengine,null,2))+'</pre></details>'):'';
+  const limits='<div class="card" style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);"><div style="font-size:12px;color:var(--text2);line-height:1.6;"><b style="color:#e6b428;">This is a prediction, not a verdict.</b> An informed inference from Meta’s <i>published</i> Recommendation Guidelines — not Meta’s real, proprietary classifier. Treat <b>Followers-only</b> as "a human should look." Uncalibrated until real outcomes are logged. Instagram and Facebook are shown separately (Facebook is stricter) and deliberately not averaged — where they disagree is where to look. Video is sampled at '+(s.frames_sampled||8)+' frames, so fast motion between frames can be missed.</div></div>';
+  el.innerHTML=
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+(num?'<b style="color:var(--accent2);">'+num+'</b> · ':'')+escapeHtml((o&&o.model_name)||'—')+' · scanned '+(s.scanned_at?fmtDateTime(s.scanned_at):'—')+(s.scanner_version?' · '+escapeHtml(s.scanner_version):'')+'</div>'
+    +'<div id="compliance-media" style="margin-bottom:14px;"></div>'
+    +reasonHtml
+    +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'+outcomeCard('Instagram',s.instagram_outcome)+outcomeCard('Facebook',s.facebook_outcome)+'</div>'
+    +fixHtml
+    +(s.media_kind==='video'?'<div style="font-size:12px;color:var(--text2);margin:10px 0;">🎞 '+(s.frames_sampled||8)+' frames sampled'+(peak?' · worst moment: frame '+peak:'')+'</div>':'')
+    +findingsBlock('Body & framing',s.genital_area)
+    +findingsBlock('Motion',s.motion)
+    +findingsBlock('Triggers',s.triggers)
+    +(s.transcript?'<div class="card"><div class="card-title">Transcript</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;">'+escapeHtml(s.transcript)+'</div></div>':'')
+    +se
+    +complianceGroundTruthHtml(s)
+    +limits;
+  if(o&&o.video_path){
+    sb.storage.from('content-videos').createSignedUrl(o.video_path,3600).then(function(r){
+      var m=document.getElementById('compliance-media'); if(!m) return;
+      m.innerHTML=(r&&r.data&&r.data.signedUrl)?'<video src="'+r.data.signedUrl+'#t='+(peak?peak:0)+'" controls style="max-width:100%;max-height:440px;border-radius:10px;border:1px solid var(--border);"></video>':'<div style="color:var(--text2);font-size:12px;">Media unavailable.</div>';
+    });
+  }
 }
 
 function filterContentOrders() {
