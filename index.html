@@ -2170,6 +2170,7 @@
       <div class="modal">
         <div class="modal-title"><span id="account-modal-title">Add Account</span><button class="modal-close" onclick="closeModal('account-modal')">✕</button></div>
         <input type="hidden" id="acc-id">
+        <div class="form-group full"><label>Owner</label><select id="acc-owner"></select></div>
         <div class="form-row">
           <div class="form-group"><label>Platform</label>
             <select id="acc-platform"><option value="onlyfans">🔒 OnlyFans</option><option value="instagram">📸 Instagram</option><option value="tiktok">🎵 TikTok</option><option value="x">𝕏 X / Twitter</option><option value="reddit">👽 Reddit</option><option value="snapchat">👻 Snapchat</option><option value="email">✉️ Email</option><option value="other">🔗 Other</option></select></div>
@@ -5612,7 +5613,13 @@ function openAccountModal(id){
   var al=document.getElementById('acc-modal-alert'); if(al)al.textContent='';
   var set=function(x,v){var e=document.getElementById(x);if(e)e.value=v;};
   var ent=STATE._accEntity;
-  var entName= ent==='agency' ? 'Agency' : ((STATE.models.find(function(m){return m.id===ent;})||{}).name||'Model');
+  var entName= ent==='agency' ? 'Agency' : ent==='emails' ? 'Emails' : ((STATE.models.find(function(m){return m.id===ent;})||{}).name||'Model');
+  var ownerSel=document.getElementById('acc-owner');
+  if(ownerSel){ ownerSel.innerHTML='<option value="agency">🏢 Agency</option>'+(STATE.models||[]).map(function(m){return '<option value="'+m.id+'">'+escapeHtml(m.name||'Model')+'</option>';}).join(''); }
+  var ownerVal;
+  if(id){ var _a=(STATE.accounts||[]).find(function(x){return x.id===id;})||{}; ownerVal=_a.owner_type==='agency'?'agency':(_a.model_id||'agency'); }
+  else { ownerVal=(ent==='agency'||ent==='emails')?'agency':ent; }
+  set('acc-owner', ownerVal);
   if(id){
     var a=(STATE.accounts||[]).find(function(x){return x.id===id;}); if(!a)return;
     document.getElementById('account-modal-title').textContent='Edit Account · '+entName;
@@ -5622,15 +5629,15 @@ function openAccountModal(id){
   } else {
     document.getElementById('account-modal-title').textContent='Add Account · '+entName;
     ['acc-id','acc-handle','acc-email','acc-password','acc-phone-number','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
-    set('acc-platform', ent==='agency'?'other':'onlyfans'); set('acc-status','active');
+    set('acc-platform', ent==='emails'?'email':(ent==='agency'?'other':'onlyfans')); set('acc-status','active');
     document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none';
   }
   openModal('account-modal');
 }
 async function saveAccount(){
   var g=function(x){return ((document.getElementById(x)||{}).value||'').trim();};
-  var ent=STATE._accEntity;
-  var p={ owner_type: ent==='agency'?'agency':'model', model_id: ent==='agency'?null:ent, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
+  var owner=g('acc-owner')||'agency';
+  var p={ owner_type: owner==='agency'?'agency':'model', model_id: owner==='agency'?null:owner, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
   var id=g('acc-id'); var al=document.getElementById('acc-modal-alert');
   var res = id ? await sb.from('accounts').update(p).eq('id',id).select() : await sb.from('accounts').insert(p).select();
   if(res.error){ if(al)al.textContent='Could not save — '+res.error.message; return; }
