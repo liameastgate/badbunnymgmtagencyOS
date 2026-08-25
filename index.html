@@ -64,6 +64,10 @@
   #app { display: none; min-height: 100vh; }
   #sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: width 0.2s, transform 0.2s; overflow: hidden; }
   #sidebar.collapsed { width: 0; transform: translateX(-220px); }
+  /* Mobile drawer backdrop: tap outside the open sidebar to close it. Only shows on mobile
+     (where the sidebar overlays content); on desktop the sidebar pushes content, no backdrop. */
+  #sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
+  @media (max-width: 768px) { #sidebar-backdrop.show { display: block; } }
   /* Bigger, blue, high-contrast toggle button (was a small dark-gray-on-near-black square
      that read as an unclear "box" on mobile) -- env(safe-area-inset-*) keeps it clear of
      the iPhone notch/Dynamic Island instead of a flat px offset that ignores it. */
@@ -456,6 +460,7 @@
   </div>
   <div id="app-glow-mask"></div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+    <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
   <div id="sidebar">
     <div class="logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <nav id="nav"></nav>
@@ -2509,7 +2514,7 @@ async function initApp(user) {
   buildNav(profile.role);
   await loadAllData();
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
-  const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'chatters' : 'overview';
+  const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'chatters' : profile.role === 'traffic' ? 'traffic' : 'overview';
   let savedPage=null;
   try{ savedPage=localStorage.getItem('agencyos_page'); }catch(e){}
   navigate(savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage);
@@ -2560,6 +2565,8 @@ function navigate(page) {
   const el = document.getElementById('page-' + pageDomId); if (el) el.classList.add('active');
   const nav = document.getElementById('nav-' + page); if (nav) nav.classList.add('active');
   try{ localStorage.setItem('agencyos_page', page); }catch(e){}
+  // On mobile, picking a page auto-closes the drawer so the content is visible.
+  if(window.innerWidth<=768){ const sb2=document.getElementById('sidebar'); if(sb2 && !sb2.classList.contains('collapsed')) toggleSidebar(); }
   if (page === 'overview') renderOverview();
   if (page === 'invoices') renderInvoicePage();
   if (page === 'team') loadTeam();
@@ -2663,6 +2670,7 @@ function toggleSidebar() {
   main.classList.toggle('expanded', collapsed);
   btn.classList.toggle('collapsed', collapsed);
   btn.textContent = collapsed ? '☰' : '✕';
+  document.getElementById('sidebar-backdrop')?.classList.toggle('show', !collapsed);
 }
 
 async function signOut() {
@@ -6927,8 +6935,21 @@ function fmtDateTime(ts){
   const d=new Date(ts); if(isNaN(d)) return '';
   return d.toLocaleString(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
 }
-function notesSeenMap(){ try{ return JSON.parse(localStorage.getItem('agencyos_notes_seen')||'{}'); }catch(e){ return {}; } }
-function markNotesSeen(modelId){ try{ const m=notesSeenMap(); m[modelId]=new Date().toISOString(); localStorage.setItem('agencyos_notes_seen',JSON.stringify(m)); }catch(e){} }
+// Cross-device read-state: stored in note_reads (user + model) so the "new messages" badge
+// stays consistent whether a chatter/model checks on their phone or on desktop.
+async function fetchNotesSeenMap(){
+  try{
+    const uid=STATE.user?.id; if(!uid) return {};
+    const{data}=await sb.from('note_reads').select('model_id,last_seen_at').eq('user_id',uid);
+    const m={}; (data||[]).forEach(r=>{ m[r.model_id]=r.last_seen_at; }); return m;
+  }catch(e){ return {}; }
+}
+async function markNotesSeen(modelId){
+  try{
+    const uid=STATE.user?.id; if(!uid) return;
+    await sb.from('note_reads').upsert({user_id:uid, model_id:modelId, last_seen_at:new Date().toISOString()},{onConflict:'user_id,model_id'});
+  }catch(e){}
+}
 function canManageNotes(modelId){
   const role=STATE.profile?.role;
   if(['admin','va'].includes(role)) return true;
@@ -7067,7 +7088,7 @@ function openImageLightbox(id){
 // if a model has left a note this user hasn't opened since; otherwise the normal empty state.
 async function renderSheetsLanding(){
   const content=document.getElementById('sheets-content'); if(!content) return;
-  const seen=notesSeenMap();
+  const seen=await fetchNotesSeenMap();
   const{data}=await sb.from('script_notes').select('model_id,created_at,author_role').eq('author_role','model');
   const newest={};
   (data||[]).forEach(n=>{ if(!newest[n.model_id]||n.created_at>newest[n.model_id]) newest[n.model_id]=n.created_at; });
