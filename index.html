@@ -4949,7 +4949,9 @@ async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
   // so every week's invoice lands on the same predictable schedule (e.g. the week of Jul
   // 20-26 becomes payable Aug 3, always the Monday two weeks after the week's own Monday).
   const payoutDate=addDays(weekOf,14);
-  const eligible=rows.filter(r=>r.model_id && r.agency_net>0);
+  // Skip hidden/owner models (e.g. Liam) — the owner runs the agency, so auto-invoicing
+  // themselves the agency commission is meaningless.
+  const eligible=rows.filter(r=>r.model_id && r.agency_net>0 && !((STATE.models.find(m=>m.id===r.model_id)||{}).hidden));
   if(!eligible.length) return {generated:0, skippedPaid:0};
 
   // Re-uploading the same week (a correction) should replace any invoice for it that's
