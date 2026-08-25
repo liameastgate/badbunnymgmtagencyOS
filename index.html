@@ -1112,6 +1112,7 @@
         <div class="tab" onclick="switchPersonalReportTab('upload')">Creator Stats</div>
         <div class="tab" onclick="switchPersonalReportTab('chatters')">Chatter Performance</div>
         <div class="tab" onclick="switchPersonalReportTab('sales')">Sales Records</div>
+        <div class="tab" onclick="switchPersonalReportTab('commission')">Chatter Commission</div>
         <div class="tab" onclick="switchPersonalReportTab('reconcile')">Reconcile</div>
         <div class="tab" onclick="switchPersonalReportTab('history')">History</div>
       </div>
@@ -1325,6 +1326,20 @@
         <div id="p-sales-history-alert" class="alert" style="margin-bottom:12px;"></div>
         <div id="p-sales-history-groups" style="margin-top:10px;"></div>
         <div id="p-sales-history-empty" class="empty" style="display:none;"><div class="empty-icon">💰</div><p>No sales records uploaded yet</p></div>
+      </div>
+
+      <!-- Chatter Commission on your private accounts (paid out of agency profit) -->
+      <div id="p-report-tab-commission" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">Chatter Commission — your accounts</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Each chatter's commission on YOUR private accounts, from your uploaded Sales Records. Add these figures to their chatter invoice — it's paid out of agency profit. Nothing here is visible to anyone but you.</div>
+          <div class="form-grid" style="align-items:end;">
+            <div class="form-group" style="max-width:140px;"><label>From</label><input type="date" id="p-comm-start" onchange="loadPersonalCommission()"></div>
+            <div class="form-group" style="max-width:140px;"><label>To</label><input type="date" id="p-comm-end" onchange="loadPersonalCommission()"></div>
+            <div class="form-group" style="max-width:120px;"><label>Commission %</label><input type="number" id="p-comm-pct" value="5" min="0" max="100" step="0.5" onchange="loadPersonalCommission()"></div>
+          </div>
+        </div>
+        <div id="p-comm-results"></div>
       </div>
 
       <!-- Reconcile: Sales Records (source of truth) vs Employee Performance -->
@@ -9218,18 +9233,20 @@ function populatePersonalDropdowns(){
 
 // ── Weekly Reports ───────────────────────────────────────────
 function switchPersonalReportTab(tab){
-  const order=['overview','upload','chatters','sales','reconcile','history'];
+  const order=['overview','upload','chatters','sales','commission','reconcile','history'];
   document.querySelectorAll('#page-personal-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('p-report-tab-overview').style.display=tab==='overview'?'block':'none';
   document.getElementById('p-report-tab-upload').style.display=tab==='upload'?'block':'none';
   document.getElementById('p-report-tab-chatters').style.display=tab==='chatters'?'block':'none';
   document.getElementById('p-report-tab-sales').style.display=tab==='sales'?'block':'none';
+  document.getElementById('p-report-tab-commission').style.display=tab==='commission'?'block':'none';
   document.getElementById('p-report-tab-reconcile').style.display=tab==='reconcile'?'block':'none';
   document.getElementById('p-report-tab-history').style.display=tab==='history'?'block':'none';
   if(tab==='overview') loadPersonalReportsOverview();
   if(tab==='upload') loadPersonalCreatorStatsSummary();
   if(tab==='chatters'){ loadPersonalEmpSummary(); loadPersonalEmpHistory(); }
   if(tab==='sales'){ loadPersonalSalesSummary(); loadPersonalSalesHistory(); }
+  if(tab==='commission') loadPersonalCommission();
   if(tab==='reconcile') loadPersonalReconciliation();
   if(tab==='history') loadPersonalReportHistory();
 }
@@ -9857,6 +9874,44 @@ function renderPersonalQualityStats(rows){
     statCard('Avg Earnings/Fan',avgEarningsPerFan!==null?'$'+fmt(avgEarningsPerFan):'—','','')+
     statCard('Avg Reply Time',avgReplyTime!==null?avgReplyTime.toFixed(1)+' min':'—','accent','blue')+
     statCard('Avg Sub Length',avgSubLength!==null?avgSubLength.toFixed(0)+' days':'—','accent','green');
+}
+
+// Per-chatter commission on Liam's OWN accounts, from private sales records. This figure
+// is added to each chatter's normal invoice (paid out of agency profit). Owner-only page.
+async function loadPersonalCommission(){
+  const startEl=document.getElementById('p-comm-start'); const endEl=document.getElementById('p-comm-end');
+  if(!startEl||!endEl) return;
+  ensureDefaultRange(startEl,endEl);
+  const start=startEl.value, end=endEl.value;
+  const pct=parseFloat(document.getElementById('p-comm-pct')?.value||'5')||0;
+  const{data}=await sb.from('personal_sales_records').select('*');
+  const rows=(data||[]).filter(r=>overlaps(r.week_of,r.week_end,start,end));
+  const byChatter=new Map(); let unassigned=0;
+  rows.forEach(r=>{
+    const name=(r.chatter_name||'').trim();
+    const earn=parseFloat(r.earnings||0);
+    if(!name){ unassigned+=earn; return; }
+    const cur=byChatter.get(name)||{name,earnings:0,sales:0};
+    cur.earnings+=earn; cur.sales++; byChatter.set(name,cur);
+  });
+  const list=[...byChatter.values()].sort((a,b)=>b.earnings-a.earnings);
+  const totalComm=list.reduce((s,c)=>s+c.earnings*pct/100,0);
+  const el=document.getElementById('p-comm-results'); if(!el) return;
+  if(!list.length){ el.innerHTML='<div class="empty" style="margin-top:20px;"><div class="empty-icon">💸</div><p>No chatter-attributed sales in this range.</p></div>'; return; }
+  const rowsHtml=list.map(c=>`<tr><td><strong>${escapeHtml(c.name)}</strong></td><td>${c.sales}</td><td>$${fmt(c.earnings)}</td><td class="profit">$${fmt(c.earnings*pct/100)}</td></tr>`).join('');
+  el.innerHTML=`
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
+      ${statCard('Total Chatter Commission','$'+fmt(totalComm),'accent','green')}
+      ${statCard('Commission Rate',pct+'%','','')}
+      ${statCard('Chatters',list.length,'white','purple')}
+    </div>
+    <div class="card"><div class="card-title">Per-chatter commission on your accounts</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Chatter</th><th>Sales</th><th>Their earnings (your accounts)</th><th>Commission (${pct}%)</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+      ${unassigned>0?`<div style="font-size:11px;color:var(--text2);margin-top:10px;">Note: $${fmt(unassigned)} of sales had no chatter attributed — no commission owed on those.</div>`:''}
+    </div>`;
 }
 
 async function loadPersonalSalesSummary(){
