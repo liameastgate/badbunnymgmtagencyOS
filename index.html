@@ -2688,9 +2688,9 @@ async function loadAllData() {
   const [m, c, o, sheets] = await Promise.all([
     sb.from('models').select('*').order('name'),
     sb.from('chatters').select('*').order('name'),
-    STATE.profile.role === 'model'
-      ? sb.from('content_orders').select('*').eq('model_email', STATE.profile.email).order('created_at',{ascending:false})
-      : sb.from('content_orders').select('*').order('created_at',{ascending:false}),
+    // RLS returns the right rows per role (admin/va: all; model: own by email OR model_id),
+    // so a single unfiltered query works and avoids missing model_id-only orders.
+    sb.from('content_orders').select('*').order('created_at',{ascending:false}),
     sb.from('model_sheets').select('model_id,pdf_url')
   ]);
   const rawModels = m.data||[];
@@ -3089,17 +3089,19 @@ function contentOrderRowHtml(o,isAdmin,hidden){
   const thumb=o.thumbnail_url
     ?`<img src="${o.thumbnail_url}" style="width:80px;height:45px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
     :`<div style="width:80px;height:45px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;">No thumb</div>`;
-  const vid=o.video_url?`<a href="${o.video_url}" target="_blank" style="color:var(--green);font-size:11px;">🎬 Video ↗</a>`:'';
+  const hasVid=!!o.video_path;
   return `<tr${hidden?' style="display:none;"':''}>
       ${isAdmin?`<td><input type="checkbox" class="co-row-select" data-id="${o.id}" ${_selectedOrderIds.has(o.id)?'checked':''} onchange="toggleOrderSelect('${o.id}',this.checked)"></td>`:''}
       <td>${thumb}</td>
       <td><strong>${num?`<span style="color:var(--accent2);">${num}</span> · `:''}${o.model_name||'—'}</strong></td><td>${pl}</td>
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
-      <td style="max-width:180px;">${o.notes||'—'}${vid?'<br>'+vid:''}</td>
+      <td style="max-width:180px;">${o.notes||'—'}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span></td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${o.video_path?`<button class="btn btn-sm btn-ghost" onclick="openOrderVideo('${o.id}')" title="View uploaded video">🎬 Video</button>`:''}
+        ${canEdit?`<button id="co-up-${o.id}" class="btn btn-sm btn-ghost" onclick="uploadOrderVideo('${o.id}')">📤 ${o.video_path?'Replace':'Upload'}</button>`:''}
         ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓ Done</button>`:''}
         ${canEdit&&o.status==='done'?`<button class="btn btn-sm btn-ghost" onclick="markPending('${o.id}')" style="font-size:11px;">↩ Undo</button>`:''}
         ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="editOrder('${o.id}')">✏ Edit</button>`:''}
@@ -3127,6 +3129,35 @@ function renderContentOrders(filtered) {
   }
   tbody.innerHTML=html;
   updateOrderBulkBar();
+}
+
+// In-app video upload per order. INTERIM: Supabase Storage (private bucket, signed-URL
+// playback). Migrating to Cloudflare R2 later swaps only these two functions.
+var CONTENT_VIDEO_MAX=524288000; // 500MB
+async function uploadOrderVideo(orderId){
+  const o=STATE.contentOrders.find(x=>x.id===orderId); if(!o) return;
+  const modelId=o.model_id;
+  if(!modelId){ alert('This order has no model assigned yet — an admin needs to assign it before a video can be attached.'); return; }
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='video/*';
+  inp.onchange=async()=>{
+    const file=inp.files&&inp.files[0]; if(!file) return;
+    if(file.size>CONTENT_VIDEO_MAX){ alert('That video is '+(file.size/1048576).toFixed(0)+'MB — over the 500MB limit. Trim or compress it first.'); return; }
+    const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${modelId}/${orderId}/${Date.now()}_${safe}`;
+    const btn=document.getElementById('co-up-'+orderId); if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
+    const{error}=await sb.storage.from('content-videos').upload(path,file,{upsert:true,contentType:file.type||'video/mp4'});
+    if(error){ alert('Upload failed: '+error.message); if(btn){btn.textContent='📤 Upload';btn.disabled=false;} return; }
+    await sb.from('content_orders').update({video_path:path}).eq('id',orderId);
+    const co=STATE.contentOrders.find(x=>x.id===orderId); if(co) co.video_path=path;
+    filterContentOrders();
+  };
+  inp.click();
+}
+async function openOrderVideo(orderId){
+  const o=STATE.contentOrders.find(x=>x.id===orderId); if(!o||!o.video_path) return;
+  const{data,error}=await sb.storage.from('content-videos').createSignedUrl(o.video_path,3600);
+  if(error||!data){ alert('Could not open video: '+(error?error.message:'unknown')); return; }
+  window.open(data.signedUrl,'_blank');
 }
 
 function filterContentOrders() {
