@@ -7248,6 +7248,10 @@ async function loadContentIdeas(){
 function populateIdeaNicheFilter(){
   const sel=document.getElementById('idea-filter-niche'); if(!sel)return;
   const cur=sel.value;
+  // A model must never see other models' niches. Hide the niche filter for them entirely
+  // (they only have one niche anyway) so it can't reveal the roster of niches.
+  if(STATE.profile?.role==='model'){ sel.style.display='none'; sel.innerHTML='<option value="">All Niches</option>'; return; }
+  sel.style.display='';
   const niches=[...new Set([
     ...STATE.contentIdeas.map(i=>i.niche).filter(Boolean),
     ...STATE.models.map(m=>m.niche).filter(Boolean)
@@ -7256,11 +7260,19 @@ function populateIdeaNicheFilter(){
   sel.value=cur;
 }
 
+// Ideas a model is allowed to see: their own niche + untagged/general ideas. Never another
+// model's niche. Staff (admin/va) see everything.
+function ideasVisibleToMe(rows){
+  if(STATE.profile?.role!=='model') return rows;
+  const myNiche=(myOwnModel()?.niche||'').toLowerCase();
+  return rows.filter(i=>{ const n=(i.niche||'').toLowerCase(); return !n || n===myNiche; });
+}
+
 function filterContentIdeas(){
   const niche=document.getElementById('idea-filter-niche')?.value||'';
   const status=document.getElementById('idea-filter-status')?.value||'';
   const sort=document.getElementById('idea-sort')?.value||'date_desc';
-  let rows=STATE.contentIdeas.slice();
+  let rows=ideasVisibleToMe(STATE.contentIdeas.slice());
   if(niche) rows=rows.filter(i=>i.niche===niche);
   if(status) rows=rows.filter(i=>i.status===status);
   if(sort==='date_asc') rows.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
@@ -7970,7 +7982,9 @@ function parseTrafficDate(raw){
 }
 
 function populateTrafficModelDropdowns(){
-  const opts=STATE.models.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  // A model must only ever see themselves in any picker — never the roster of other models.
+  const visible=STATE.profile?.role==='model' ? (myOwnModel()?[myOwnModel()]:[]) : STATE.models;
+  const opts=visible.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
   const viewSel=document.getElementById('traffic-model-select');
   const uploadSel=document.getElementById('traffic-upload-model');
   if(viewSel) viewSel.innerHTML=opts||'<option value="">No models yet</option>';
