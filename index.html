@@ -6999,6 +6999,9 @@ async function saveSheet(modelId){
 var _scriptNotes=[];
 var _editingNoteId=null;
 var _pendingNoteImg=null;
+var _noteSearch='';
+var _noteTypeFilter='';
+const NOTE_TYPE_META={update:['Update','#6b7280'],ppv:['PPV','#0ea45a'],script_change:['Script change','#2f6bff'],request:['Request','#b45309']};
 
 function fmtDateTime(ts){
   if(!ts) return '';
@@ -7028,7 +7031,7 @@ function canManageNotes(modelId){
 
 async function renderScriptNotes(modelId){
   const panel=document.getElementById('sheet-notes-panel'); if(!panel) return;
-  _editingNoteId=null; _pendingNoteImg=null;
+  _editingNoteId=null; _pendingNoteImg=null; _noteSearch=''; _noteTypeFilter='';
   const{data}=await sb.from('script_notes').select('*').eq('model_id',modelId).order('created_at',{ascending:false});
   _scriptNotes=data||[];
   markNotesSeen(modelId); // opening a script clears its "new messages" flag for this user
@@ -7038,18 +7041,31 @@ async function renderScriptNotes(modelId){
 function renderNotesPanel(modelId){
   const panel=document.getElementById('sheet-notes-panel'); if(!panel) return;
   const canManage=canManageNotes(modelId);
+  const inp='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);font-family:inherit;';
   const composer=canManage?`
     <div style="margin-bottom:14px;">
-      <textarea id="note-input" placeholder="Leave an update for the chatters — new PPV drop, description, page news…" style="width:100%;box-sizing:border-box;min-height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;color:var(--text);font-family:inherit;resize:vertical;"></textarea>
+      <select id="note-type" onchange="toggleNoteTypeFields()" style="${inp}margin-bottom:8px;">
+        <option value="update">💬 General update</option>
+        <option value="ppv">🎬 PPV Release</option>
+        <option value="script_change">📝 Chatting script change</option>
+        <option value="request">🙋 Request to chatters</option>
+      </select>
+      <textarea id="note-input" placeholder="Keep it respectful and to the point — one clear update, not a flood of messages." style="${inp}min-height:64px;resize:vertical;"></textarea>
+      <div id="note-ppv-fields" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:6px;">
+          <input id="note-price-low" placeholder="Low $" style="${inp}">
+          <input id="note-price-mid" placeholder="Mid $" style="${inp}">
+          <input id="note-price-whale" placeholder="Whale $" style="${inp}">
+        </div>
+        <input id="note-buzzwords" placeholder="Buzzwords for search: feet, ass, foreskin…" style="${inp}margin-top:6px;">
+        <div style="font-size:10px;color:var(--text2);margin-top:4px;">Attach the PPV thumbnail below (📎). Buzzwords let chatters search this later.</div>
+      </div>
       <div id="note-img-preview" style="margin-top:6px;"></div>
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;">📎 Photo<input type="file" accept="image/*" style="display:none;" onchange="handleNoteImg(this.files[0])"></label>
         <button class="btn btn-primary btn-sm" onclick="postScriptNote('${modelId}')" style="margin-left:auto;">Post update</button>
       </div>
     </div>`:'';
-  const bubbles=_scriptNotes.length
-    ? _scriptNotes.map(n=>noteBubbleHtml(n,canManage)).join('')
-    : `<div style="color:var(--text2);font-size:12px;text-align:center;padding:20px 8px;">No updates yet.</div>`;
   panel.innerHTML=`
     <div class="card" style="padding:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -7057,8 +7073,39 @@ function renderNotesPanel(modelId){
         <span style="font-size:11px;color:var(--text2);">for chatters</span>
       </div>
       ${composer}
-      <div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow-y:auto;">${bubbles}</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <input id="note-search" oninput="setNoteSearch(this.value)" placeholder="🔎 Search updates / buzzwords" style="${inp}flex:1;">
+        <select id="note-type-filter" onchange="setNoteTypeFilter(this.value)" style="${inp}width:auto;">
+          <option value="">All</option>
+          <option value="ppv">PPV history</option>
+          <option value="script_change">Script</option>
+          <option value="request">Requests</option>
+          <option value="update">Updates</option>
+        </select>
+      </div>
+      <div id="note-bubbles" style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;"></div>
     </div>`;
+  const s=document.getElementById('note-search'); if(s) s.value=_noteSearch;
+  const tf=document.getElementById('note-type-filter'); if(tf) tf.value=_noteTypeFilter;
+  renderNoteBubbles();
+}
+
+function toggleNoteTypeFields(){
+  const t=document.getElementById('note-type')?.value;
+  const f=document.getElementById('note-ppv-fields'); if(f) f.style.display=(t==='ppv')?'block':'none';
+}
+function setNoteSearch(v){ _noteSearch=v; renderNoteBubbles(); }
+function setNoteTypeFilter(v){ _noteTypeFilter=v; renderNoteBubbles(); }
+
+function renderNoteBubbles(){
+  const wrap=document.getElementById('note-bubbles'); if(!wrap) return;
+  const canManage=canManageNotes(window._currentSheetModelId);
+  let list=_scriptNotes.slice();
+  if(_noteTypeFilter) list=list.filter(n=>(n.note_type||'update')===_noteTypeFilter);
+  if(_noteSearch){ const q=_noteSearch.toLowerCase(); list=list.filter(n=>((n.body||'')+' '+(n.buzzwords||'')).toLowerCase().includes(q)); }
+  wrap.innerHTML=list.length
+    ? list.map(n=>noteBubbleHtml(n,canManage)).join('')
+    : `<div style="color:var(--text2);font-size:12px;text-align:center;padding:20px 8px;">${(_noteSearch||_noteTypeFilter)?'No matching updates.':'No updates yet.'}</div>`;
 }
 
 function noteBubbleHtml(n,canManage){
@@ -7073,17 +7120,25 @@ function noteBubbleHtml(n,canManage){
   }
   const roleTag=n.author_role==='model'?'Model':(n.author_role==='admin'?'Admin':(n.author_role==='va'?'VA':(n.author_role||'')));
   const img=n.image_url?`<img src="${n.image_url}" onclick="openImageLightbox('${n.id}')" style="margin-top:8px;width:88px;height:88px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--border);">`:'';
+  const nt=n.note_type||'update';
+  const meta=NOTE_TYPE_META[nt]||NOTE_TYPE_META.update;
+  const typeChip=`<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;background:${meta[1]}22;color:${meta[1]};">${meta[0]}</span>`;
+  const ppv=nt==='ppv'?`<div style="margin-top:6px;font-size:12px;color:var(--text2);">
+      ${(n.price_low||n.price_mid||n.price_whale)?`💰 Low <b style="color:var(--text);">${escapeHtml(n.price_low||'—')}</b> · Mid <b style="color:var(--text);">${escapeHtml(n.price_mid||'—')}</b> · Whale <b style="color:var(--text);">${escapeHtml(n.price_whale||'—')}</b>`:''}
+      ${n.buzzwords?`<div style="margin-top:4px;">🔖 ${escapeHtml(n.buzzwords)}</div>`:''}
+    </div>`:'';
   const controls=canManage?`
     <div style="display:flex;gap:10px;margin-top:6px;">
       <span onclick="startEditNote('${n.id}')" title="Edit" style="cursor:pointer;font-size:12px;opacity:.7;">✏️</span>
       <span onclick="deleteScriptNote('${n.id}')" title="Delete" style="cursor:pointer;font-size:12px;opacity:.7;">🗑️</span>
     </div>`:'';
   return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;border-top-left-radius:3px;padding:10px 12px;">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;">
-      <span style="font-size:12px;font-weight:700;">${escapeHtml(n.author_name||'—')}${roleTag?` <span style="font-weight:500;color:var(--text2);">· ${roleTag}</span>`:''}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+      <span style="font-size:12px;font-weight:700;">${typeChip} ${escapeHtml(n.author_name||'—')}${roleTag?` <span style="font-weight:500;color:var(--text2);">· ${roleTag}</span>`:''}</span>
       <span style="font-size:10px;color:var(--text2);white-space:nowrap;">${fmtDateTime(n.created_at)}</span>
     </div>
     <div style="font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--text);">${escapeHtml(n.body||'')}</div>
+    ${ppv}
     ${img}
     ${controls}
   </div>`;
@@ -7119,33 +7174,41 @@ function readImageThumb(file,cb){
 async function postScriptNote(modelId){
   const ta=document.getElementById('note-input');
   const body=(ta?.value||'').trim();
+  const type=document.getElementById('note-type')?.value||'update';
   if(!body&&!_pendingNoteImg) return;
   const p=STATE.profile||{};
-  const{error}=await sb.from('script_notes').insert({
-    model_id:modelId, body, image_url:_pendingNoteImg||null,
+  const row={
+    model_id:modelId, body, image_url:_pendingNoteImg||null, note_type:type,
     author_email:p.email||null, author_name:(p.name||(p.email||'').split('@')[0]||'—'), author_role:p.role||null
-  });
+  };
+  if(type==='ppv'){
+    row.price_low=(document.getElementById('note-price-low')?.value||'').trim()||null;
+    row.price_mid=(document.getElementById('note-price-mid')?.value||'').trim()||null;
+    row.price_whale=(document.getElementById('note-price-whale')?.value||'').trim()||null;
+    row.buzzwords=(document.getElementById('note-buzzwords')?.value||'').trim()||null;
+  }
+  const{error}=await sb.from('script_notes').insert(row);
   if(error) return alert('Could not post: '+error.message);
   _pendingNoteImg=null;
   renderScriptNotes(modelId);
 }
 
-function startEditNote(id){ _editingNoteId=id; renderNotesPanel(window._currentSheetModelId); }
-function cancelEditNote(){ _editingNoteId=null; renderNotesPanel(window._currentSheetModelId); }
+function startEditNote(id){ _editingNoteId=id; renderNoteBubbles(); }
+function cancelEditNote(){ _editingNoteId=null; renderNoteBubbles(); }
 async function saveEditNote(id){
   const val=document.getElementById('note-edit-input')?.value||'';
   const{error}=await sb.from('script_notes').update({body:val,updated_at:new Date().toISOString()}).eq('id',id);
   if(error) return alert('Could not save: '+error.message);
   _editingNoteId=null;
   const n=_scriptNotes.find(x=>x.id===id); if(n) n.body=val;
-  renderNotesPanel(window._currentSheetModelId);
+  renderNoteBubbles();
 }
 async function deleteScriptNote(id){
   if(!confirm('Delete this update?')) return;
   const{error,data}=await sb.from('script_notes').delete().eq('id',id).select();
   if(error||!data||!data.length) return alert('Could not delete — you may not have permission.');
   _scriptNotes=_scriptNotes.filter(x=>x.id!==id);
-  renderNotesPanel(window._currentSheetModelId);
+  renderNoteBubbles();
 }
 function openImageLightbox(id){
   const n=_scriptNotes.find(x=>x.id===id); if(!n||!n.image_url) return;
