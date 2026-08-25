@@ -553,6 +553,7 @@
       <!-- Drive link banners — populated by populateModelDropdowns() -->
       <div id="co-drive-banners" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;"></div>
       <div id="co-completions-banner" style="display:none;margin-bottom:14px;"></div>
+      <div id="co-compliance-bulk" style="margin-bottom:14px;"></div>
       <div id="content-admin-panel" style="display:none;">
         <div class="card">
           <div class="card-title">New Content Order</div>
@@ -3367,7 +3368,36 @@ async function renderCompliance(){
   }
 }
 
+// Per-model Meta-compliance summary — shows at a glance whose content is mostly unusable.
+function renderComplianceBulk(){
+  const el=document.getElementById('co-compliance-bulk'); if(!el) return;
+  const scans=STATE.scansByOrder||{};
+  const byModel={};
+  (STATE.contentOrders||[]).forEach(function(o){
+    const s=scans[o.id]; if(!s||s.scan_error) return;
+    const key=o.model_name||'—';
+    const g=byModel[key]||(byModel[key]={model:key,distributed:0,not_recommended:0,removed:0,total:0});
+    g.total++;
+    if(s.instagram_outcome==='distributed')g.distributed++;
+    else if(s.instagram_outcome==='not_recommended')g.not_recommended++;
+    else if(s.instagram_outcome==='removed')g.removed++;
+  });
+  const list=Object.values(byModel).sort(function(a,b){return (b.removed+b.not_recommended)-(a.removed+a.not_recommended);});
+  if(!list.length){ el.innerHTML=''; return; }
+  const rows=list.map(function(g){
+    const bad=g.removed+g.not_recommended; const pct=g.total?Math.round(bad/g.total*100):0;
+    const col=pct>=50?'var(--red)':pct>=25?'#e6b428':'var(--text2)';
+    return '<tr><td><strong>'+escapeHtml(g.model)+'</strong></td>'
+      +'<td><span class="cscan cscan-green">'+g.distributed+'</span></td>'
+      +'<td><span class="cscan cscan-amber">'+g.not_recommended+'</span></td>'
+      +'<td><span class="cscan cscan-red">'+g.removed+'</span></td>'
+      +'<td style="font-weight:800;color:'+col+';">'+pct+'% capped/removed</td></tr>';
+  }).join('');
+  el.innerHTML='<div class="card"><div class="card-title">🛡️ Meta compliance by model <span style="font-weight:400;color:var(--text3);">(scanned items)</span></div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Reaches new</th><th>Followers-only</th><th>Removed</th><th>Unusable</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+
 function filterContentOrders() {
+  renderComplianceBulk();
   const m=document.getElementById('co-filter-model').value;
   const s=document.getElementById('co-filter-status').value;
   const sortBy=document.getElementById('co-sort')?.value||'date_desc';
