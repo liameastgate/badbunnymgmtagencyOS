@@ -470,11 +470,40 @@
     <div class="logo">AgencyOS<span>BadBunnyMgmt</span></div>
     <nav id="nav"></nav>
     <div class="user-info">
+      <div class="lang-toggle" id="lang-toggle" title="Language / Idioma">
+        <button class="lang-opt" data-lang="en" onclick="setSiteLang('en')">EN</button>
+        <button class="lang-opt" data-lang="es" onclick="setSiteLang('es')">ES</button>
+      </div>
       <div class="user-email" id="user-email-display"></div>
       <span class="user-role" id="user-role-display"></span>
       <button class="btn-signout" onclick="signOut()">Sign out</button>
     </div>
   </div>
+
+  <!-- Whole-app EN/ES translation (Google Translate) -->
+  <style>
+    .goog-te-banner-frame.skiptranslate,.goog-te-gadget-icon,#goog-gt-tt,.goog-te-balloon-frame,#google_translate_element{display:none!important;}
+    body{top:0!important;position:static!important;}
+    .goog-text-highlight{background:none!important;box-shadow:none!important;}
+    .lang-toggle{display:inline-flex;gap:2px;background:#141a26;border:1px solid #263047;border-radius:8px;padding:2px;margin-bottom:10px;}
+    .lang-opt{border:0;background:transparent;color:#8a92a6;font-size:11px;font-weight:800;letter-spacing:1px;padding:5px 14px;border-radius:6px;cursor:pointer;}
+    .lang-opt.active{background:#1e4fff;color:#fff;}
+  </style>
+  <div id="google_translate_element"></div>
+  <script>
+    function googleTranslateElementInit(){ try{ new google.translate.TranslateElement({pageLanguage:'en',includedLanguages:'en,es',autoDisplay:false},'google_translate_element'); }catch(e){} }
+    function setSiteLang(lang){
+      var host=location.hostname;
+      document.cookie='googtrans=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+      document.cookie='googtrans=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=.'+host+';';
+      if(lang==='es'){ document.cookie='googtrans=/en/es;path=/;'; document.cookie='googtrans=/en/es;path=/;domain=.'+host+';'; }
+      location.reload();
+    }
+    function _highlightLang(){ var es=(document.cookie.indexOf('googtrans=/en/es')>-1); var n=document.querySelectorAll('.lang-opt'); for(var i=0;i<n.length;i++){ n[i].classList.toggle('active', n[i].getAttribute('data-lang')===(es?'es':'en')); } }
+    document.addEventListener('DOMContentLoaded',_highlightLang);
+  </script>
+  <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
   <div id="main">
 
     <!-- Model Overview / Welcome (landing page for the 'model' role) -->
