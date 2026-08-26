@@ -1967,6 +1967,11 @@
           <div class="tab active" id="msg-tab-mm" onclick="switchMsgTab('mm')">Mass Messages</div>
           <div class="tab" id="msg-tab-bumps" onclick="switchMsgTab('bumps')">Bumps</div>
           <div class="tab" id="msg-tab-welcome" onclick="switchMsgTab('welcome')">Welcome</div>
+          <div class="tab" id="msg-tab-winback" onclick="switchMsgTab('winback')">Winback</div>
+        </div>
+        <div class="tabs" style="margin-bottom:0;margin-left:auto;">
+          <div class="tab active" id="msg-view-active" onclick="switchMsgView('active')">📥 Active</div>
+          <div class="tab" id="msg-view-archive" onclick="switchMsgView('archive')">🗄️ Archive</div>
         </div>
       </div>
       <div id="msg-body"></div>
@@ -7674,163 +7679,142 @@ async function renderSheetsLanding(){
 }
 function openSheetForModelById(id){ const m=STATE.models.find(x=>x.id===id); if(m) openSheetForModel(m); }
 
-// ── Messages: Mass Messages / Bumps / Welcome ─────────────────
-var MSG_TAB='mm';
+// ── Messages: Mass Messages / Bumps / Welcome (refill + archive) ───────────
+var MSG_TAB='mm', MSG_VIEW='active';
+function msgTable(kind){ return kind==='mm'?'mass_messages':kind==='bump'?'bumps':kind==='winback'?'winback_messages':'welcome_messages'; }
+function msgArr(kind){ return kind==='mm'?STATE.massMessages:kind==='bump'?STATE.bumps:kind==='winback'?STATE.winbackMessages:STATE.welcomeMessages; }
+function msgKind(){ return MSG_TAB==='mm'?'mm':MSG_TAB==='bumps'?'bump':MSG_TAB==='winback'?'winback':'welcome'; }
 async function loadMessages(){
   const sel=document.getElementById('msg-model');
   if(sel){ const cur=sel.value; sel.innerHTML=(STATE.models||[]).map(function(m){return '<option value="'+m.id+'">'+escapeHtml(m.name||'')+'</option>';}).join(''); if(cur)sel.value=cur; }
   const res=await Promise.all([
     sb.from('mass_messages').select('*').order('created_at',{ascending:false}),
     sb.from('bumps').select('*').order('created_at',{ascending:false}),
-    sb.from('welcome_messages').select('*').order('created_at',{ascending:false})
+    sb.from('welcome_messages').select('*').order('created_at',{ascending:false}),
+    sb.from('winback_messages').select('*').order('created_at',{ascending:false})
   ]);
-  STATE.massMessages=res[0].data||[]; STATE.bumps=res[1].data||[]; STATE.welcomeMessages=res[2].data||[];
+  STATE.massMessages=res[0].data||[]; STATE.bumps=res[1].data||[]; STATE.welcomeMessages=res[2].data||[]; STATE.winbackMessages=res[3].data||[];
   renderMessages();
 }
 function switchMsgTab(t){
   MSG_TAB=t;
-  ['mm','bumps','welcome'].forEach(function(k){ const el=document.getElementById('msg-tab-'+k); if(el)el.classList.toggle('active',k===t); });
+  ['mm','bumps','welcome','winback'].forEach(function(k){ const el=document.getElementById('msg-tab-'+k); if(el)el.classList.toggle('active',k===t); });
   renderMessages();
 }
-function renderMessages(){
-  const body=document.getElementById('msg-body'); if(!body) return;
-  if(MSG_TAB==='mm') renderMM(body);
-  else if(MSG_TAB==='bumps') renderBumps(body);
-  else renderWelcome(body);
+function switchMsgView(v){
+  MSG_VIEW=v;
+  ['active','archive'].forEach(function(k){ const el=document.getElementById('msg-view-'+k); if(el)el.classList.toggle('active',k===v); });
+  renderMessages();
 }
 function copyMsg(kind,id,btn){
-  const arr=kind==='mm'?STATE.massMessages:kind==='bump'?STATE.bumps:STATE.welcomeMessages;
-  const it=(arr||[]).find(function(x){return x.id===id;}); if(!it) return;
+  const it=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(!it) return;
   const done=function(){ if(btn){const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(function(){btn.textContent=o;},1200);} };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(it.body||'').then(done,function(){done();}); } else { done(); }
 }
-// Mass Messages
-function renderMM(body){
+function renderMessages(){
+  const body=document.getElementById('msg-body'); if(!body) return;
+  const kind=msgKind();
   const modelId=(document.getElementById('msg-model')||{}).value;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  let items=(STATE.massMessages||[]).filter(function(m){return m.model_id===modelId;});
-  items.sort(function(a,b){return (a.used?1:0)-(b.used?1:0) || new Date(b.created_at)-new Date(a.created_at);});
-  const unused=items.filter(function(m){return !m.used;}).length;
-  const addBtn=isAdmin?'<button class="btn btn-sm btn-primary" onclick="addMassMessage()">➕ Add mass message</button>':'';
-  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'+addBtn+'<span style="font-size:12px;color:var(--text2);">'+unused+' unused · '+(items.length-unused)+' used</span></div>'
-    +(items.length?items.map(function(m){return massMsgCard(m,isAdmin);}).join(''):'<div class="empty" style="margin-top:20px;"><div class="empty-icon">💬</div><p>No mass messages for this model yet.</p></div>');
+  const archive=MSG_VIEW==='archive';
+  const all=(msgArr(kind)||[]).filter(function(m){return m.model_id===modelId;});
+  const activeCount=all.filter(function(m){return !m.used;}).length;
+  const archCount=all.filter(function(m){return !!m.used;}).length;
+  let items=all.filter(function(m){ return archive ? !!m.used : !m.used; });
+  items.sort(function(a,b){ return archive ? (new Date(b.used_at||0)-new Date(a.used_at||0)) : (new Date(b.created_at)-new Date(a.created_at)); });
+  const labels={mm:'mass message',bump:'bump',welcome:'welcome message',winback:'win-back message'};
+  const addFn={mm:'addMassMessage()',bump:'addBump()',welcome:'addWelcome()',winback:'addWinback()'}[kind];
+  const addBtn=(isAdmin&&!archive)?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
+  const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Opening messages for new subs. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div>'+addBtn+'</div>'
+    +'<span style="font-size:12px;color:var(--text2);">'+activeCount+' active · '+archCount+' archived</span></div>'
+    +(hint&&!archive?'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+hint+'Always personalise before sending.</div>':'')
+    +(items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
+      :'<div class="empty" style="margin-top:20px;"><div class="empty-icon">'+(archive?'🗄️':'💬')+'</div><p>'+(archive?'Nothing used yet — archive is empty.':'No '+labels[kind]+'s loaded for this model.'+(isAdmin?' Add some above to fill the queue.':' Ask an admin to refill.'))+'</p></div>');
 }
-function massMsgCard(m,isAdmin){
-  const tone=m.tone?'<span class="cscan cscan-grey" style="cursor:default;">'+escapeHtml(m.tone)+'</span> ':'';
-  const usedInfo=m.used?'<span style="font-size:11px;color:var(--text2);">✅ used'+(m.used_by_email?' · '+escapeHtml((m.used_by_email||'').split('@')[0]):'')+(m.used_at?' · '+fmtDate(m.used_at):'')+'</span>':'';
-  return '<div class="card" style="'+(m.used?'opacity:.5;':'')+'padding:12px 14px;margin-bottom:10px;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div>'+tone+usedInfo+'</div>'
-    +'<div style="display:flex;gap:8px;align-items:center;white-space:nowrap;">'
-    +'<label style="font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" '+(m.used?'checked':'')+' onchange="toggleMMUsed(\''+m.id+'\',this.checked)" style="width:auto;margin:0;"> used</label>'
-    +'<button class="btn btn-sm btn-ghost" onclick="copyMsg(\'mm\',\''+m.id+'\',this)">⧉ Copy</button></div></div>'
+function msgCard(kind,m,isAdmin,archive){
+  let tags='';
+  if(kind==='mm'&&m.tone) tags='<span class="cscan cscan-grey" style="cursor:default;">'+escapeHtml(m.tone)+'</span> ';
+  if(kind==='bump'){ tags=(m.status==='proven'?'<span class="cscan cscan-green" style="cursor:default;">✅ proven</span> ':'<span class="cscan cscan-amber" style="cursor:default;">🧪 testing</span> ')+(m.reply_rate?'<span style="font-size:12px;color:var(--text2);">reply '+escapeHtml(m.reply_rate)+'</span>':''); }
+  const usedInfo=archive?'<span style="font-size:11px;color:var(--text2);">🗄️ used '+(m.used_at?fmtDate(m.used_at):'')+(m.used_by_email?' · '+escapeHtml((m.used_by_email||'').split('@')[0]):'')+'</span>':'';
+  const kq="'"+kind+"','"+m.id+"'";
+  const right=archive
+    ? '<button class="btn btn-sm btn-ghost" onclick="restoreMsg('+kq+')">↩ Restore</button>'
+    : '<button class="btn btn-sm btn-primary" onclick="markUsed('+kq+')" title="Mark used &amp; move to archive">✓ Used</button> <button class="btn btn-sm btn-ghost" onclick="copyMsg('+kq+',this)">⧉ Copy</button>';
+  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;'+(archive?'opacity:.7;':'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div>'+(tags||usedInfo?tags+usedInfo:'<span style="font-size:11px;color:var(--text2);">ready</span>')+'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'+right+'</div></div>'
     +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(m.body||'')+'</div>'
-    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMassMessage(\''+m.id+'\')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMassMessage(\''+m.id+'\')">✕</button></div>':'')
+    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMsg('+kq+')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMsg('+kq+')">✕</button></div>':'')
     +'</div>';
 }
-async function toggleMMUsed(id,checked){
+async function markUsed(kind,id){
   const p=STATE.profile||{};
-  const upd={used:checked, used_by_email:checked?(p.email||null):null, used_at:checked?new Date().toISOString():null};
-  const r=await sb.from('mass_messages').update(upd).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not update.'); return; }
-  const m=(STATE.massMessages||[]).find(function(x){return x.id===id;}); if(m) Object.assign(m,upd);
+  const upd={used:true, used_by_email:p.email||null, used_at:new Date().toISOString()};
+  const r=await sb.from(msgTable(kind)).update(upd).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — you may not have permission.'); return; }
+  const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(m) Object.assign(m,upd);
   renderMessages();
 }
+async function restoreMsg(kind,id){
+  const upd={used:false, used_by_email:null, used_at:null};
+  const r=await sb.from(msgTable(kind)).update(upd).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not restore.'); return; }
+  const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(m) Object.assign(m,upd);
+  renderMessages();
+}
+function delMsg(kind,id){
+  if(!confirm('Delete this permanently?')) return;
+  sb.from(msgTable(kind)).delete().eq('id',id).select().then(function(r){
+    if(r.error||!r.data||!r.data.length){ alert('Could not delete.'); return; }
+    if(kind==='mm') STATE.massMessages=(STATE.massMessages||[]).filter(function(x){return x.id!==id;});
+    else if(kind==='bump') STATE.bumps=(STATE.bumps||[]).filter(function(x){return x.id!==id;});
+    else STATE.welcomeMessages=(STATE.welcomeMessages||[]).filter(function(x){return x.id!==id;});
+    renderMessages();
+  });
+}
+function editMsg(kind,id){
+  const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(!m) return;
+  const bodyv=prompt('Message text:',m.body||''); if(bodyv===null||!bodyv.trim()) return;
+  const upd={body:bodyv.trim()};
+  if(kind==='mm'){ const tone=prompt('Tone / vibe:',m.tone||''); if(tone===null) return; upd.tone=tone.trim()||null; }
+  if(kind==='bump'){ const status=bumpStatusPrompt(m.status); if(status===null) return; const rr=prompt('Reply rate note (optional):',m.reply_rate||''); if(rr===null) return; upd.status=status; upd.reply_rate=rr.trim()||null; }
+  sb.from(msgTable(kind)).update(upd).eq('id',id).select().then(function(r){
+    if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
+    Object.assign(m,upd); renderMessages();
+  });
+}
+function bumpStatusPrompt(cur){ const v=prompt('Status — type "proven" or "testing":',cur||'testing'); if(v===null) return null; return (v.trim().toLowerCase()==='proven')?'proven':'testing'; }
 async function addMassMessage(){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const tone=prompt('Tone / vibe (e.g. flirty, dominant, girlfriend, playful):',''); if(tone===null) return;
   const bodyv=prompt('Mass message text:',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('mass_messages').insert({model_id:modelId,tone:(tone.trim()||null),body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
-  STATE.massMessages.unshift(r.data[0]); renderMessages();
+  STATE.massMessages.unshift(r.data[0]); MSG_VIEW='active'; renderMessages();
 }
-async function editMassMessage(id){
-  const m=(STATE.massMessages||[]).find(function(x){return x.id===id;}); if(!m) return;
-  const tone=prompt('Tone / vibe:',m.tone||''); if(tone===null) return;
-  const bodyv=prompt('Mass message text:',m.body||''); if(bodyv===null||!bodyv.trim()) return;
-  const r=await sb.from('mass_messages').update({tone:(tone.trim()||null),body:bodyv.trim()}).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not save.');return;}
-  m.tone=tone.trim()||null; m.body=bodyv.trim(); renderMessages();
-}
-async function delMassMessage(id){
-  if(!confirm('Delete this mass message?')) return;
-  const r=await sb.from('mass_messages').delete().eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not delete.');return;}
-  STATE.massMessages=(STATE.massMessages||[]).filter(function(x){return x.id!==id;}); renderMessages();
-}
-// Bumps
-function renderBumps(body){
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const items=STATE.bumps||[];
-  const addBtn=isAdmin?'<button class="btn btn-sm btn-primary" onclick="addBump()">➕ Add bump</button>':'';
-  body.innerHTML='<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Shared bumps for re-engaging quiet fans. ✅ proven = high reply rate · 🧪 testing = trialling. Always personalise before sending.</div>'
-    +'<div style="margin-bottom:12px;">'+addBtn+'</div>'
-    +(items.length?items.map(function(b){return bumpCard(b,isAdmin);}).join(''):'<div class="empty" style="margin-top:20px;"><div class="empty-icon">🎣</div><p>No bumps yet.</p></div>');
-}
-function bumpCard(b,isAdmin){
-  const st=b.status==='proven'?'<span class="cscan cscan-green" style="cursor:default;">✅ proven</span>':'<span class="cscan cscan-amber" style="cursor:default;">🧪 testing</span>';
-  const rr=b.reply_rate?'<span style="font-size:12px;color:var(--text2);">reply rate: '+escapeHtml(b.reply_rate)+'</span>':'';
-  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;align-items:center;"><div style="display:flex;gap:8px;align-items:center;">'+st+rr+'</div><button class="btn btn-sm btn-ghost" onclick="copyMsg(\'bump\',\''+b.id+'\',this)">⧉ Copy</button></div>'
-    +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(b.body||'')+'</div>'
-    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editBump(\''+b.id+'\')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delBump(\''+b.id+'\')">✕</button></div>':'')+'</div>';
-}
-function bumpStatusPrompt(cur){ const v=prompt('Status — type "proven" or "testing":',cur||'testing'); if(v===null) return null; return (v.trim().toLowerCase()==='proven')?'proven':'testing'; }
 async function addBump(){
+  const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const bodyv=prompt('Bump text:',''); if(bodyv===null||!bodyv.trim()) return;
   const status=bumpStatusPrompt('testing'); if(status===null) return;
   const rr=prompt('Reply rate note (optional, e.g. "62%"):',''); if(rr===null) return;
-  const r=await sb.from('bumps').insert({body:bodyv.trim(),status:status,reply_rate:(rr.trim()||null)}).select();
-  if(r.error||!r.data){alert('Could not save.');return;}
-  STATE.bumps.unshift(r.data[0]); renderMessages();
-}
-async function editBump(id){
-  const b=(STATE.bumps||[]).find(function(x){return x.id===id;}); if(!b) return;
-  const bodyv=prompt('Bump text:',b.body||''); if(bodyv===null||!bodyv.trim()) return;
-  const status=bumpStatusPrompt(b.status); if(status===null) return;
-  const rr=prompt('Reply rate note (optional):',b.reply_rate||''); if(rr===null) return;
-  const r=await sb.from('bumps').update({body:bodyv.trim(),status:status,reply_rate:(rr.trim()||null)}).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not save.');return;}
-  Object.assign(b,{body:bodyv.trim(),status:status,reply_rate:rr.trim()||null}); renderMessages();
-}
-async function delBump(id){
-  if(!confirm('Delete this bump?')) return;
-  const r=await sb.from('bumps').delete().eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not delete.');return;}
-  STATE.bumps=(STATE.bumps||[]).filter(function(x){return x.id!==id;}); renderMessages();
-}
-// Welcome messages
-function renderWelcome(body){
-  const modelId=(document.getElementById('msg-model')||{}).value;
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const items=(STATE.welcomeMessages||[]).filter(function(w){return w.model_id===modelId;});
-  const addBtn=isAdmin?'<button class="btn btn-sm btn-primary" onclick="addWelcome()">➕ Add welcome message</button>':'';
-  body.innerHTML='<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Opening messages for new subs — update these weekly to keep them fresh. Always personalise.</div>'
-    +'<div style="margin-bottom:12px;">'+addBtn+'</div>'
-    +(items.length?items.map(function(w){return welcomeCard(w,isAdmin);}).join(''):'<div class="empty" style="margin-top:20px;"><div class="empty-icon">👋</div><p>No welcome messages for this model yet.</p></div>');
-}
-function welcomeCard(w,isAdmin){
-  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;"><div style="display:flex;justify-content:flex-end;margin-bottom:6px;"><button class="btn btn-sm btn-ghost" onclick="copyMsg(\'welcome\',\''+w.id+'\',this)">⧉ Copy</button></div>'
-    +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(w.body||'')+'</div>'
-    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editWelcome(\''+w.id+'\')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delWelcome(\''+w.id+'\')">✕</button></div>':'')+'</div>';
+  const r=await sb.from('bumps').insert({model_id:modelId,body:bodyv.trim(),status:status,reply_rate:(rr.trim()||null)}).select();
+  if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
+  STATE.bumps.unshift(r.data[0]); MSG_VIEW='active'; renderMessages();
 }
 async function addWelcome(){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const bodyv=prompt('Welcome message text:',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('welcome_messages').insert({model_id:modelId,body:bodyv.trim()}).select();
-  if(r.error||!r.data){alert('Could not save.');return;}
-  STATE.welcomeMessages.unshift(r.data[0]); renderMessages();
+  if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
+  STATE.welcomeMessages.unshift(r.data[0]); MSG_VIEW='active'; renderMessages();
 }
-async function editWelcome(id){
-  const w=(STATE.welcomeMessages||[]).find(function(x){return x.id===id;}); if(!w) return;
-  const bodyv=prompt('Welcome message text:',w.body||''); if(bodyv===null||!bodyv.trim()) return;
-  const r=await sb.from('welcome_messages').update({body:bodyv.trim()}).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not save.');return;}
-  w.body=bodyv.trim(); renderMessages();
-}
-async function delWelcome(id){
-  if(!confirm('Delete this welcome message?')) return;
-  const r=await sb.from('welcome_messages').delete().eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){alert('Could not delete.');return;}
-  STATE.welcomeMessages=(STATE.welcomeMessages||[]).filter(function(x){return x.id!==id;}); renderMessages();
+async function addWinback(){
+  const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
+  const bodyv=prompt('Win-back message text (for expired / cancelled subs):',''); if(bodyv===null||!bodyv.trim()) return;
+  const r=await sb.from('winback_messages').insert({model_id:modelId,body:bodyv.trim()}).select();
+  if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
+  STATE.winbackMessages.unshift(r.data[0]); MSG_VIEW='active'; renderMessages();
 }
 
 // ── SOPs ──────────────────────────────────────────────────────
