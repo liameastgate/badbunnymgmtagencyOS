@@ -3254,12 +3254,18 @@ function renderLibraryList(){
   if(q) items=items.filter(function(i){return ((i.title||'')+' '+(i.tags||'')).toLowerCase().includes(q);});
   if(!items.length){ wrap.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>No content yet. Hit <strong>Upload content</strong> to add your first file.</p></div>'; return; }
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  wrap.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>Title</th>'+(isAdmin?'<th>Owner</th>':'')+'<th>Tags</th><th>Size</th><th>Added</th><th></th></tr></thead><tbody>'
+  wrap.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>Title</th>'+(isAdmin?'<th>Owner</th>':'')+'<th>Tags</th>'+(isAdmin?'<th>Meta scan</th><th>Review</th>':'')+'<th>Size</th><th>Added</th><th></th></tr></thead><tbody>'
     +items.map(function(i){
       const mdl=isAdmin?('<td>'+escapeHtml((STATE.models.find(function(m){return m.id===i.model_id;})||{}).name||(i.owner_type==='agency'?'Agency':'—'))+'</td>'):'';
       const size=i.size_bytes?(i.size_bytes>1048576?(i.size_bytes/1048576).toFixed(1)+' MB':(i.size_bytes/1024).toFixed(0)+' KB'):'';
-      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td>'+mdl+'<td style="font-size:12px;color:var(--text2);">'+escapeHtml(i.tags||'')+'</td><td style="font-size:12px;white-space:nowrap;">'+size+'</td><td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+fmtDate(i.created_at)+'</td>'
-        +'<td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')">⬇ Download</button> <button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')">✏</button> <button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')">✕</button></td></tr>';
+      const reviewCell=isAdmin
+        ? (i.review_status?libReviewBadge(i)+' <button class="btn btn-sm btn-ghost" title="clear" onclick="reviewLibraryItem(\''+i.id+'\',null)">✕</button>'
+            :'<button class="btn btn-sm btn-green" title="Approve" onclick="reviewLibraryItem(\''+i.id+'\',\'approved\')">✅</button> <button class="btn btn-sm btn-danger" title="Reject" onclick="reviewLibraryItem(\''+i.id+'\',\'rejected\')">⛔</button>')
+        : libReviewBadge(i);
+      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td>'+mdl+'<td style="font-size:12px;color:var(--text2);">'+escapeHtml(i.tags||'')+'</td>'
+        +(isAdmin?('<td style="white-space:nowrap;">'+libCompliancePill(i)+'</td><td style="white-space:nowrap;">'+reviewCell+'</td>'):'')
+        +'<td style="font-size:12px;white-space:nowrap;">'+size+'</td><td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+fmtDate(i.created_at)+'</td>'
+        +'<td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" title="Download" onclick="downloadLibraryItem(\''+i.id+'\')">⬇</button> <button class="btn btn-sm btn-ghost" title="Edit" onclick="editLibraryItem(\''+i.id+'\')">✏</button> <button class="btn btn-sm btn-danger" title="Delete" onclick="deleteLibraryItem(\''+i.id+'\')">✕</button></td></tr>';
     }).join('')+'</tbody></table></div></div>';
 }
 async function uploadLibraryFile(){
@@ -3276,9 +3282,11 @@ async function uploadLibraryFile(){
       const url=await r2SignedUrl(key,'PUT');
       const res=await fetch(url,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
       if(!res.ok) throw new Error('upload failed ('+res.status+')');
-      const{error}=await sb.from('content_library').insert({model_id:modelId,owner_type:ownerType,title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,uploaded_by_email:STATE.profile?.email||null});
+      const{data:ins,error}=await sb.from('content_library').insert({model_id:modelId,owner_type:ownerType,title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,uploaded_by_email:STATE.profile?.email||null}).select();
       if(error) throw new Error(error.message);
       await loadContentLibrary(); renderLibraryList();
+      // auto-scan videos for Meta compliance the moment they land
+      if(ins&&ins[0]&&/^video\//.test(file.type||'')) scanLibraryItem(ins[0].id);
     }catch(e){ alert('Upload failed: '+e.message); }
     if(btn){ btn.textContent='📤 Upload content'; btn.disabled=false; }
   };
@@ -3304,6 +3312,73 @@ async function deleteLibraryItem(id){
   if(error||!data||!data.length){ alert('Could not delete — you may not have permission.'); return; }
   if(it){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
   STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
+}
+// ── Content Library compliance (scan R2 videos via presigned URL) ──────────
+function libScan(it){ return it?((STATE.scansByLibKey||{})[it.r2_key]||null):null; }
+async function scanLibraryItem(id){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  STATE.scanningLib=STATE.scanningLib||new Set(); STATE.scanningLib.add(it.r2_key); renderLibraryList();
+  try{
+    const url=await r2SignedUrl(it.r2_key,'GET');
+    await sb.functions.invoke('trigger-scan',{body:{bucket:'bbm-content',path:it.r2_key,url:url,frames:8}});
+  }catch(e){ /* scanner writes the verdict async; ignore transport hiccups */ }
+  [15000,35000,70000].forEach(function(t){ setTimeout(function(){ if(STATE.scanningLib) STATE.scanningLib.delete(it.r2_key); loadContentScans(); }, t); });
+}
+async function reviewLibraryItem(id,status){
+  const upd={review_status:status, reviewed_by:status?(STATE.profile?.email||null):null, reviewed_at:status?new Date().toISOString():null};
+  const r=await sb.from('content_library').update(upd).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not save — you may not have permission.'); return; }
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) Object.assign(it,upd);
+  renderLibraryList(); const el=document.getElementById('compliance-body'); if(el&&_complianceLibId===id) renderCompliance();
+}
+function libCompliancePill(it){
+  const s=libScan(it);
+  if(s){
+    if(s.scan_error) return '<span class="cscan cscan-grey" title="'+escapeHtml(s.scan_error||'')+'">⚠ Scan failed</span> <span onclick="scanLibraryItem(\''+it.id+'\')" title="Retry" style="cursor:pointer;">↻</span>';
+    const m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''};
+    return '<span class="cscan '+m.cls+'" style="cursor:pointer;" onclick="openLibCompliance(\''+it.id+'\')" title="Open compliance detail">'+m.icon+' '+m.short+'</span>';
+  }
+  if(STATE.scanningLib&&STATE.scanningLib.has(it.r2_key)) return '<span class="cscan cscan-grey">⏳ Scanning…</span>';
+  return '<span class="cscan cscan-grey" style="cursor:pointer;" onclick="scanLibraryItem(\''+it.id+'\')">🔍 Scan</span>';
+}
+function libReviewBadge(it){
+  if(it.review_status==='approved') return '<span class="cscan cscan-green">✅ Approved</span>';
+  if(it.review_status==='rejected') return '<span class="cscan cscan-red">⛔ Rejected</span>';
+  return '<span class="cscan cscan-grey">⏳ Pending</span>';
+}
+function openLibCompliance(id){ _complianceLibId=id; _complianceOrderId=null; _complianceReturn='content-upload'; navigate('compliance'); }
+function renderLibComplianceInto(el){
+  const it=(STATE.library||[]).find(function(x){return x.id===_complianceLibId});
+  if(!it){ el.innerHTML='<div class="empty" style="margin-top:40px;"><div class="empty-icon">📁</div><p>Item not found.</p></div>'; return; }
+  const s=libScan(it);
+  const isAdmin=['admin','va'].includes(STATE.profile?.role);
+  const reviewBtns=isAdmin
+    ? (it.review_status?'<div style="font-size:13px;">Decision: '+libReviewBadge(it)+(it.reviewed_at?' · '+fmtDateTime(it.reviewed_at):'')+' <button class="btn btn-sm btn-ghost" onclick="reviewLibraryItem(\''+it.id+'\',null)">clear</button></div>'
+        :'<div class="btn-row"><button class="btn btn-sm btn-green" onclick="reviewLibraryItem(\''+it.id+'\',\'approved\')">✅ Approve</button><button class="btn btn-sm btn-danger" onclick="reviewLibraryItem(\''+it.id+'\',\'rejected\')">⛔ Reject</button></div>')
+    : '<div style="font-size:13px;">Status: '+libReviewBadge(it)+'</div>';
+  const reviewCard='<div class="card" style="border:1px dashed var(--accent);"><div class="card-title" style="color:var(--accent2);">Approve / Reject</div>'+reviewBtns+'</div>';
+  if(!s){
+    el.innerHTML='<div style="font-size:13px;color:var(--text2);margin-bottom:12px;"><b>'+escapeHtml(it.title||'—')+'</b> · library upload</div>'
+      +'<div id="compliance-media" style="margin-bottom:14px;"></div>'
+      +'<div class="empty" style="margin:20px 0;"><div class="empty-icon">🔍</div><p>Not scanned yet. <button class="btn btn-sm btn-primary" onclick="scanLibraryItem(\''+it.id+'\')">Scan now</button></p></div>'+reviewCard;
+  } else {
+    const peak=(s.motion&&s.motion.peak_frame)?s.motion.peak_frame:null;
+    const fixHtml=s.fix?'<div class="card" style="border-left:3px solid var(--accent);"><div class="card-title" style="color:var(--accent2);">✏️ How to fix it</div><div style="font-size:14px;line-height:1.6;">'+escapeHtml(s.fix)+'</div></div>':'';
+    const reasonHtml=s.primary_reason?'<div style="font-size:14px;color:var(--text);margin:6px 0 14px;">'+escapeHtml(s.primary_reason)+(s.confidence!=null?' <span style="color:var(--text2);font-size:12px;">· '+s.confidence+'% confidence</span>':'')+'</div>':'';
+    const limits='<div class="card" style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);"><div style="font-size:12px;color:var(--text2);line-height:1.6;"><b style="color:#e6b428;">A prediction, not a verdict.</b> Inferred from Meta’s published guidelines, not their real classifier. Instagram and Facebook shown separately (Facebook is stricter).</div></div>';
+    el.innerHTML='<div style="font-size:13px;color:var(--text2);margin-bottom:12px;"><b>'+escapeHtml(it.title||'—')+'</b> · library upload · scanned '+(s.scanned_at?fmtDateTime(s.scanned_at):'—')+'</div>'
+      +'<div id="compliance-media" style="margin-bottom:14px;"></div>'+reasonHtml
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'+outcomeCard('Instagram',s.instagram_outcome)+outcomeCard('Facebook',s.facebook_outcome)+'</div>'
+      +reviewCard+fixHtml
+      +findingsBlock('Body & framing',s.genital_area)+findingsBlock('Motion',s.motion)+findingsBlock('Triggers',s.triggers)
+      +(s.transcript?'<div class="card"><div class="card-title">Transcript</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;">'+escapeHtml(s.transcript)+'</div></div>':'')
+      +limits;
+  }
+  r2SignedUrl(it.r2_key,'GET').then(function(u){ var m=document.getElementById('compliance-media'); if(!m) return;
+    m.innerHTML=/^video\//.test(it.content_type||'')||/\.(mp4|mov|webm|m4v)$/i.test(it.r2_key)
+      ? '<video src="'+u+'" controls style="max-width:100%;max-height:440px;border-radius:10px;border:1px solid var(--border);"></video>'
+      : '<img src="'+u+'" style="max-width:100%;max-height:440px;border-radius:10px;border:1px solid var(--border);">';
+  }).catch(function(){});
 }
 
 var _showCompletedOrders=false;
@@ -3397,14 +3472,16 @@ var COMPLIANCE_META={
   removed:{cls:'cscan-red',short:'Would be removed',icon:'⛔'}
 };
 var _complianceOrderId=null;
+var _complianceLibId=null;
 var _complianceReturn='content';
 async function loadContentScans(){
   const{data,error}=await sb.from('content_scans').select('*').order('scanned_at',{ascending:false,nullsFirst:false});
   if(error){ return; }
-  const map={}; (data||[]).forEach(s=>{ if(s.content_order_id && !map[s.content_order_id]) map[s.content_order_id]=s; });
-  STATE.scansByOrder=map;
+  const map={}, libmap={}; (data||[]).forEach(s=>{ if(s.content_order_id && !map[s.content_order_id]) map[s.content_order_id]=s; if(s.storage_path && !libmap[s.storage_path]) libmap[s.storage_path]=s; });
+  STATE.scansByOrder=map; STATE.scansByLibKey=libmap;
   const pc=document.getElementById('page-content'); if(pc&&pc.classList.contains('active')) filterContentOrders();
   const pco=document.getElementById('page-compliance'); if(pco&&pco.classList.contains('active')) renderCompliance();
+  if(document.getElementById('cl-list')) renderLibraryList();
 }
 function scanForOrder(id){ return (STATE.scansByOrder||{})[id]; }
 async function triggerScan(orderId,path){
@@ -3428,7 +3505,7 @@ function compliancePillHtml(o){
   if(o.video_path) return '<span class="cscan cscan-grey" style="cursor:pointer;" onclick="triggerScan(\''+o.id+'\')">🔍 Scan Meta</span>';
   return '';
 }
-function openCompliance(orderId,from){ _complianceOrderId=orderId; _complianceReturn=from||'content'; navigate('compliance'); }
+function openCompliance(orderId,from){ _complianceOrderId=orderId; _complianceLibId=null; _complianceReturn=from||'content'; navigate('compliance'); }
 function jclean(obj){ var out=[]; if(!obj||typeof obj!=='object') return out; Object.keys(obj).forEach(function(k){ var v=obj[k]; if(v===false||v==='none'||v===''||v===0||v===null||v===undefined) return; out.push([k,v]); }); return out; }
 function fmtKey(k){ return String(k).replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
 function outcomeCard(label,val){ var m=COMPLIANCE_META[val]||{cls:'cscan-grey',short:val||'—',icon:''}; return '<div style="flex:1;min-width:170px;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'+label+'</div><span class="cscan '+m.cls+'" style="font-size:13px;padding:6px 14px;">'+m.icon+' '+m.short+'</span></div>'; }
@@ -3449,6 +3526,7 @@ async function recordOutcome(scanId,outcome){
 }
 async function renderCompliance(){
   const el=document.getElementById('compliance-body'); if(!el) return;
+  if(_complianceLibId){ return renderLibComplianceInto(el); }
   const o=STATE.contentOrders.find(x=>x.id===_complianceOrderId);
   const s=scanForOrder(_complianceOrderId);
   const num=o&&o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
