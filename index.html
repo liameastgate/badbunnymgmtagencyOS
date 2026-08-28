@@ -494,8 +494,11 @@
     function googleTranslateElementInit(){ try{ new google.translate.TranslateElement({pageLanguage:'en',includedLanguages:'en,es',autoDisplay:false},'google_translate_element'); }catch(e){} }
     function setSiteLang(lang){
       var host=location.hostname;
-      document.cookie='googtrans=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
-      document.cookie='googtrans=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=.'+host+';';
+      var exp=';expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+      // clear every variant Google may have set so English reliably sticks
+      document.cookie='googtrans='+exp;
+      document.cookie='googtrans='+exp+'domain='+host+';';
+      document.cookie='googtrans='+exp+'domain=.'+host+';';
       if(lang==='es'){ document.cookie='googtrans=/en/es;path=/;'; document.cookie='googtrans=/en/es;path=/;domain=.'+host+';'; }
       location.reload();
     }
@@ -1766,6 +1769,7 @@
           <div class="tab" id="minv-tab-all" onclick="setModelInvoiceFilter('')">All</div>
         </div>
         <div id="minv-admin-actions" style="display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="editInvoiceSettings()" title="Set business name, ABN, GST — used on every printed invoice">🧾 Invoice details</button>
           <button class="btn btn-ghost btn-sm" onclick="openManualInvoiceModal()">➕ Add Invoice Manually</button>
         </div>
       </div>
@@ -6903,12 +6907,86 @@ function modelInvoiceCardHtml(inv,isAdmin){
       <span>${isPaid?`Paid ${fmtDate(inv.paid_at)}`:`Payable ${fmtDate(inv.payout_date)}`}</span>
       <span>${inv.source==='auto'?'Auto-generated':'Manual'}</span>
     </div>
-    ${isAdmin?`<div class="btn-row" style="margin-top:12px;">
+    <div class="btn-row" style="margin-top:12px;"><button class="btn btn-sm btn-primary" onclick="printModelInvoice('${inv.id}')">🧾 Print invoice</button></div>
+    ${isAdmin?`<div class="btn-row" style="margin-top:8px;">
       ${isPaid?`<button class="btn btn-sm btn-ghost" onclick="markModelInvoiceUnpaid('${inv.id}')">↺ Mark Unpaid</button>`:`<button class="btn btn-sm btn-green" onclick="markModelInvoicePaid('${inv.id}')">✓ Mark Paid</button>`}
       <button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>
       <button class="btn btn-sm btn-danger" onclick="delModelInvoice('${inv.id}')" title="Delete permanently">🗑</button>
     </div>`:''}
   </div>`;
+}
+
+// ── Official BBM management-fee invoice (printable, same template weekly) ──────
+async function loadInvoiceSettings(){
+  if(STATE.invoiceSettings) return STATE.invoiceSettings;
+  const{data}=await sb.from('invoice_settings').select('*').eq('id',1).maybeSingle();
+  STATE.invoiceSettings=data||{business_name:'BadBunnyManagement',contact_email:'badbunnymgmt@outlook.com',abn:null,gst_registered:false};
+  return STATE.invoiceSettings;
+}
+function invNumber(inv){
+  const d=inv.week_of?new Date(inv.week_of):new Date(inv.created_at||Date.now());
+  const ymd=''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  const tok=((inv.submitted_by_name||'MDL').replace(/[^a-zA-Z]/g,'').toUpperCase()+'XXX').slice(0,3);
+  return 'BBM-'+ymd+'-'+tok;
+}
+async function printModelInvoice(id){
+  const inv=(STATE_MODEL_INVOICES||[]).find(function(x){return x.id===id;}); if(!inv){alert('Invoice not found.');return;}
+  const s=await loadInvoiceSettings();
+  const w=window.open('','_blank'); if(!w){alert('Allow pop-ups for this site to print the invoice.');return;}
+  w.document.write(invoiceHtml(inv,s)); w.document.close();
+}
+function invoiceHtml(inv,s){
+  const esc=escapeHtml;
+  const period=inv.week_end?(fmtDate(inv.week_of)+' – '+fmtDate(inv.week_end)):fmtDate(inv.week_of);
+  const num=invNumber(inv);
+  const issue=fmtDate(inv.payout_date||inv.week_end||inv.week_of||inv.created_at);
+  const amt=parseFloat(inv.amount||0);
+  const gross=parseFloat(inv.gross_earnings||0);
+  const pct=inv.split_pct!=null?parseFloat(inv.split_pct):null;
+  const desc=pct!=null?('OnlyFans account management commission — '+pct+'% of $'+fmt(gross)+' gross earnings for the billing period'):(inv.description||'OnlyFans account management commission for the billing period');
+  const paid=inv.status==='paid';
+  const gstOn=!!(s.gst_registered&&s.abn);
+  const gst=gstOn?amt/11:0, net=gstOn?amt-gst:amt, title=gstOn?'TAX INVOICE':'INVOICE';
+  const abnLine=s.abn?('<div class="muted">ABN: '+esc(s.abn)+'</div>'):'';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(num)+'</title><style>'
+    +'*{box-sizing:border-box;}body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a;margin:0;padding:40px;font-size:14px;line-height:1.5;background:#fff;}'
+    +'.wrap{max-width:720px;margin:0 auto;}.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:20px;margin-bottom:28px;}'
+    +'.brand{font-size:24px;font-weight:800;letter-spacing:.5px;}.muted{color:#666;font-size:12px;}'
+    +'h1{font-size:20px;letter-spacing:3px;margin:0 0 8px;text-align:right;}.meta{text-align:right;font-size:12px;color:#444;}'
+    +'.row{display:flex;justify-content:space-between;gap:30px;margin-bottom:24px;}.lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:4px;}'
+    +'table{width:100%;border-collapse:collapse;margin-top:6px;}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;border-bottom:2px solid #111;padding:8px 6px;}'
+    +'td{padding:12px 6px;border-bottom:1px solid #eee;vertical-align:top;}.r{text-align:right;white-space:nowrap;}'
+    +'.totals{margin-left:auto;width:300px;margin-top:12px;}.totals div{display:flex;justify-content:space-between;padding:6px;}'
+    +'.totals .grand{border-top:2px solid #111;font-weight:800;font-size:16px;margin-top:4px;}'
+    +'.status{display:inline-block;padding:5px 14px;border-radius:4px;font-weight:800;font-size:12px;letter-spacing:1px;margin-top:20px;}'
+    +'.paid{background:#e5f7ec;color:#127a3e;}.unpaid{background:#fdf0d5;color:#8a6100;}'
+    +'.foot{margin-top:40px;border-top:1px solid #eee;padding-top:14px;color:#999;font-size:11px;}'
+    +'.noprint{position:fixed;top:12px;right:12px;}.pbtn{background:#111;color:#fff;border:0;padding:10px 18px;border-radius:6px;font-size:14px;cursor:pointer;}'
+    +'@media print{body{padding:0;}.noprint{display:none;}}'
+    +'</style></head><body><div class="noprint"><button class="pbtn" onclick="window.print()">🖨 Print / Save as PDF</button></div><div class="wrap">'
+    +'<div class="top"><div><div class="brand">'+esc(s.business_name||'BadBunnyManagement')+'</div><div class="muted">'+esc(s.contact_email||'')+'</div>'+abnLine+'</div>'
+    +'<div><h1>'+title+'</h1><div class="meta"><div><b>'+esc(num)+'</b></div><div>Issued: '+esc(issue)+'</div></div></div></div>'
+    +'<div class="row"><div><div class="lbl">Bill to</div><div style="font-weight:700;">'+esc(inv.submitted_by_name||'Model')+'</div></div>'
+    +'<div style="text-align:right;"><div class="lbl">Billing period</div><div>'+esc(period)+'</div></div></div>'
+    +'<table><thead><tr><th>Description</th><th class="r">Amount</th></tr></thead><tbody>'
+    +'<tr><td>'+esc(desc)+'</td><td class="r">$'+fmt(gstOn?net:amt)+'</td></tr></tbody></table>'
+    +'<div class="totals">'
+    +(gstOn?('<div><span>Subtotal</span><span>$'+fmt(net)+'</span></div><div><span>GST (10%)</span><span>$'+fmt(gst)+'</span></div>'):'')
+    +'<div class="grand"><span>Total'+(gstOn?' (incl. GST)':'')+'</span><span>$'+fmt(amt)+'</span></div></div>'
+    +'<div>'+(paid?'<span class="status paid">PAID'+(inv.paid_at?' · '+fmtDate(inv.paid_at):'')+'</span>':'<span class="status unpaid">UNPAID'+(inv.payout_date?' · due '+fmtDate(inv.payout_date):'')+'</span>')+'</div>'
+    +'<div class="foot">'+esc(s.business_name||'BadBunnyManagement')+' · '+esc(s.contact_email||'')+(s.abn?(' · ABN '+esc(s.abn)):'')+'<br>Commission for OnlyFans account management services rendered during the billing period.'+(gstOn?'':' No GST has been charged on this invoice.')+'</div>'
+    +'</div></body></html>';
+}
+async function editInvoiceSettings(){
+  const s=await loadInvoiceSettings();
+  const name=prompt('Business name (invoice issuer):',s.business_name||'BadBunnyManagement'); if(name===null) return;
+  const email=prompt('Contact email:',s.contact_email||''); if(email===null) return;
+  const abn=prompt('ABN / tax number (leave blank to omit for now):',s.abn||''); if(abn===null) return;
+  const gst=confirm('Are you GST registered?\n\nOK = Yes — add a 10% GST line (amount treated as GST-inclusive) and label it "Tax Invoice".\nCancel = No GST.');
+  const upd={business_name:name.trim()||'BadBunnyManagement',contact_email:email.trim()||null,abn:abn.trim()||null,gst_registered:gst,updated_at:new Date().toISOString()};
+  const r=await sb.from('invoice_settings').update(upd).eq('id',1).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not save — admin only.'); return; }
+  STATE.invoiceSettings=r.data[0]; alert('Invoice details saved.');
 }
 
 async function markModelInvoicePaid(id){
