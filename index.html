@@ -6866,7 +6866,10 @@ async function renderModelInvoicePage(){
 
 function renderModelInvoiceSummary(){
   const el=document.getElementById('minv-summary'); if(!el)return;
+  const isAdmin=STATE.profile?.role==='admin';
   const unpaidTotal=STATE_MODEL_INVOICES.filter(i=>i.status!=='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  // Models only ever see what they currently owe — never a running total of what they've paid us.
+  if(!isAdmin){ el.innerHTML=statCard('Money owed','$'+fmt(unpaidTotal),'accent','red'); return; }
   const paidTotal=STATE_MODEL_INVOICES.filter(i=>i.status==='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
   el.innerHTML=statCard('Unpaid','$'+fmt(unpaidTotal),'accent','red')+statCard('Paid (all time)','$'+fmt(paidTotal),'accent','green')+statCard('Invoices',STATE_MODEL_INVOICES.length,'white','purple');
 }
