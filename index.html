@@ -1973,12 +1973,19 @@
           <div class="tab" id="msg-tab-welcome" onclick="switchMsgTab('welcome')">Welcome</div>
           <div class="tab" id="msg-tab-winback" onclick="switchMsgTab('winback')">Winback</div>
         </div>
-        <div class="tabs" style="margin-bottom:0;margin-left:auto;">
+        <div class="tabs" id="msg-view-toggle" style="margin-bottom:0;margin-left:auto;">
           <div class="tab active" id="msg-view-active" onclick="switchMsgView('active')">📥 Active</div>
           <div class="tab" id="msg-view-archive" onclick="switchMsgView('archive')">🗄️ Archive</div>
         </div>
       </div>
       <div id="msg-body"></div>
+    </div>
+
+    <!-- Chatter Feedback: admin drafts/publishes privately; chatters see only their own published feedback -->
+    <div class="page" id="page-feedback">
+      <div class="page-title" id="feedback-title">Chatter Feedback</div>
+      <div class="page-sub" id="feedback-sub">Draft feedback privately, then publish it to the chatter</div>
+      <div id="feedback-body"></div>
     </div>
 
     <!-- Chatting SOPs -->
@@ -2638,6 +2645,7 @@ var NAV = [
   { id: 'sops',       icon: '📖', label: 'Chatting SOPs',       roles: ['admin','va','chatter','traffic'],         section: 'Chatting' },
   { id: 'sheets',     icon: '📋', label: 'Chatting Script',      roles: ['admin','va','chatter','traffic','model'], section: 'Chatting' },
   { id: 'messages',   icon: '💬', label: 'Messages',            roles: ['admin','va','chatter'],                   section: 'Chatting' },
+  { id: 'feedback',   icon: '📝', label: 'Feedback',            roles: ['admin','chatter'],                        section: 'Chatting' },
   { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','traffic'],                   section: 'Chatting' },
 
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
@@ -2762,6 +2770,7 @@ function navigate(page) {
   if (page === 'team') loadTeam();
   if (page === 'sheets') loadModelSheets();
   if (page === 'messages') loadMessages();
+  if (page === 'feedback') renderFeedbackPage();
   if (page === 'sops') { SOP_CATEGORY='chatting'; loadSOPs(); }
   if (page === 'traffic-sops') { SOP_CATEGORY='traffic'; loadSOPs(); }
   if (page === 'management') loadManagement();
@@ -7873,35 +7882,42 @@ function copyMsg(kind,id,btn){
 function renderMessages(){
   const body=document.getElementById('msg-body'); if(!body) return;
   const kind=msgKind();
+  const reusable=kind==='welcome';           // welcome messages are reused indefinitely — no "used"/archive
   const modelId=(document.getElementById('msg-model')||{}).value;
   const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const archive=MSG_VIEW==='archive';
+  const vt=document.getElementById('msg-view-toggle'); if(vt) vt.style.display=reusable?'none':'';
+  const archive=reusable?false:(MSG_VIEW==='archive');
   const all=(msgArr(kind)||[]).filter(function(m){return m.model_id===modelId;});
   const activeCount=all.filter(function(m){return !m.used;}).length;
   const archCount=all.filter(function(m){return !!m.used;}).length;
-  let items=all.filter(function(m){ return archive ? !!m.used : !m.used; });
-  items.sort(function(a,b){ return archive ? (new Date(b.used_at||0)-new Date(a.used_at||0)) : (new Date(b.created_at)-new Date(a.created_at)); });
+  let items=reusable?all.slice():all.filter(function(m){ return archive ? !!m.used : !m.used; });
+  items.sort(function(a,b){ return (!reusable&&archive) ? (new Date(b.used_at||0)-new Date(a.used_at||0)) : (new Date(b.created_at)-new Date(a.created_at)); });
   const labels={mm:'mass message',bump:'bump',welcome:'welcome message',winback:'win-back message'};
   const addFn={mm:'addMassMessage()',bump:'addBump()',welcome:'addWelcome()',winback:'addWinback()'}[kind];
   const addBtn=(isAdmin&&!archive)?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
-  const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Opening messages for new subs. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
+  const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Opening messages for new subs — reusable, use as often as you like. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
+  const countHtml=reusable?(all.length+' message'+(all.length===1?'':'s')):(activeCount+' active · '+archCount+' archived');
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div>'+addBtn+'</div>'
-    +'<span style="font-size:12px;color:var(--text2);">'+activeCount+' active · '+archCount+' archived</span></div>'
+    +'<span style="font-size:12px;color:var(--text2);">'+countHtml+'</span></div>'
     +(hint&&!archive?'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+hint+'Always personalise before sending.</div>':'')
     +(items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
       :'<div class="empty" style="margin-top:20px;"><div class="empty-icon">'+(archive?'🗄️':'💬')+'</div><p>'+(archive?'Nothing used yet — archive is empty.':'No '+labels[kind]+'s loaded for this model.'+(isAdmin?' Add some above to fill the queue.':' Ask an admin to refill.'))+'</p></div>');
 }
 function msgCard(kind,m,isAdmin,archive){
+  const reusable=kind==='welcome';
   let tags='';
   if(kind==='mm'&&m.tone) tags='<span class="cscan cscan-grey" style="cursor:default;">'+escapeHtml(m.tone)+'</span> ';
   if(kind==='bump'){ tags=(m.status==='proven'?'<span class="cscan cscan-green" style="cursor:default;">✅ proven</span> ':'<span class="cscan cscan-amber" style="cursor:default;">🧪 testing</span> ')+(m.reply_rate?'<span style="font-size:12px;color:var(--text2);">reply '+escapeHtml(m.reply_rate)+'</span>':''); }
-  const usedInfo=archive?'<span style="font-size:11px;color:var(--text2);">🗄️ used '+(m.used_at?fmtDate(m.used_at):'')+(m.used_by_email?' · '+escapeHtml((m.used_by_email||'').split('@')[0]):'')+'</span>':'';
+  const usedInfo=(!reusable&&archive)?'<span style="font-size:11px;color:var(--text2);">🗄️ used '+(m.used_at?fmtDate(m.used_at):'')+(m.used_by_email?' · '+escapeHtml((m.used_by_email||'').split('@')[0]):'')+'</span>':'';
   const kq="'"+kind+"','"+m.id+"'";
-  const right=archive
-    ? '<button class="btn btn-sm btn-ghost" onclick="restoreMsg('+kq+')">↩ Restore</button>'
-    : '<button class="btn btn-sm btn-primary" onclick="markUsed('+kq+')" title="Mark used &amp; move to archive">✓ Used</button> <button class="btn btn-sm btn-ghost" onclick="copyMsg('+kq+',this)">⧉ Copy</button>';
-  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;'+(archive?'opacity:.7;':'')+'">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div>'+(tags||usedInfo?tags+usedInfo:'<span style="font-size:11px;color:var(--text2);">ready</span>')+'</div>'
+  const right=reusable
+    ? '<button class="btn btn-sm btn-ghost" onclick="copyMsg('+kq+',this)">⧉ Copy</button>'
+    : (archive
+      ? '<button class="btn btn-sm btn-ghost" onclick="restoreMsg('+kq+')">↩ Restore</button>'
+      : '<button class="btn btn-sm btn-primary" onclick="markUsed('+kq+')" title="Mark used &amp; move to archive">✓ Used</button> <button class="btn btn-sm btn-ghost" onclick="copyMsg('+kq+',this)">⧉ Copy</button>');
+  const badge=(tags||usedInfo)?(tags+usedInfo):(reusable?'':'<span style="font-size:11px;color:var(--text2);">ready</span>');
+  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;'+((!reusable&&archive)?'opacity:.7;':'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div>'+badge+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'+right+'</div></div>'
     +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(m.body||'')+'</div>'
     +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMsg('+kq+')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMsg('+kq+')">✕</button></div>':'')
@@ -7974,6 +7990,100 @@ async function addWinback(){
   const r=await sb.from('winback_messages').insert({model_id:modelId,body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
   STATE.winbackMessages.unshift(r.data[0]); MSG_VIEW='active'; renderMessages();
+}
+
+// ── Chatter Feedback (admin drafts/publishes; chatter sees own published) ──
+var FB_TAB='draft';
+function setFbTab(t){ FB_TAB=t; renderFeedbackPage(); }
+async function renderFeedbackPage(){
+  const el=document.getElementById('feedback-body'); if(!el) return;
+  const isAdmin=STATE.profile?.role==='admin';
+  const titleEl=document.getElementById('feedback-title'); const subEl=document.getElementById('feedback-sub');
+  if(titleEl) titleEl.textContent=isAdmin?'Chatter Feedback':'My Feedback';
+  if(subEl) subEl.textContent=isAdmin?'Draft feedback privately, then choose to save, delete or publish it to the chatter':'Feedback from your manager';
+  const{data}=await sb.from('chatter_feedback').select('*').order('created_at',{ascending:false});
+  STATE.feedback=data||[];
+  if(isAdmin){
+    const cp=await sb.from('profiles').select('id,name,email,role').eq('role','chatter').order('name');
+    STATE.chatterProfiles=cp.data||[];
+    renderFeedbackAdmin(el);
+  } else {
+    renderFeedbackChatter(el);
+  }
+}
+function renderFeedbackChatter(el){
+  const list=(STATE.feedback||[]).filter(function(f){return f.status==='published';});
+  el.innerHTML=list.length?list.map(function(f){
+    const rating=f.rating?(' · '+'⭐'.repeat(Math.max(0,Math.min(5,f.rating)))):'';
+    return '<div class="card" style="padding:14px 16px;margin-bottom:12px;"><div style="font-size:11px;color:var(--text2);margin-bottom:6px;">'+(f.published_at?fmtDateTime(f.published_at):fmtDate(f.created_at))+rating+'</div><div style="font-size:14px;white-space:pre-wrap;line-height:1.6;">'+escapeHtml(f.body||'')+'</div></div>';
+  }).join(''):'<div class="empty" style="margin-top:40px;"><div class="empty-icon">💬</div><p>No feedback yet. Your manager will leave feedback here.</p></div>';
+}
+function renderFeedbackAdmin(el){
+  const chatters=STATE.chatterProfiles||[];
+  const opts=chatters.map(function(c){return '<option value="'+escapeHtml(c.email||'')+'" data-name="'+escapeHtml(c.name||c.email||'')+'">'+escapeHtml(c.name||c.email||'')+'</option>';}).join('');
+  const drafts=(STATE.feedback||[]).filter(function(f){return f.status!=='published';});
+  const pub=(STATE.feedback||[]).filter(function(f){return f.status==='published';});
+  const list=FB_TAB==='published'?pub:drafts;
+  el.innerHTML=
+    '<div class="card"><div class="card-title">✍️ Write feedback</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;">'
+    +'<select id="fb-chatter">'+(opts||'<option value="">No chatters found</option>')+'</select>'
+    +'<textarea id="fb-body" rows="4" placeholder="Write feedback for this chatter… They only see it once you hit Publish."></textarea>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><select id="fb-rating" style="width:170px;"><option value="">No rating</option><option value="5">⭐ 5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — OK</option><option value="2">2 — Needs work</option><option value="1">1 — Poor</option></select>'
+    +'<button class="btn btn-sm btn-primary" onclick="saveFeedbackDraft()">💾 Save as draft</button></div>'
+    +'<div style="font-size:11px;color:var(--text2);">Saved as a private draft — nothing reaches the chatter until you publish it.</div>'
+    +'</div></div>'
+    +'<div class="tabs"><div class="tab '+(FB_TAB!=='published'?'active':'')+'" onclick="setFbTab(\'draft\')">📝 Drafts ('+drafts.length+')</div><div class="tab '+(FB_TAB==='published'?'active':'')+'" onclick="setFbTab(\'published\')">✅ Published ('+pub.length+')</div></div>'
+    +'<div id="fb-list">'+(list.length?list.map(fbAdminCard).join(''):'<div class="empty" style="margin-top:16px;"><div class="empty-icon">📝</div><p>'+(FB_TAB==='published'?'Nothing published yet.':'No drafts — write feedback above to start one.')+'</p></div>')+'</div>';
+}
+function fbAdminCard(f){
+  const rating=f.rating?(' · '+'⭐'.repeat(Math.max(0,Math.min(5,f.rating)))):'';
+  const pubd=f.status==='published';
+  return '<div class="card" style="padding:12px 14px;margin-bottom:10px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;"><div style="font-weight:700;">'+escapeHtml(f.chatter_name||f.chatter_email||'—')+'<span style="font-weight:400;color:var(--text2);">'+rating+'</span></div>'
+    +'<span class="cscan '+(pubd?'cscan-green':'cscan-amber')+'" style="cursor:default;">'+(pubd?'✅ Published'+(f.published_at?' '+fmtDate(f.published_at):''):'📝 Draft (private)')+'</span></div>'
+    +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(f.body||'')+'</div>'
+    +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'
+    +(pubd?'<button class="btn btn-sm btn-ghost" onclick="unpublishFeedback(\''+f.id+'\')" title="Pull it back to a private draft">↩ Unpublish</button>':'<button class="btn btn-sm btn-green" onclick="publishFeedback(\''+f.id+'\')">📣 Publish to chatter</button>')
+    +'<button class="btn btn-sm btn-ghost" onclick="editFeedback(\''+f.id+'\')">✏ Edit</button>'
+    +'<button class="btn btn-sm btn-danger" onclick="deleteFeedback(\''+f.id+'\')">🗑 Delete</button>'
+    +'</div></div>';
+}
+async function saveFeedbackDraft(){
+  const sel=document.getElementById('fb-chatter'); const email=sel?sel.value:'';
+  const name=(sel&&sel.selectedOptions[0])?sel.selectedOptions[0].getAttribute('data-name'):'';
+  const body=((document.getElementById('fb-body')||{}).value||'').trim();
+  const rating=(document.getElementById('fb-rating')||{}).value||'';
+  if(!email){ alert('Pick a chatter first.'); return; }
+  if(!body){ alert('Write some feedback first.'); return; }
+  const r=await sb.from('chatter_feedback').insert({chatter_email:email,chatter_name:name||email,body:body,rating:rating?parseInt(rating):null,status:'draft',created_by:STATE.profile?.email||null}).select();
+  if(r.error||!r.data){ alert('Could not save: '+(r.error&&r.error.message)); return; }
+  FB_TAB='draft'; renderFeedbackPage();
+}
+async function publishFeedback(id){
+  if(!confirm('Publish this feedback? The chatter will be able to see it.')) return;
+  const r=await sb.from('chatter_feedback').update({status:'published',published_at:new Date().toISOString()}).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not publish.'); return; }
+  renderFeedbackPage();
+}
+async function unpublishFeedback(id){
+  const r=await sb.from('chatter_feedback').update({status:'draft',published_at:null}).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not unpublish.'); return; }
+  renderFeedbackPage();
+}
+function editFeedback(id){
+  const f=(STATE.feedback||[]).find(function(x){return x.id===id;}); if(!f) return;
+  const body=prompt('Edit feedback:',f.body||''); if(body===null||!body.trim()) return;
+  sb.from('chatter_feedback').update({body:body.trim(),updated_at:new Date().toISOString()}).eq('id',id).select().then(function(r){
+    if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
+    renderFeedbackPage();
+  });
+}
+async function deleteFeedback(id){
+  if(!confirm('Delete this feedback permanently?')) return;
+  const r=await sb.from('chatter_feedback').delete().eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete.'); return; }
+  renderFeedbackPage();
 }
 
 // ── SOPs ──────────────────────────────────────────────────────
