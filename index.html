@@ -343,6 +343,48 @@
   .proxy-yes{color:#4ade80;font-weight:700;}
   .proxy-no{color:var(--text3);font-weight:700;}
   .acc-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:2px;}
+  /* ── Content Plans ───────────────────────────────────────── */
+  .cp-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .cp-bar select { width:auto; min-width:200px; }
+  .cp-status { font-size:12px; color:var(--text2); }
+  .cp-status.ok { color:var(--green); }
+  .cp-sec { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px 20px; margin-bottom:14px; }
+  .cp-sec > h3 { margin:0 0 4px; font-size:15px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:10px; }
+  .cp-tag { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; background:var(--accent); color:#fff; padding:4px 8px; border-radius:6px; }
+  .cp-sec > p.cp-intro { margin:0 0 14px; font-size:13px; color:var(--text2); line-height:1.6; max-width:70ch; }
+  .cp-f { margin-bottom:14px; }
+  .cp-f > label { display:block; font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); margin-bottom:6px; }
+  .cp-q { font-size:14.5px; font-weight:600; color:var(--text); margin-bottom:8px; }
+  .cp-hint { font-size:12px; color:var(--text2); line-height:1.55; margin-top:6px; padding-left:10px; border-left:2px solid var(--border); }
+  .cp-hint b { color:var(--accent2); font-weight:600; }
+  .cp-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .cp-grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  @media(max-width:760px){ .cp-grid, .cp-grid3 { grid-template-columns:1fr; } }
+  .cp-checks { display:flex; flex-direction:column; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:14px; background:var(--surface2); }
+  .cp-checks label { display:grid; grid-template-columns:auto 1fr; gap:11px; padding:10px 14px; cursor:pointer; align-items:start; border-bottom:1px solid var(--border); font-size:13px; }
+  .cp-checks label:last-child { border-bottom:none; }
+  .cp-checks label:hover { background:var(--surface); }
+  .cp-checks input { width:16px; height:16px; margin:1px 0 0; accent-color:var(--accent); cursor:pointer; }
+  .cp-checks .sub { display:block; color:var(--text2); font-size:12px; margin-top:3px; line-height:1.5; }
+  .cp-note { border-left:3px solid var(--accent); background:rgba(30,79,255,0.07); padding:12px 14px; border-radius:0 8px 8px 0; font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:14px; }
+  .cp-note.warn { border-left-color:#e9b04a; background:rgba(233,176,74,0.07); }
+  .cp-note.stop { border-left-color:#f2685f; background:rgba(242,104,95,0.07); }
+  .cp-note b { color:var(--text); }
+  .cp-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+  .cp-tbl th { text-align:left; padding:8px 10px; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); border-bottom:1px solid var(--border); font-weight:700; }
+  .cp-tbl td { padding:5px 6px 5px 0; vertical-align:top; }
+  .cp-tbl td:first-child { padding-left:0; }
+  .cp-tbl input { font-size:12.5px; padding:7px 10px; }
+  .cp-tbl .rowlbl { font-size:12.5px; color:var(--text2); font-weight:600; padding-right:12px; white-space:nowrap; padding-top:14px; }
+  .cp-scroll { overflow-x:auto; }
+  .cp-pips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .cp-pip { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text2); background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:5px 10px; }
+  .cp-pip.done { color:var(--green); border-color:var(--green); }
+  .cp-call { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  @media(max-width:760px){ .cp-call { grid-template-columns:1fr; } }
+  .cp-call label { border:1px solid var(--border); border-radius:8px; padding:12px 14px; cursor:pointer; background:var(--surface2); font-size:13.5px; font-weight:600; display:flex; gap:8px; align-items:center; }
+  .cp-call label:hover { border-color:var(--accent); }
+  .cp-call input { width:auto; accent-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -691,8 +733,8 @@
 
     <!-- Compliance hub (nav page) -->
     <div class="page" id="page-compliance-hub">
-      <div class="page-title">🛡️ Compliance</div>
-      <div class="page-sub">Meta reach outcomes across all uploaded content</div>
+      <div class="page-title">🛡️ Content Scanner</div>
+      <div class="page-sub">Meta reach outcomes across content orders &amp; the content library</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
         <select id="ch-filter-outcome" onchange="renderComplianceHub()" style="width:190px;">
           <option value="">All outcomes</option>
@@ -712,6 +754,24 @@
       <div class="page-title">Content Upload</div>
       <div class="page-sub">Your Drive folder — where finished content goes</div>
       <div id="cu-body"></div>
+    </div>
+
+    <!-- Content Plans -- the niche workbook, one saved plan per model. Rendered from the
+         CP_SPEC array below rather than hand-written markup, so adding a field is a one-line
+         change. Answers live in content_plans.data (jsonb), gate ticks in .gates. -->
+    <div class="page" id="page-content-plans">
+      <div class="page-title">Content Plans</div>
+      <div class="page-sub">One niche plan per model. Work the gates in order — if one fails, stop there and fix it.</div>
+      <div class="cp-bar">
+        <select id="cp-model" onchange="loadContentPlan()"><option value="">Select a model…</option></select>
+        <span class="cp-status" id="cp-status"></span>
+        <span style="flex:1"></span>
+        <button class="btn btn-sm btn-ghost" onclick="copyContentPlan()">Copy as text</button>
+      </div>
+      <div id="cp-pips" class="cp-pips"></div>
+      <div id="cp-body">
+        <div class="empty" style="margin-top:60px;"><div class="empty-icon">🧭</div><p>Pick a model to open their plan</p></div>
+      </div>
     </div>
 
     <!-- Content Ideas -->
@@ -2655,7 +2715,8 @@ var NAV = [
   { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
-  { id: 'compliance-hub', icon: '🛡️', label: 'Compliance',           roles: ['admin','va'],                     section: 'Models' },
+  { id: 'content-plans', icon: '🧭', label: 'Content Plans',      roles: ['admin','va'],                             section: 'Models' },
+  { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',      roles: ['admin','va'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
@@ -2778,13 +2839,14 @@ function navigate(page) {
   if (page === 'chatters') renderSchedulePage();
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
   if (page === 'compliance') renderCompliance();
-  if (page === 'compliance-hub') { loadContentScans(); renderComplianceHub(); }
+  if (page === 'compliance-hub') { loadContentLibrary().then(renderComplianceHub); loadContentScans(); }
   if (page === 'reports') loadReportsOverview();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'content-schedule') loadContentSchedule();
+  if (page === 'content-plans') loadContentPlans();
   if (page === 'model-hub') renderModelHub();
   if (page === 'accounts') loadAccounts();
   if (page === 'model-home') renderModelHome();
@@ -3494,6 +3556,7 @@ async function loadContentScans(){
   STATE.scansByOrder=map; STATE.scansByLibKey=libmap;
   const pc=document.getElementById('page-content'); if(pc&&pc.classList.contains('active')) filterContentOrders();
   const pco=document.getElementById('page-compliance'); if(pco&&pco.classList.contains('active')) renderCompliance();
+  const pch=document.getElementById('page-compliance-hub'); if(pch&&pch.classList.contains('active')) renderComplianceHub();
   if(document.getElementById('cl-list')) renderLibraryList();
 }
 function scanForOrder(id){ return (STATE.scansByOrder||{})[id]; }
@@ -3597,27 +3660,56 @@ function renderComplianceBulk(){ const el=document.getElementById('co-compliance
 // Dedicated Compliance hub page: filterable list of everything + the per-model summary.
 function renderComplianceHub(){
   const bulk=document.getElementById('ch-bulk'); const list=document.getElementById('ch-list'); if(!list) return;
+  const scans=STATE.scansByOrder||{}; const libScans=STATE.scansByLibKey||{};
+  const modelName=function(id,ownerType){ var m=(STATE.models||[]).find(function(x){return x.id===id;}); return m?m.name:(ownerType==='agency'?'Agency':'—'); };
+  // model filter options from orders + library
   const msel=document.getElementById('ch-filter-model');
-  if(msel){ const cur=msel.value; const names=Array.from(new Set((STATE.contentOrders||[]).map(function(o){return o.model_name;}).filter(Boolean))).sort(); msel.innerHTML='<option value="">All models</option>'+names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join(''); msel.value=cur; }
+  if(msel){ const cur=msel.value;
+    const on=(STATE.contentOrders||[]).map(function(o){return o.model_name;}).filter(Boolean);
+    const ln=(STATE.library||[]).map(function(i){return modelName(i.model_id,i.owner_type);}).filter(function(n){return n&&n!=='—';});
+    const names=Array.from(new Set(on.concat(ln))).sort();
+    msel.innerHTML='<option value="">All models</option>'+names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join(''); msel.value=cur; }
   if(bulk) bulk.innerHTML=complianceBulkHtml();
   const outcome=(document.getElementById('ch-filter-outcome')||{}).value||'';
   const mfilter=(document.getElementById('ch-filter-model')||{}).value||'';
-  const scans=STATE.scansByOrder||{};
-  let items=(STATE.contentOrders||[]).filter(function(o){return o.video_path||scans[o.id];});
-  if(mfilter) items=items.filter(function(o){return o.model_name===mfilter;});
-  if(outcome==='unscanned') items=items.filter(function(o){return !scans[o.id];});
-  else if(outcome) items=items.filter(function(o){return scans[o.id]&&scans[o.id].instagram_outcome===outcome;});
-  if(!items.length){ list.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">🛡️</div><p>No content matches. Upload videos to orders and scan them to populate this.</p></div>'; return; }
   const rank={removed:0,not_recommended:1,distributed:2};
-  items.sort(function(a,b){ const sa=scans[a.id],sb=scans[b.id]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
-  list.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+items.map(function(o){
-    const s=scans[o.id]; const num=o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
-    let pill;
-    if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; }
-    else pill='<span class="cscan cscan-grey">🔍 Unscanned</span>';
-    const act=s?'<button class="btn btn-sm btn-ghost" onclick="openCompliance(\''+o.id+'\',\'compliance-hub\')">Open</button>':'<button class="btn btn-sm btn-ghost" onclick="triggerScan(\''+o.id+'\')">Scan</button>';
-    return '<tr><td style="color:var(--accent2);font-weight:700;">'+num+'</td><td>'+escapeHtml(o.model_name||'—')+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:340px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
-  }).join('')+'</tbody></table></div></div>';
+
+  // ── Content Orders ──
+  let oItems=(STATE.contentOrders||[]).filter(function(o){return o.video_path||scans[o.id];});
+  if(mfilter) oItems=oItems.filter(function(o){return o.model_name===mfilter;});
+  if(outcome==='unscanned') oItems=oItems.filter(function(o){return !scans[o.id];});
+  else if(outcome) oItems=oItems.filter(function(o){return scans[o.id]&&scans[o.id].instagram_outcome===outcome;});
+  oItems.sort(function(a,b){ const sa=scans[a.id],sb=scans[b.id]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
+  let ordersHtml='';
+  if(oItems.length){
+    ordersHtml='<div class="card"><div class="card-title">🎬 Content Orders</div><div class="table-wrap"><table><thead><tr><th>#</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+oItems.map(function(o){
+      const s=scans[o.id]; const num=o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
+      let pill; if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; } else pill='<span class="cscan cscan-grey">🔍 Unscanned</span>';
+      const act=s?'<button class="btn btn-sm btn-ghost" onclick="openCompliance(\''+o.id+'\',\'compliance-hub\')">Open</button>':'<button class="btn btn-sm btn-ghost" onclick="triggerScan(\''+o.id+'\')">Scan</button>';
+      return '<tr><td style="color:var(--accent2);font-weight:700;">'+num+'</td><td>'+escapeHtml(o.model_name||'—')+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+  }
+
+  // ── Content Library (videos) ──
+  let lItems=(STATE.library||[]).filter(function(i){return /^video\//.test(i.content_type||'')||/\.(mp4|mov|webm|m4v)$/i.test(i.r2_key||'')||libScans[i.r2_key];});
+  if(mfilter) lItems=lItems.filter(function(i){return modelName(i.model_id,i.owner_type)===mfilter;});
+  if(outcome==='unscanned') lItems=lItems.filter(function(i){return !libScans[i.r2_key];});
+  else if(outcome) lItems=lItems.filter(function(i){return libScans[i.r2_key]&&libScans[i.r2_key].instagram_outcome===outcome;});
+  lItems.sort(function(a,b){ const sa=libScans[a.r2_key],sb=libScans[b.r2_key]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
+  let libHtml='';
+  if(lItems.length){
+    libHtml='<div class="card"><div class="card-title">📁 Content Library</div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+lItems.map(function(i){
+      const s=libScans[i.r2_key];
+      let pill,act;
+      if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; act='<button class="btn btn-sm btn-ghost" onclick="openLibCompliance(\''+i.id+'\')">Open</button>'; }
+      else if(STATE.scanningLib&&STATE.scanningLib.has(i.r2_key)){ pill='<span class="cscan cscan-grey">⏳ Scanning…</span>'; act=''; }
+      else { pill='<span class="cscan cscan-grey">🔍 Unscanned</span>'; act='<button class="btn btn-sm btn-ghost" onclick="scanLibraryItem(\''+i.id+'\')">🔍 Scan</button>'; }
+      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td><td>'+escapeHtml(modelName(i.model_id,i.owner_type))+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+  }
+
+  if(!ordersHtml&&!libHtml){ list.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">🛡️</div><p>No content matches. Upload videos to Content Orders or the Content Library and scan them to populate this.</p></div>'; return; }
+  list.innerHTML=ordersHtml+libHtml;
 }
 
 function filterContentOrders() {
@@ -11343,6 +11435,368 @@ async function deletePersonalSalesGroup(ids,label){
 
 
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
+
+// ── Content Plans ────────────────────────────────────────────
+// The niche workbook, stored one row per model in `content_plans`. The form is generated
+// from CP_SPEC so a new field is a one-line change here rather than new markup. Free-text
+// answers go in .data (jsonb keyed by field key), gate checkboxes in .gates.
+// Adapted from the Niche Creation Workbook (OFM Oliver) for this roster; the coaching notes
+// and the swipe/playbook sections are ours.
+
+var CP_SPEC = [
+ { id:'profile', tag:'Start', title:'Who you’re profiling',
+   intro:'A conversation, not a form to email over. Sit down together and write their words, not your summary. Budget forty minutes — if it takes ten, you skipped Gate 1.',
+   fields:[
+    {k:'buys', l:'Who buys from this model', t:'text', ph:'Gay & bi men, US · or straight men, US',
+     h:'Checked again in Gate 2 — you look for <b>this</b> audience inside the niche, not just any audience.'},
+    {k:'face', l:'Face shown?', t:'text', ph:'Yes / faceless',
+     h:'Faceless changes three checks: <b>looks like they belong</b> falls to hands, kit and setting; <b>surviving the comments</b> gets harder with no charm to cover a knowledge gap; locked locations matter more. Rules out talking heads, rules in over-the-shoulder — trades, cooking, garage, tools.'},
+    {k:'city', l:'City they live in', t:'text'},
+    {k:'reads', l:'How they read on camera', t:'text', ph:'tradie / athlete / art-school / corporate / farm',
+     h:'The type a stranger guesses in two seconds. Not how attractive they are — everyone on the roster is attractive, that isn’t a positioning.'},
+    {k:'hours', l:'Hours a week they’ll give', t:'text'},
+    {k:'assets', l:'What they own that could be filmed', t:'area', ph:'Vehicle, tools, kit, animals, a workplace. Skills they already have. Anywhere they have access other people don’t.',
+     h:'Half the menu needs something you either own or don’t — a truck, a garage, a dog, a bar job.'},
+    {k:'lines', l:'Lines they won’t cross', t:'area', ph:'Face shown or not. Anyone in their life who can’t see this. Places they can’t be filmed. Anything they’ve already said no to.',
+     h:'Ask now, not in week six. Most niches that die mid-launch die because nobody asked whether they could be filmed at their actual workplace.'}
+ ]},
+
+ { id:'concept', tag:'Concept', title:'Two things get called a niche',
+   note:{t:'', h:'<b>A sexual category</b> — twink, daddy, dom, GFE, feet, age-gap — sells inside the chat, not on the feed. Instagram recognises it and files the account as OF material: bad audience, low reach. No audience outlives the category.<br><br><b>A topic world</b> — bass fishing, welding, F1, dive bars, trail running — was there before the model showed up. Own feed, own American audience, own comment culture, no OF association. <b>The topic brings the reach. The body converts it.</b>'},
+   fields:[] },
+
+ { id:'g1', tag:'Gate 1', title:'The model', gate:1,
+   intro:'The niche has to be something the model already has a foot in. A niche they don’t live in falls apart in about six weeks — and by then the account has learned the wrong category.',
+   checks:[
+    ['There’s a real hobby, job, background or obsession to build on',''],
+    ['They can talk about it for three minutes with no script',''],
+    ['They’d still be doing it in six months if the account earned nothing',''],
+    ['They look like they belong in that world','Not dressed up as it for the day.'],
+    ['They survive the comments','Powerlifting, trades, military, metal, BJJ, hunting and motorsport test people hard. Getting caught out once ends the account.'],
+    ['They said yes to this specific idea, out loud','']
+   ],
+   fields:[
+    {k:'q1', l:'', q:'Q1 · What do you do on a Sunday when nobody’s watching?', t:'tall', ph:'Their words.',
+     h:'<b>Good</b> has detail they didn’t reach for — “in the garage with the bike on the stand until it’s dark”. <b>Bad</b> is a list of categories: “gym, chill, gaming”. Probe: <i>walk me through last Sunday, hour by hour</i>, or <i>what did you spend money on last month that wasn’t food or rent?</i>'},
+    {k:'q2', l:'', q:'Q2 · What could you talk about for an hour without getting bored?', t:'tall', ph:'Their words.',
+     h:'Watch them, not the answer. <b>Good</b> is animated, interrupting, correcting you. <b>Bad</b> is a topic they think sounds impressive — if they perform the answer they’ll perform the content. Probe: <i>what do most people get wrong about it?</i>'},
+    {k:'q3', l:'', q:'Q3 · What do people already ask you about?', t:'tall', ph:'Their words.',
+     h:'Outside evidence — other people already treating them as the person for something. Probe: <i>what do your mates text you about?</i> Not what they compliment, what they come to them <b>for</b>.'},
+    {k:'x_nouns', l:'Step 1 — every concrete noun in the answers', t:'area', ph:'Bike, garage, night shift, dog, brisket, Sunday league. Skip feelings and adjectives.'},
+    {k:'x_feed', l:'Step 2 — which of those has a feed on Instagram?', t:'area', ph:'Search each. Cross off anything with no creators and no comment culture.'},
+    {k:'x_free', l:'Step 3 — which survivors would they still do for free?', t:'area', ph:'Cross off anything that only exists because it might make money.'},
+    {k:'x_deep', l:'Step 4 — take the last one standing a rung deeper', t:'area', ph:'Cars → JDM tuning. Gym → beginner powerlifting. Cooking → live-fire steak.',
+     h:'Run these four literally, on paper, in front of them. If nothing survives Step 3 you don’t have a niche problem — you have a model who hasn’t told you the truth yet. If two survive, pick one: two topics on one account and the algorithm files it as OF content.'}
+   ],
+   after:{c:'stop', h:'<b>If Gate 1 fails</b> — don’t go shopping for an easier niche. Go back to the model and find the thing they already do. That conversation is thirty minutes and it saves you a quarter.'} },
+
+ { id:'pos', tag:'Position', title:'The positioning sentence',
+   intro:'Specific sub-niche + recognisable journey + personality. All three — two out of three is a topic, not a position. “Beginner powerlifter chasing a 200 kg deadlift, self-deprecating about every failed rep.”',
+   fields:[{k:'pos', l:'The positioning sentence', t:'tall', ph:'One sentence. If it needs a semicolon, it’s two positions.',
+     h:'<b>The repeat test.</b> Say it to somebody who wasn’t in the room, ask them a week later what the account is about. Your sentence back — it holds. “Just another fitness account” — you have a topic and no position.'}] },
+
+ { id:'g2', tag:'Gate 2', title:'Is the niche real?', gate:2,
+   intro:'A niche that reads well on a whiteboard is worth nothing. Check it exists as a live feed with the right people in it. Use a clean research account, never the model’s.',
+   checks:[
+    ['Searched the topic, watched and liked for 30–60 minutes, and the feed filled with it',''],
+    ['Found 10–15 creators already making this content','Fewer and the audience is too small to grow into.'],
+    ['Found 5 creators in it who go viral consistently','These become the swipe file below.'],
+    ['Comments are mostly American, in real sentences, from accounts with lives on them',''],
+    ['70%+ of visible engagement is American or Western',''],
+    ['The buying audience you named at the top is already awake in it','Look in the comments and fan accounts, not at the top creators.'],
+    ['Nobody in the niche is running OF content','If the top accounts are OF-coded the feed is contaminated and you inherit it on day one.'],
+    ['It’s a sub-niche, not a family','“Cars” is too broad. “JDM tuning” works.'],
+    ['One niche only','Two topics and the algorithm can’t file it, so it defaults to OF content.'],
+    ['Enough in it for 200 videos without repeating yourself','']
+   ],
+   fields:[{k:'niche', l:'The niche, written in full', t:'area', ph:'Not a word. A sentence a stranger could act on.'}],
+   swipe:true },
+
+ { id:'g3', tag:'Gate 3', title:'Production', gate:3,
+   intro:'The gate most agencies skip, then blame the niche. A niche is a production commitment — every empty field is a bottleneck you haven’t found yet.',
+   checks:[
+    ['The editor knows this niche’s formats, or has 20–30 reference videos saved',''],
+    ['One named person owns the weekly instruction to the model, with a deadline',''],
+    ['Shooting fresh footage, not re-cutting the raw library they already have',''],
+    ['They can hit the volume in bad weeks — busy, ill, travelling — not only good ones',''],
+    ['There’s a batch day in the calendar, not a hope that they film when they feel like it',''],
+    ['Raw is 1080p minimum, vertical, stable on a tripod or steady surface',''],
+    ['Clean audio and proper light','No echo, no aircon hum, no wind into the mic. Daylight or a light they own.'],
+    ['They send raw files, not screen recordings or squashed phone exports',''],
+    ['Somebody watched three recent raw clips end to end and would ship them',''],
+    ['Permissions asked where needed; wardrobe exists or has a budget line with a number','']
+   ],
+   fields:[
+    {k:'films', l:'Who films', t:'text'},
+    {k:'edits', l:'Who edits', t:'text', h:'If the honest answer is nobody, <b>that’s your bottleneck, not the niche.</b> Nine launches in ten die here.'},
+    {k:'vol', l:'Raw per week / posts per day', t:'text', ph:'6 raw / 2 posts'},
+    {k:'cost', l:'Cost of entry, signed off', t:'text', ph:'$ and what for'},
+    {k:'locs', l:'The 3–4 locked locations', t:'area', ph:'Where every video gets shot. Name them.',
+     h:'A new location every video and the algorithm never learns the category.'}
+   ]},
+
+ { id:'g4', tag:'Gate 4', title:'Quality, at niche level', gate:4,
+   intro:'Run these on the whole niche now, on paper, before a single video exists. If the niche can’t pass here the videos won’t either.',
+   checks:[
+    ['Every post will be recognisably the same world','Someone landing on the grid gets it in two seconds.'],
+    ['We’ll hold this for 90 days minimum','Switching niche resets the algorithm and loses the audience you just built.'],
+    ['The niche gives people something to argue about, correct, defend or ask for',''],
+    ['The journey gives them a reason to come back, not just to watch once',''],
+    ['Topic, clothing, setting and heat level all fit the same person',''],
+    ['The sex appeal sits in the framing, never in the topic','If the video only works because the model is hot, it’s OF content in a costume.'],
+    ['Locations look good on camera at the time of day they can actually film',''],
+    ['The niche has a visual signature we can own','A colour, a setting, a piece of kit, a shot that repeats.'],
+    ['Against the five from Gate 2, they win on something specific',''],
+    ['Adapting the niche’s own formats, not repainting an OF trend with niche props','']
+   ],
+   fields:[{k:'wins', l:'What they win on, specifically', t:'area', ph:'Against those five creators, by name. Not “better content”.',
+     h:'<b>The 100K test.</b> Picture the account, in this niche, with 100,000 real American followers. Not “could it work” — do you see it? If no, sharpen the position or drop the niche.'}] }
+];
+
+CP_SPEC.push(
+ { id:'play', tag:'Playbook', title:'The playbook',
+   intro:'Everything above decides the niche. This turns it into Monday’s post. Fill it once the niche is committed, and hand it to whoever produces.',
+   fields:[
+    {k:'pillar1', l:'Pillar 1 — bucket · example post', t:'text'},
+    {k:'pillar2', l:'Pillar 2 — bucket · example post', t:'text'},
+    {k:'pillar3', l:'Pillar 3 — bucket · example post', t:'text'},
+    {k:'pillar4', l:'Pillar 4 — bucket · example post', t:'text',
+     h:'Three or four recurring buckets the niche produces. If you can’t name three, the niche is too narrow. If you need eight, it’s too broad.'},
+    {k:'formats', l:'Recurring formats / the series', t:'area', ph:'The repeatable thing people come back for. “Every Friday I try a lift I have no business attempting.”',
+     h:'The signature format matters more than any single video — it’s the reason to follow rather than to watch once.'},
+    {k:'signature', l:'Visual signature', t:'text', ph:'The colour, setting, piece of kit or repeating shot we own.'},
+    {k:'hooks', l:'Hook bank — 10 openers in their voice', t:'tall', ph:'One per line. Built from what already works in the swipe file, rewritten in this model’s voice.',
+     h:'Steal the <b>structure</b> of hooks that work in the niche, never the wording. Test them as trial reels once the account is past phase E.'},
+    {k:'ctas', l:'CTA phrasings', t:'area', ph:'This model’s own versions.',
+     h:'Never “link in bio”, “check out my OF”, “all my links” — those are suppressed. Use “surprise in my bio”, “check my profile”, “you already know where to find me”, or anything that creates curiosity without naming the destination.'}
+   ]},
+
+ { id:'plat', tag:'Platforms', title:'Platform map',
+   intro:'The same niche is a different animal per platform. Fill only the platforms this model is actually on.',
+   platform:true },
+
+ { id:'g5', tag:'Gate 5', title:'Commit and measure', gate:5,
+   intro:'Set the numbers now. Decide the exit before you start, and don’t let anyone renegotiate it in week three. Success: US traffic above 70%, like ratio above 3% on videos past 50K views, views per paid sub moving toward 10K.',
+   checks:[
+    ['Baseline written down before launch, not after',''],
+    ['Two weeks of consistent posting minimum before anybody judges it',''],
+    ['Geography and like ratio go in the conversion log weekly',''],
+    ['Everybody agreed up front what result kills it','']
+   ],
+   fields:[
+    {k:'vps', l:'Views per paid sub today', t:'text', ph:'—'},
+    {k:'us', l:'US share today', t:'text', ph:'—%'},
+    {k:'start', l:'Test start date', t:'text'},
+    {k:'owner', l:'Weekly check owned by', t:'text'},
+    {k:'kill', l:'What kills it', t:'area', ph:'The specific result that ends this test. Agreed by everyone, today.',
+     h:'Written before launch it’s a decision. Written afterwards it’s an argument, and the loudest person wins instead of the right one.'},
+    {k:'sign', l:'Signed off by / date / review on', t:'text'}
+   ],
+   call:true }
+);
+
+var CP_PLATFORMS = ['Instagram','Reddit','TikTok','X','Other'];
+var CP_STATE = { modelId:null, data:{}, gates:{}, timer:null, loaded:false };
+
+function cpEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function cpVal(k){ return CP_STATE.data[k]==null ? '' : CP_STATE.data[k]; }
+
+function cpField(f){
+  var v = cpEsc(cpVal(f.k)), ph = cpEsc(f.ph||'');
+  var inner;
+  if (f.t === 'text') inner = '<input type="text" id="cpf-'+f.k+'" value="'+v+'" placeholder="'+ph+'" oninput="cpSet(\''+f.k+'\',this.value)">';
+  else inner = '<textarea id="cpf-'+f.k+'" placeholder="'+ph+'"'+(f.t==='tall'?' style="min-height:110px"':'')+' oninput="cpSet(\''+f.k+'\',this.value)">'+v+'</textarea>';
+  return '<div class="cp-f">'
+    + (f.q ? '<div class="cp-q">'+cpEsc(f.q)+'</div>' : '')
+    + (f.l ? '<label for="cpf-'+f.k+'">'+cpEsc(f.l)+'</label>' : '')
+    + inner
+    + (f.h ? '<div class="cp-hint">'+f.h+'</div>' : '')
+    + '</div>';
+}
+
+function cpSwipe(){
+  var rows = '';
+  for (var i=0;i<5;i++){
+    rows += '<tr>'
+      + '<td><input type="text" id="cpf-sw'+i+'_h" value="'+cpEsc(cpVal('sw'+i+'_h'))+'" placeholder="@handle" oninput="cpSet(\'sw'+i+'_h\',this.value)"></td>'
+      + '<td><input type="text" id="cpf-sw'+i+'_w" value="'+cpEsc(cpVal('sw'+i+'_w'))+'" placeholder="What they win on" oninput="cpSet(\'sw'+i+'_w\',this.value)"></td>'
+      + '<td><input type="text" id="cpf-sw'+i+'_s" value="'+cpEsc(cpVal('sw'+i+'_s'))+'" placeholder="What to steal" oninput="cpSet(\'sw'+i+'_s\',this.value)"></td>'
+      + '</tr>';
+  }
+  return '<div class="cp-f"><label>Swipe file — the five to copy</label>'
+    + '<div class="cp-scroll"><table class="cp-tbl" style="min-width:560px"><thead><tr><th>Handle</th><th>What they win on</th><th>What to steal</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div>'
+    + '<div class="cp-hint">This is the editor’s brief. They should open it, watch twenty of those videos, and know the formats without asking you anything. Pick creators who go viral <b>consistently</b> — one lucky video teaches nobody.</div></div>'
+    + cpField({k:'sw_refs', l:'Saved reference videos', t:'text', ph:'Drive folder or saved-collection link'})
+    + cpField({k:'sw_gap', l:'What none of the five are doing', t:'area', ph:'The gap. This is where the positioning actually comes from.',
+        h:'Anything all five already do is table stakes. The account is built on the thing that’s missing.'});
+}
+
+function cpPlatform(){
+  var rows = '';
+  for (var i=0;i<CP_PLATFORMS.length;i++){
+    var p = CP_PLATFORMS[i], k = 'pl'+i;
+    rows += '<tr><td class="rowlbl">'+p+'</td>'
+      + '<td><input type="text" value="'+cpEsc(cpVal(k+'_f'))+'" placeholder="Format" oninput="cpSet(\''+k+'_f\',this.value)"></td>'
+      + '<td><input type="text" value="'+cpEsc(cpVal(k+'_v'))+'" placeholder="Volume" oninput="cpSet(\''+k+'_v\',this.value)"></td>'
+      + '<td><input type="text" value="'+cpEsc(cpVal(k+'_g'))+'" placeholder="What good looks like" oninput="cpSet(\''+k+'_g\',this.value)"></td></tr>';
+  }
+  return '<div class="cp-scroll"><table class="cp-tbl" style="min-width:640px"><thead><tr><th></th><th>Format</th><th>Volume</th><th>What good looks like</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div>'
+    + '<div class="cp-hint">Judge on distribution — saves, shares, follows from the post, retention. Not views, not likes.</div>';
+}
+
+function cpCall(){
+  var cur = cpVal('final_call');
+  var opts = ['Commit','Test two weeks','Drop'];
+  var h = '<div class="cp-f"><label>Final call</label><div class="cp-call">';
+  for (var i=0;i<opts.length;i++){
+    h += '<label><input type="radio" name="cp-call" value="'+opts[i]+'"'+(cur===opts[i]?' checked':'')+' onchange="cpSet(\'final_call\',this.value)"> '+opts[i]+'</label>';
+  }
+  return h + '</div></div>';
+}
+
+function cpChecks(sec){
+  var h = '<div class="cp-checks">';
+  for (var i=0;i<sec.checks.length;i++){
+    var key = sec.id+'_'+i, on = CP_STATE.gates[key] ? ' checked' : '';
+    h += '<label><input type="checkbox"'+on+' onchange="cpTick(\''+key+'\',this.checked)">'
+      + '<span>'+cpEsc(sec.checks[i][0])
+      + (sec.checks[i][1] ? '<span class="sub">'+cpEsc(sec.checks[i][1])+'</span>' : '')
+      + '</span></label>';
+  }
+  return h + '</div>';
+}
+
+function cpRenderPips(){
+  var el = document.getElementById('cp-pips'); if (!el) return;
+  if (!CP_STATE.modelId) { el.innerHTML = ''; return; }
+  var h = '';
+  for (var i=0;i<CP_SPEC.length;i++){
+    var sec = CP_SPEC[i]; if (!sec.gate) continue;
+    var done = 0;
+    for (var j=0;j<sec.checks.length;j++) if (CP_STATE.gates[sec.id+'_'+j]) done++;
+    var full = done === sec.checks.length;
+    h += '<span class="cp-pip'+(full?' done':'')+'">Gate '+sec.gate+' '+done+'/'+sec.checks.length+'</span>';
+  }
+  el.innerHTML = h;
+}
+
+function cpRender(){
+  var body = document.getElementById('cp-body'); if (!body) return;
+  if (!CP_STATE.modelId){
+    body.innerHTML = '<div class="empty" style="margin-top:60px;"><div class="empty-icon">🧭</div><p>Pick a model to open their plan</p></div>';
+    cpRenderPips(); return;
+  }
+  var h = '';
+  for (var i=0;i<CP_SPEC.length;i++){
+    var sec = CP_SPEC[i];
+    h += '<div class="cp-sec"><h3>'+(sec.tag?'<span class="cp-tag">'+cpEsc(sec.tag)+'</span>':'')+cpEsc(sec.title)+'</h3>';
+    if (sec.intro) h += '<p class="cp-intro">'+cpEsc(sec.intro)+'</p>';
+    if (sec.note)  h += '<div class="cp-note'+(sec.note.c?' '+sec.note.c:'')+'">'+sec.note.h+'</div>';
+    if (sec.checks) h += cpChecks(sec);
+    if (sec.fields) for (var j=0;j<sec.fields.length;j++) h += cpField(sec.fields[j]);
+    if (sec.swipe) h += cpSwipe();
+    if (sec.platform) h += cpPlatform();
+    if (sec.call) h += cpCall();
+    if (sec.after) h += '<div class="cp-note'+(sec.after.c?' '+sec.after.c:'')+'">'+sec.after.h+'</div>';
+    h += '</div>';
+  }
+  body.innerHTML = h;
+  cpRenderPips();
+}
+
+function cpSet(k, v){ CP_STATE.data[k] = v; cpQueueSave(); }
+function cpTick(k, on){ if (on) CP_STATE.gates[k] = true; else delete CP_STATE.gates[k]; cpRenderPips(); cpQueueSave(); }
+
+function cpStatus(msg, ok){
+  var el = document.getElementById('cp-status'); if (!el) return;
+  el.textContent = msg; el.className = 'cp-status' + (ok ? ' ok' : '');
+}
+
+function cpQueueSave(){
+  if (CP_STATE.timer) clearTimeout(CP_STATE.timer);
+  cpStatus('Saving…', false);
+  CP_STATE.timer = setTimeout(saveContentPlan, 900);
+}
+
+async function saveContentPlan(){
+  if (!CP_STATE.modelId) return;
+  var row = { model_id: CP_STATE.modelId, data: CP_STATE.data, gates: CP_STATE.gates,
+              status: CP_STATE.data.final_call || 'draft', updated_by: STATE.user ? STATE.user.id : null };
+  const { error } = await sb.from('content_plans').upsert(row, { onConflict:'model_id' }).select();
+  // RLS blocks silently on this project -- a returned error or an empty result both mean
+  // the write did not land, so say so rather than showing a false "Saved".
+  if (error) { cpStatus('Not saved — ' + error.message, false); return; }
+  cpStatus('Saved', true);
+}
+
+async function loadContentPlans(){
+  var sel = document.getElementById('cp-model'); if (!sel) return;
+  if (!CP_STATE.loaded){
+    const { data } = await sb.from('models').select('id,name').order('name');
+    var h = '<option value="">Select a model…</option>';
+    (data||[]).forEach(function(m){ h += '<option value="'+m.id+'">'+cpEsc(m.name)+'</option>'; });
+    sel.innerHTML = h;
+    CP_STATE.loaded = true;
+  }
+  if (CP_STATE.modelId) sel.value = CP_STATE.modelId;
+  cpRender();
+}
+
+async function loadContentPlan(){
+  var sel = document.getElementById('cp-model');
+  var id = sel ? sel.value : '';
+  CP_STATE.modelId = id || null;
+  CP_STATE.data = {}; CP_STATE.gates = {};
+  if (!id){ cpStatus(''); cpRender(); return; }
+  cpStatus('Loading…', false);
+  const { data, error } = await sb.from('content_plans').select('*').eq('model_id', id).maybeSingle();
+  if (error){ cpStatus('Could not load — ' + error.message, false); }
+  else if (data){
+    CP_STATE.data = data.data || {}; CP_STATE.gates = data.gates || {};
+    cpStatus('Last saved ' + new Date(data.updated_at).toLocaleString(), true);
+  } else cpStatus('New plan', false);
+  cpRender();
+}
+
+function copyContentPlan(){
+  if (!CP_STATE.modelId){ alert('Pick a model first'); return; }
+  var sel = document.getElementById('cp-model');
+  var out = ['CONTENT PLAN — ' + (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : ''), ''];
+  for (var i=0;i<CP_SPEC.length;i++){
+    var sec = CP_SPEC[i];
+    if (!sec.fields && !sec.swipe && !sec.platform && !sec.call) continue;
+    out.push('== ' + sec.title.toUpperCase() + ' ==');
+    if (sec.checks){
+      var done = 0; for (var j=0;j<sec.checks.length;j++) if (CP_STATE.gates[sec.id+'_'+j]) done++;
+      out.push('Checks: ' + done + '/' + sec.checks.length);
+    }
+    if (sec.fields) sec.fields.forEach(function(f){ out.push((f.q||f.l||f.k) + ': ' + (cpVal(f.k)||'—')); });
+    if (sec.swipe){
+      for (var s=0;s<5;s++){
+        var hh = cpVal('sw'+s+'_h'); if (!hh) continue;
+        out.push('Swipe ' + hh + ' — wins: ' + (cpVal('sw'+s+'_w')||'—') + ' — steal: ' + (cpVal('sw'+s+'_s')||'—'));
+      }
+      out.push('Reference videos: ' + (cpVal('sw_refs')||'—'));
+      out.push('Gap none of them fill: ' + (cpVal('sw_gap')||'—'));
+    }
+    if (sec.platform){
+      for (var p=0;p<CP_PLATFORMS.length;p++){
+        var k='pl'+p, line=[cpVal(k+'_f'),cpVal(k+'_v'),cpVal(k+'_g')].filter(Boolean).join(' · ');
+        if (line) out.push(CP_PLATFORMS[p] + ': ' + line);
+      }
+    }
+    if (sec.call) out.push('FINAL CALL: ' + (cpVal('final_call')||'not made'));
+    out.push('');
+  }
+  var text = out.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ cpStatus('Copied to clipboard', true); },
+                                            function(){ cpStatus('Copy failed', false); });
+  } else cpStatus('Copy not supported in this browser', false);
+}
+
 </script>
 </body>
 </html>
