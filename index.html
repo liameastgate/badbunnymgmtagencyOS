@@ -1884,23 +1884,6 @@
       </div>
 
       <div id="traffic-content"></div>
-
-      <div class="card" style="max-width:900px;margin-top:24px;">
-        <div class="card-title">Upload Tracking Links Export</div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:12px;">This is a full snapshot export (not a weekly delta) — uploading a new file for a model replaces their existing tracking-link data.</div>
-        <div class="form-grid">
-          <div class="form-group full">
-            <label>Model this file belongs to</label>
-            <select id="traffic-upload-model"></select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>File (.xlsx or .csv)</label>
-          <input type="file" id="traffic-file-input" accept=".xlsx,.csv" onchange="handleTrafficFile(this.files[0])">
-        </div>
-        <div id="traffic-preview"></div>
-        <div id="traffic-upload-alert" class="alert" style="margin-top:10px;"></div>
-      </div>
     </div>
 
     <!-- Expenses -->
@@ -11444,152 +11427,153 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('cl
 // and the swipe/playbook sections are ours.
 
 var CP_SPEC = [
- { id:'profile', tag:'Start', title:'Who you’re profiling',
-   intro:'A conversation, not a form to email over. Sit down together and write their words, not your summary. Budget forty minutes — if it takes ten, you skipped Gate 1.',
+ { id:'profile', tag:'Start', title:'Where we’re starting',
+   intro:'This is a conversation, not a form. We fill it in together and we use your words, not a tidied-up version of them. Give it forty minutes — if it takes ten, we’ve skipped the part that matters.',
    fields:[
-    {k:'buys', l:'Who buys from this model', t:'text', ph:'Gay & bi men, US · or straight men, US',
-     h:'Checked again in Gate 2 — you look for <b>this</b> audience inside the niche, not just any audience.'},
+    {k:'buys', l:'Who we’re selling to', t:'text', ph:'Gay & bi men, US · or straight men, US',
+     h:'We check for <b>this</b> audience again in Gate 2 — not just any audience, the one that actually buys.'},
     {k:'face', l:'Face shown?', t:'text', ph:'Yes / faceless',
-     h:'Faceless changes three checks: <b>looks like they belong</b> falls to hands, kit and setting; <b>surviving the comments</b> gets harder with no charm to cover a knowledge gap; locked locations matter more. Rules out talking heads, rules in over-the-shoulder — trades, cooking, garage, tools.'},
-    {k:'city', l:'City they live in', t:'text'},
-    {k:'reads', l:'How they read on camera', t:'text', ph:'tradie / athlete / art-school / corporate / farm',
-     h:'The type a stranger guesses in two seconds. Not how attractive they are — everyone on the roster is attractive, that isn’t a positioning.'},
-    {k:'hours', l:'Hours a week they’ll give', t:'text'},
-    {k:'assets', l:'What they own that could be filmed', t:'area', ph:'Vehicle, tools, kit, animals, a workplace. Skills they already have. Anywhere they have access other people don’t.',
-     h:'Half the menu needs something you either own or don’t — a truck, a garage, a dog, a bar job.'},
-    {k:'lines', l:'Lines they won’t cross', t:'area', ph:'Face shown or not. Anyone in their life who can’t see this. Places they can’t be filmed. Anything they’ve already said no to.',
-     h:'Ask now, not in week six. Most niches that die mid-launch die because nobody asked whether they could be filmed at their actual workplace.'}
+     h:'If we’re going faceless, three things change: <b>looking like you belong</b> falls to your hands, your kit and the setting; <b>holding your own in the comments</b> gets harder with no face to carry it; and the locations do more work. It rules out talking to camera and rules in over-the-shoulder — trades, cooking, garage, tools.'},
+    {k:'city', l:'Where you’re based', t:'text'},
+    {k:'reads', l:'How you read on camera', t:'text', ph:'tradie / athlete / art-school / corporate / farm',
+     h:'The type a stranger would guess in two seconds. Not how good-looking you are — everyone here is good-looking, so that isn’t a position.'},
+    {k:'hours', l:'Hours a week you can give this', t:'text',
+     h:'Be honest rather than optimistic. We’d rather build around four real hours than eight imaginary ones.'},
+    {k:'assets', l:'What you’ve got that we can film', t:'area', ph:'Vehicle, tools, kit, animals, a workplace. Skills you already have. Anywhere you can get into that most people can’t.',
+     h:'Half the options later come down to something you either have or don’t — a truck, a garage, a dog, a job behind a bar.'},
+    {k:'lines', l:'Your hard limits', t:'area', ph:'Face shown or not. Anyone in your life who can’t see this. Places you can’t be filmed. Anything you’ve already decided is a no.',
+     h:'We’d rather know now than in week six. Most plans that fall apart do it because nobody asked whether you could film at work, or who follows you.'}
  ]},
 
  { id:'concept', tag:'Concept', title:'Two things get called a niche',
-   note:{t:'', h:'<b>A sexual category</b> — twink, daddy, dom, GFE, feet, age-gap — sells inside the chat, not on the feed. Instagram recognises it and files the account as OF material: bad audience, low reach. No audience outlives the category.<br><br><b>A topic world</b> — bass fishing, welding, F1, dive bars, trail running — was there before the model showed up. Own feed, own American audience, own comment culture, no OF association. <b>The topic brings the reach. The body converts it.</b>'},
+   note:{t:'', h:'<b>A sexual category</b> — twink, daddy, dom, GFE, feet, age-gap — sells inside the chat, but not on the feed. Instagram recognises it and files the account as OF material: wrong audience, low reach. There’s no audience that outlives the category.<br><br><b>A topic world</b> — bass fishing, welding, F1, dive bars, trail running — was there before any of us showed up. Its own feed, its own American audience, its own comment culture, and no OF association at all. You join it as a real member who happens to be hot.<br><br><b>The topic brings the reach. The body converts it.</b>'},
    fields:[] },
 
- { id:'g1', tag:'Gate 1', title:'The model', gate:1,
-   intro:'The niche has to be something the model already has a foot in. A niche they don’t live in falls apart in about six weeks — and by then the account has learned the wrong category.',
+ { id:'g1', tag:'Gate 1', title:'You', gate:1,
+   intro:'Whatever we pick has to be something you already have a foot in. A world you don’t actually live in falls apart in about six weeks — and by then the account has learned the wrong thing and we’re starting over.',
    checks:[
-    ['There’s a real hobby, job, background or obsession to build on',''],
-    ['They can talk about it for three minutes with no script',''],
-    ['They’d still be doing it in six months if the account earned nothing',''],
-    ['They look like they belong in that world','Not dressed up as it for the day.'],
-    ['They survive the comments','Powerlifting, trades, military, metal, BJJ, hunting and motorsport test people hard. Getting caught out once ends the account.'],
-    ['They said yes to this specific idea, out loud','']
+    ['There’s a real hobby, job, background or obsession here to build on',''],
+    ['You can talk about it for three minutes with no script',''],
+    ['You’d still be doing it in six months if the account earned nothing',''],
+    ['You look like you belong in that world','Not dressed up as it for the day.'],
+    ['You can hold your own in the comments','Powerlifting, trades, military, metal, BJJ, hunting and motorsport all test people. Getting caught out once is hard to come back from — so if it isn’t really yours, say so now.'],
+    ['You’ve said yes to this specific idea, out loud','']
    ],
    fields:[
-    {k:'q1', l:'', q:'Q1 · What do you do on a Sunday when nobody’s watching?', t:'tall', ph:'Their words.',
-     h:'<b>Good</b> has detail they didn’t reach for — “in the garage with the bike on the stand until it’s dark”. <b>Bad</b> is a list of categories: “gym, chill, gaming”. Probe: <i>walk me through last Sunday, hour by hour</i>, or <i>what did you spend money on last month that wasn’t food or rent?</i>'},
-    {k:'q2', l:'', q:'Q2 · What could you talk about for an hour without getting bored?', t:'tall', ph:'Their words.',
-     h:'Watch them, not the answer. <b>Good</b> is animated, interrupting, correcting you. <b>Bad</b> is a topic they think sounds impressive — if they perform the answer they’ll perform the content. Probe: <i>what do most people get wrong about it?</i>'},
-    {k:'q3', l:'', q:'Q3 · What do people already ask you about?', t:'tall', ph:'Their words.',
-     h:'Outside evidence — other people already treating them as the person for something. Probe: <i>what do your mates text you about?</i> Not what they compliment, what they come to them <b>for</b>.'},
-    {k:'x_nouns', l:'Step 1 — every concrete noun in the answers', t:'area', ph:'Bike, garage, night shift, dog, brisket, Sunday league. Skip feelings and adjectives.'},
-    {k:'x_feed', l:'Step 2 — which of those has a feed on Instagram?', t:'area', ph:'Search each. Cross off anything with no creators and no comment culture.'},
-    {k:'x_free', l:'Step 3 — which survivors would they still do for free?', t:'area', ph:'Cross off anything that only exists because it might make money.'},
+    {k:'q1', l:'', q:'What do you do on a Sunday when nobody’s watching?', t:'tall', ph:'In your words.',
+     h:'We’re after the detail you don’t have to reach for — “in the garage with the bike on the stand until it’s dark”. A list of categories like “gym, chill, gaming” usually means we haven’t got to the real answer yet. Try: <i>walk me through last Sunday, hour by hour</i>, or <i>what did you spend money on last month that wasn’t food or rent?</i>'},
+    {k:'q2', l:'', q:'What could you talk about for an hour without getting bored?', t:'tall', ph:'In your words.',
+     h:'Energy matters more than the answer here. If it’s something you’d pick because it sounds impressive rather than something you actually love, it won’t survive six weeks of filming. Good test: <i>what do most people get wrong about it?</i> — anyone properly into something answers that instantly.'},
+    {k:'q3', l:'', q:'What do people already ask you about?', t:'tall', ph:'In your words.',
+     h:'This one is outside evidence — other people already treating you as the person for something. Not what they compliment you on. What they come to you <b>for</b>. Try: <i>what do your mates text you about?</i>'},
+    {k:'x_nouns', l:'Step 1 — every real thing in those answers', t:'area', ph:'Bike, garage, night shift, dog, brisket, Sunday league. Things, not feelings.'},
+    {k:'x_feed', l:'Step 2 — which of them already has a feed on Instagram?', t:'area', ph:'Search each one. Cross off anything with no creators and no comment culture.'},
+    {k:'x_free', l:'Step 3 — which of those would you still do for free?', t:'area', ph:'Cross off anything that’s only on the list because it might make money.'},
     {k:'x_deep', l:'Step 4 — take the last one standing a rung deeper', t:'area', ph:'Cars → JDM tuning. Gym → beginner powerlifting. Cooking → live-fire steak.',
-     h:'Run these four literally, on paper, in front of them. If nothing survives Step 3 you don’t have a niche problem — you have a model who hasn’t told you the truth yet. If two survive, pick one: two topics on one account and the algorithm files it as OF content.'}
+     h:'Do these four out loud, on paper, together. If nothing survives step 3, the answer is still somewhere in Q1 — go back and dig rather than settling. If two survive, we pick one: two topics on one account and the algorithm can’t file it, so it files it as OF content.'}
    ],
-   after:{c:'stop', h:'<b>If Gate 1 fails</b> — don’t go shopping for an easier niche. Go back to the model and find the thing they already do. That conversation is thirty minutes and it saves you a quarter.'} },
+   after:{c:'stop', h:'<b>If this gate doesn’t clear</b> — we don’t go looking for an easier niche. We go back to the three questions and find the thing that’s already true. That conversation takes half an hour and saves a quarter.'} },
 
- { id:'pos', tag:'Position', title:'The positioning sentence',
-   intro:'Specific sub-niche + recognisable journey + personality. All three — two out of three is a topic, not a position. “Beginner powerlifter chasing a 200 kg deadlift, self-deprecating about every failed rep.”',
-   fields:[{k:'pos', l:'The positioning sentence', t:'tall', ph:'One sentence. If it needs a semicolon, it’s two positions.',
-     h:'<b>The repeat test.</b> Say it to somebody who wasn’t in the room, ask them a week later what the account is about. Your sentence back — it holds. “Just another fitness account” — you have a topic and no position.'}] },
+ { id:'pos', tag:'Position', title:'The one sentence',
+   intro:'A specific sub-niche, a journey people can follow, and a personality. All three — two out of three is a topic, not a position. “Beginner powerlifter chasing a 200 kg deadlift, self-deprecating about every failed rep.”',
+   fields:[{k:'pos', l:'The sentence', t:'tall', ph:'One sentence. If it needs a semicolon, it’s two positions.',
+     h:'<b>The repeat test.</b> Say it to someone who wasn’t in the room, then ask them a week later what the account is about. If roughly your sentence comes back, it holds. If you get “just another fitness account”, we sharpen it.'}] },
 
- { id:'g2', tag:'Gate 2', title:'Is the niche real?', gate:2,
-   intro:'A niche that reads well on a whiteboard is worth nothing. Check it exists as a live feed with the right people in it. Use a clean research account, never the model’s.',
+ { id:'g2', tag:'Gate 2', title:'Is it real?', gate:2,
+   intro:'A niche that sounds good in this room is worth nothing until we’ve seen it as a live feed with the right people in it. Do this research on a clean account, never yours.',
    checks:[
-    ['Searched the topic, watched and liked for 30–60 minutes, and the feed filled with it',''],
-    ['Found 10–15 creators already making this content','Fewer and the audience is too small to grow into.'],
-    ['Found 5 creators in it who go viral consistently','These become the swipe file below.'],
+    ['Searched the topic, watched and liked for 30–60 minutes, and the feed filled up with it',''],
+    ['Found 10–15 creators already making this','Fewer and the audience is too small to grow into.'],
+    ['Found 5 who go viral consistently','These become the swipe file below.'],
     ['Comments are mostly American, in real sentences, from accounts with lives on them',''],
-    ['70%+ of visible engagement is American or Western',''],
-    ['The buying audience you named at the top is already awake in it','Look in the comments and fan accounts, not at the top creators.'],
-    ['Nobody in the niche is running OF content','If the top accounts are OF-coded the feed is contaminated and you inherit it on day one.'],
-    ['It’s a sub-niche, not a family','“Cars” is too broad. “JDM tuning” works.'],
-    ['One niche only','Two topics and the algorithm can’t file it, so it defaults to OF content.'],
-    ['Enough in it for 200 videos without repeating yourself','']
+    ['70%+ of the visible engagement is American or Western',''],
+    ['The audience we named at the top is already active in there','Look at the comments and the fan accounts, not the big creators.'],
+    ['Nobody in the niche is running OF content','If the top accounts are OF-coded the feed is already contaminated and we’d inherit that on day one.'],
+    ['It’s a sub-niche, not a whole family','“Cars” is too broad. “JDM tuning” works.'],
+    ['One niche, not two','Two topics on one account and the algorithm defaults to filing it as OF content.'],
+    ['There’s enough here for 200 videos without repeating ourselves','']
    ],
-   fields:[{k:'niche', l:'The niche, written in full', t:'area', ph:'Not a word. A sentence a stranger could act on.'}],
+   fields:[{k:'niche', l:'The niche, written out in full', t:'area', ph:'Not one word. A sentence someone else could act on.'}],
    swipe:true },
 
- { id:'g3', tag:'Gate 3', title:'Production', gate:3,
-   intro:'The gate most agencies skip, then blame the niche. A niche is a production commitment — every empty field is a bottleneck you haven’t found yet.',
+ { id:'g3', tag:'Gate 3', title:'Can we actually make it?', gate:3,
+   intro:'The gate most agencies skip and then blame the niche for. A niche is a production commitment on both sides — every empty field here is a problem we haven’t found yet.',
    checks:[
     ['The editor knows this niche’s formats, or has 20–30 reference videos saved',''],
-    ['One named person owns the weekly instruction to the model, with a deadline',''],
-    ['Shooting fresh footage, not re-cutting the raw library they already have',''],
-    ['They can hit the volume in bad weeks — busy, ill, travelling — not only good ones',''],
-    ['There’s a batch day in the calendar, not a hope that they film when they feel like it',''],
-    ['Raw is 1080p minimum, vertical, stable on a tripod or steady surface',''],
-    ['Clean audio and proper light','No echo, no aircon hum, no wind into the mic. Daylight or a light they own.'],
-    ['They send raw files, not screen recordings or squashed phone exports',''],
-    ['Somebody watched three recent raw clips end to end and would ship them',''],
-    ['Permissions asked where needed; wardrobe exists or has a budget line with a number','']
+    ['One named person owns the weekly brief to you, with a deadline',''],
+    ['We’re shooting fresh footage, not re-cutting what’s already in the library',''],
+    ['You can hit the volume in a bad week — busy, ill, travelling — not just a good one',''],
+    ['There’s a batch day in the calendar, not a hope that it gets filmed',''],
+    ['Raw is 1080p minimum, vertical, steady on a tripod or a surface',''],
+    ['Clean audio and proper light','No echo, no aircon hum, no wind into the mic. Daylight or a light you own.'],
+    ['You’re sending raw files, not screen recordings or squashed phone exports',''],
+    ['Someone has watched three recent clips end to end and would ship them',''],
+    ['Permissions asked where we need them; wardrobe exists or has a budget with a number on it','']
    ],
    fields:[
     {k:'films', l:'Who films', t:'text'},
-    {k:'edits', l:'Who edits', t:'text', h:'If the honest answer is nobody, <b>that’s your bottleneck, not the niche.</b> Nine launches in ten die here.'},
+    {k:'edits', l:'Who edits', t:'text', h:'If the honest answer is nobody, <b>that’s the bottleneck — not the niche.</b> Nine plans in ten die right here and get blamed on the idea afterwards.'},
     {k:'vol', l:'Raw per week / posts per day', t:'text', ph:'6 raw / 2 posts'},
     {k:'cost', l:'Cost of entry, signed off', t:'text', ph:'$ and what for'},
-    {k:'locs', l:'The 3–4 locked locations', t:'area', ph:'Where every video gets shot. Name them.',
-     h:'A new location every video and the algorithm never learns the category.'}
+    {k:'locs', l:'The 3–4 locked locations', t:'area', ph:'Where everything gets shot. Name them.',
+     h:'A new location every video and the algorithm never learns what the account is.'}
    ]},
 
- { id:'g4', tag:'Gate 4', title:'Quality, at niche level', gate:4,
-   intro:'Run these on the whole niche now, on paper, before a single video exists. If the niche can’t pass here the videos won’t either.',
+ { id:'g4', tag:'Gate 4', title:'Is it good enough to hold?', gate:4,
+   intro:'We run these on the whole idea now, on paper, before a single video exists. If it can’t pass here the videos won’t either.',
    checks:[
     ['Every post will be recognisably the same world','Someone landing on the grid gets it in two seconds.'],
-    ['We’ll hold this for 90 days minimum','Switching niche resets the algorithm and loses the audience you just built.'],
-    ['The niche gives people something to argue about, correct, defend or ask for',''],
+    ['We’re holding this for 90 days minimum','Switching resets the algorithm and loses the audience we just built.'],
+    ['It gives people something to argue about, correct, defend or ask for',''],
     ['The journey gives them a reason to come back, not just to watch once',''],
     ['Topic, clothing, setting and heat level all fit the same person',''],
-    ['The sex appeal sits in the framing, never in the topic','If the video only works because the model is hot, it’s OF content in a costume.'],
-    ['Locations look good on camera at the time of day they can actually film',''],
-    ['The niche has a visual signature we can own','A colour, a setting, a piece of kit, a shot that repeats.'],
-    ['Against the five from Gate 2, they win on something specific',''],
-    ['Adapting the niche’s own formats, not repainting an OF trend with niche props','']
+    ['The sex appeal sits in the framing, never in the topic','If a video only works because you’re hot, it’s the old approach wearing a costume.'],
+    ['The locations look good on camera at the time of day you can actually film',''],
+    ['There’s a visual signature we can own','A colour, a setting, a piece of kit, a shot that repeats.'],
+    ['Against the five from Gate 2, you win on something specific',''],
+    ['We’re adapting the niche’s own formats, not repainting an OF trend with niche props','']
    ],
-   fields:[{k:'wins', l:'What they win on, specifically', t:'area', ph:'Against those five creators, by name. Not “better content”.',
-     h:'<b>The 100K test.</b> Picture the account, in this niche, with 100,000 real American followers. Not “could it work” — do you see it? If no, sharpen the position or drop the niche.'}] }
+   fields:[{k:'wins', l:'What you win on, specifically', t:'area', ph:'Against those five, by name. Not “better content”.',
+     h:'<b>The 100K test.</b> Picture this account, in this niche, with 100,000 real American followers on it. Not “could it work” — can you see it? If not, we sharpen the position or we pick something else.'}] }
 ];
 
 CP_SPEC.push(
  { id:'play', tag:'Playbook', title:'The playbook',
-   intro:'Everything above decides the niche. This turns it into Monday’s post. Fill it once the niche is committed, and hand it to whoever produces.',
+   intro:'Everything above decides what we’re making. This is the part that turns it into Monday’s post — fill it once the niche is locked, and it becomes the brief for whoever produces.',
    fields:[
     {k:'pillar1', l:'Pillar 1 — bucket · example post', t:'text'},
     {k:'pillar2', l:'Pillar 2 — bucket · example post', t:'text'},
     {k:'pillar3', l:'Pillar 3 — bucket · example post', t:'text'},
     {k:'pillar4', l:'Pillar 4 — bucket · example post', t:'text',
-     h:'Three or four recurring buckets the niche produces. If you can’t name three, the niche is too narrow. If you need eight, it’s too broad.'},
-    {k:'formats', l:'Recurring formats / the series', t:'area', ph:'The repeatable thing people come back for. “Every Friday I try a lift I have no business attempting.”',
-     h:'The signature format matters more than any single video — it’s the reason to follow rather than to watch once.'},
+     h:'Three or four recurring buckets the niche naturally produces. If we can’t name three it’s too narrow; if we need eight it’s too broad.'},
+    {k:'formats', l:'The recurring format — our series', t:'area', ph:'The repeatable thing people come back for. “Every Friday I try a lift I have no business attempting.”',
+     h:'This matters more than any single video. It’s the difference between someone watching once and someone following.'},
     {k:'signature', l:'Visual signature', t:'text', ph:'The colour, setting, piece of kit or repeating shot we own.'},
-    {k:'hooks', l:'Hook bank — 10 openers in their voice', t:'tall', ph:'One per line. Built from what already works in the swipe file, rewritten in this model’s voice.',
-     h:'Steal the <b>structure</b> of hooks that work in the niche, never the wording. Test them as trial reels once the account is past phase E.'},
-    {k:'ctas', l:'CTA phrasings', t:'area', ph:'This model’s own versions.',
-     h:'Never “link in bio”, “check out my OF”, “all my links” — those are suppressed. Use “surprise in my bio”, “check my profile”, “you already know where to find me”, or anything that creates curiosity without naming the destination.'}
+    {k:'hooks', l:'Hook bank — 10 openers in your voice', t:'tall', ph:'One per line. Built from what already works in the swipe file, rewritten so they sound like you.',
+     h:'We take the <b>structure</b> of hooks that work in this niche, never the wording. Once the account is warmed up we test them as trial reels.'},
+    {k:'ctas', l:'How we point people to the link', t:'area', ph:'Your own phrasings.',
+     h:'Never “link in bio”, “check out my OF” or “all my links” — those get suppressed. Use “surprise in my bio”, “check my profile”, “you already know where to find me”, or anything that makes people curious without naming where it goes.'}
    ]},
 
  { id:'plat', tag:'Platforms', title:'Platform map',
-   intro:'The same niche is a different animal per platform. Fill only the platforms this model is actually on.',
+   intro:'The same niche behaves differently on each platform. Fill in only the ones we’re actually running.',
    platform:true },
 
- { id:'g5', tag:'Gate 5', title:'Commit and measure', gate:5,
-   intro:'Set the numbers now. Decide the exit before you start, and don’t let anyone renegotiate it in week three. Success: US traffic above 70%, like ratio above 3% on videos past 50K views, views per paid sub moving toward 10K.',
+ { id:'g5', tag:'Gate 5', title:'What we’re committing to', gate:5,
+   intro:'We set the numbers now and agree the exit before we start, so nobody renegotiates it in week three. Success looks like US traffic above 70%, like ratio above 3% on videos past 50K views, and views per paid sub moving toward 10K.',
    checks:[
-    ['Baseline written down before launch, not after',''],
-    ['Two weeks of consistent posting minimum before anybody judges it',''],
-    ['Geography and like ratio go in the conversion log weekly',''],
-    ['Everybody agreed up front what result kills it','']
+    ['Baseline written down before we launch, not after',''],
+    ['Two weeks of consistent posting before anybody judges it',''],
+    ['Geography and like ratio go into the log every week',''],
+    ['We’ve agreed up front what result ends it','']
    ],
    fields:[
     {k:'vps', l:'Views per paid sub today', t:'text', ph:'—'},
     {k:'us', l:'US share today', t:'text', ph:'—%'},
-    {k:'start', l:'Test start date', t:'text'},
+    {k:'start', l:'Test starts', t:'text'},
     {k:'owner', l:'Weekly check owned by', t:'text'},
-    {k:'kill', l:'What kills it', t:'area', ph:'The specific result that ends this test. Agreed by everyone, today.',
-     h:'Written before launch it’s a decision. Written afterwards it’s an argument, and the loudest person wins instead of the right one.'},
+    {k:'kill', l:'What ends it', t:'area', ph:'The specific result that stops this test. Agreed by both of us, today.',
+     h:'Agreed before launch it’s a decision we both made. Agreed afterwards it’s an argument, and the loudest person wins instead of the right one.'},
     {k:'sign', l:'Signed off by / date / review on', t:'text'}
    ],
    call:true }
