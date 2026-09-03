@@ -2312,7 +2312,7 @@
         <div class="form-group full"><label>Owner</label><select id="acc-owner"></select></div>
         <div class="form-row">
           <div class="form-group"><label>Platform</label>
-            <select id="acc-platform"><option value="onlyfans">🔒 OnlyFans</option><option value="instagram">📸 Instagram</option><option value="tiktok">🎵 TikTok</option><option value="x">𝕏 X / Twitter</option><option value="reddit">👽 Reddit</option><option value="snapchat">👻 Snapchat</option><option value="email">✉️ Email</option><option value="other">🔗 Other</option></select></div>
+            <select id="acc-platform" onchange="accPlatformChanged()"><option value="onlyfans">🔒 OnlyFans</option><option value="instagram">📸 Instagram</option><option value="tiktok">🎵 TikTok</option><option value="x">𝕏 X / Twitter</option><option value="reddit">👽 Reddit</option><option value="snapchat">👻 Snapchat</option><option value="email">✉️ Email</option><option value="other">🔗 Other</option></select></div>
           <div class="form-group"><label>Status</label>
             <select id="acc-status"><option value="active">Active</option><option value="warming">Warming up</option><option value="shadowbanned">Shadowbanned</option><option value="banned">Banned</option><option value="disabled">Disabled</option></select></div>
         </div>
@@ -2320,18 +2320,28 @@
           <div class="form-group"><label>Handle / Username</label><input id="acc-handle" placeholder="@username"></div>
           <div class="form-group"><label>Email</label><input id="acc-email" placeholder="email@…"></div>
         </div>
+        <div id="acc-email-block" style="display:none;">
+          <div class="form-row">
+            <div class="form-group"><label>Email provider</label>
+              <select id="acc-email-provider"><option value="Gmail">📧 Gmail</option><option value="Outlook">📮 Outlook / Hotmail</option><option value="Proton">🔒 Proton</option><option value="iCloud">☁️ iCloud</option><option value="Yahoo">💜 Yahoo</option><option value="Other">🔗 Other</option></select></div>
+            <div class="form-group"><label>Usage</label>
+              <select id="acc-email-status" onchange="accEmailStatusChanged()"><option value="free">🆓 Free / spare</option><option value="connected">🔗 Connected to an account</option></select></div>
+          </div>
+          <div class="form-group full" id="acc-linked-row" style="display:none;"><label>Connected account</label>
+            <select id="acc-linked-account"></select></div>
+        </div>
         <div class="form-group full"><label>Password <span style="color:var(--text3);font-weight:400;">· stored masked, admin-only reveal</span></label><input id="acc-password" placeholder="password"></div>
         <div class="form-row">
           <div class="form-group"><label>📞 Phone number</label><input id="acc-phone-number" placeholder="e.g. +44 7700 900123"></div>
           <div class="form-group"><label>Phone / Device</label><input id="acc-phone" placeholder="e.g. iPhone 12 · #3"></div>
         </div>
         <div class="form-group full"><label>Operator (who runs it)</label><input id="acc-operator" placeholder="e.g. Maria"></div>
-        <div class="form-group full"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="acc-proxy-enabled" onchange="document.getElementById('acc-proxy-fields').style.display=this.checked?'grid':'none';" style="width:auto;"> Uses a proxy?</label></div>
+        <div class="form-group full" id="acc-proxy-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="acc-proxy-enabled" onchange="document.getElementById('acc-proxy-fields').style.display=this.checked?'grid':'none';" style="width:auto;"> Uses a proxy?</label></div>
         <div class="form-row" id="acc-proxy-fields" style="display:none;">
           <div class="form-group"><label>Proxy IP</label><input id="acc-proxy-ip" placeholder="e.g. 192.0.2.14:8080"></div>
           <div class="form-group"><label>Proxy location</label><input id="acc-proxy-location" placeholder="e.g. London, UK"></div>
         </div>
-        <div class="form-group full"><label>Role in funnel</label><select id="acc-tier"><option value="">— none —</option><option value="mother">👑 Mother (protect)</option><option value="slave">🎬 Slave (expendable)</option></select></div>
+        <div class="form-group full" id="acc-tier-row"><label>Role in funnel</label><select id="acc-tier"><option value="">— none —</option><option value="mother">👑 Mother (protect)</option><option value="slave">🎬 Slave (expendable)</option></select></div>
         <div class="form-group full"><label>Notes</label><textarea id="acc-notes" rows="2" placeholder="Anything else worth remembering…"></textarea></div>
         <div id="acc-modal-alert" style="color:var(--red);font-size:13px;margin:2px 0 8px;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -5999,11 +6009,23 @@ function accCardHtml(a,isAdmin,showOwner){
   var tierChip=a.tier==='mother'?'<span class="acc-status" style="background:rgba(74,222,128,.16);color:#4ade80;">👑 Mother</span>':a.tier==='slave'?'<span class="acc-status" style="background:rgba(245,158,11,.16);color:#fbbf24;">🎬 Slave</span>':'';
   var pwRow='';
   if(a.password){ pwRow= isAdmin ? '<div class="acc-row"><span class="k">Password</span><span class="v mono pw-val" onclick="togglePw(this)" title="click to reveal / hide">'+escapeHtml(a.password)+'</span>'+_accCbtn(a.password)+'</div>' : '<div class="acc-row"><span class="k">Password</span><span class="v" style="color:var(--text3);">•••••• admin only</span></div>'; }
+  var isEmail=a.platform==='email';
   var proxyRow;
   if(a.proxy_enabled){ var pv=[a.proxy_ip,a.proxy_location].filter(Boolean).join(' · '); proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-yes">● On</span>'+(pv?' — '+escapeHtml(pv):'')+'</span>'+_accCbtn(a.proxy_ip)+'</div>'; }
   else proxyRow='<div class="acc-row"><span class="k">Proxy</span><span class="v"><span class="proxy-no">○ None</span></span></div>';
+  var emailRow='';
+  if(isEmail){
+    if(a.email_status==='connected' && a.linked_account_id){
+      var la=(STATE.accounts||[]).find(function(x){return x.id===a.linked_account_id;});
+      var laName= la ? (accEntityName(la)+' · '+(ACC_PLAT_LABEL[la.platform]||la.platform||'account')+(la.handle?' '+la.handle:'')) : 'linked account (removed)';
+      emailRow='<div class="acc-row"><span class="k">Usage</span><span class="v"><span style="color:#4ade80;font-weight:700;">🔗 Connected</span> — '+escapeHtml(laName)+'</span></div>';
+    } else {
+      emailRow='<div class="acc-row"><span class="k">Usage</span><span class="v"><span style="color:var(--text2);font-weight:700;">🆓 Free / spare</span></span></div>';
+    }
+  }
+  var provChip= isEmail ? '<span class="acc-status" style="background:var(--surface2);color:var(--text2);">'+escapeHtml(a.email_provider||emailProvider(a.email))+'</span>' : '';
   var ownerChip= showOwner ? '<span class="acc-status" style="background:var(--surface2);color:var(--text2);">'+escapeHtml(accEntityName(a))+'</span>' : '';
-  return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+ownerChip+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+_accLine('Handle',a.handle)+_accLine('Email',a.email)+pwRow+proxyRow+_accLine('Phone',a.phone_number)+_accPlain('Device',a.phone_device)+_accPlain('Operator',a.operator)+_accPlain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
+  return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+ownerChip+provChip+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+_accLine('Handle',a.handle)+_accLine('Email',a.email)+pwRow+(isEmail?emailRow:proxyRow)+_accLine('Phone',a.phone_number)+_accPlain('Device',a.phone_device)+_accPlain('Operator',a.operator)+_accPlain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
 }
 function renderAccounts(){
   const wrap=document.getElementById('acc-cards'); const empty=document.getElementById('acc-empty'); if(!wrap)return;
@@ -6015,9 +6037,10 @@ function renderAccounts(){
   if(ent==='emails'){
     if(platbar) platbar.innerHTML='';
     var emails=(STATE.accounts||[]).filter(function(a){return a.platform==='email'&&_accMatch(a,q);});
-    if(sum) sum.innerHTML=statCard('Emails',emails.length,'accent')+statCard('Providers',new Set(emails.map(function(a){return emailProvider(a.email);})).size);
+    var provOf=function(a){ return a.email_provider || emailProvider(a.email); };
+    if(sum) sum.innerHTML=statCard('Emails',emails.length,'accent')+statCard('Providers',new Set(emails.map(provOf)).size);
     if(!emails.length){ wrap.innerHTML=''; if(empty)empty.style.display='block'; return; } if(empty)empty.style.display='none';
-    var groups={}; emails.forEach(function(a){ var p=emailProvider(a.email); (groups[p]=groups[p]||[]).push(a); });
+    var groups={}; emails.forEach(function(a){ var p=provOf(a); (groups[p]=groups[p]||[]).push(a); });
     var order=['Gmail','Proton','iCloud','Outlook','Yahoo','Other'].filter(function(p){return groups[p];});
     wrap.innerHTML=order.map(function(p){
       return '<div style="grid-column:1/-1;font-size:12px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:6px 0 2px;">✉️ '+p+' <span style="color:var(--text3);font-weight:600;">('+groups[p].length+')</span></div>'
@@ -6062,18 +6085,48 @@ function openAccountModal(id){
     set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone-number',a.phone_number||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');
     document.getElementById('acc-proxy-enabled').checked=!!a.proxy_enabled;
     document.getElementById('acc-proxy-fields').style.display=a.proxy_enabled?'grid':'none';
+    set('acc-email-provider', a.email_provider || emailProvider(a.email));
+    set('acc-email-status', a.email_status || 'free');
+    fillLinkedAccountOptions(a.linked_account_id, a.id);
   } else {
     document.getElementById('account-modal-title').textContent='Add Account · '+entName;
     ['acc-id','acc-handle','acc-email','acc-password','acc-phone-number','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
     set('acc-platform', ent==='emails'?'email':(ent==='agency'?'other':'onlyfans')); set('acc-status','active');
     document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none';
+    set('acc-email-provider','Gmail'); set('acc-email-status','free');
+    fillLinkedAccountOptions('', '');
   }
+  accPlatformChanged();
   openModal('account-modal');
+}
+function accPlatformChanged(){
+  var isEmail=((document.getElementById('acc-platform')||{}).value)==='email';
+  var show=function(idv,on){var e=document.getElementById(idv);if(e)e.style.display=on?'':'none';};
+  show('acc-email-block', isEmail);
+  show('acc-proxy-row', !isEmail);
+  show('acc-tier-row', !isEmail);
+  if(isEmail){ document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none'; }
+  if(isEmail) accEmailStatusChanged();
+}
+function accEmailStatusChanged(){
+  var connected=((document.getElementById('acc-email-status')||{}).value)==='connected';
+  var row=document.getElementById('acc-linked-row'); if(row) row.style.display=connected?'':'none';
+}
+function fillLinkedAccountOptions(selectedId, excludeId){
+  var sel=document.getElementById('acc-linked-account'); if(!sel)return;
+  var opts=(STATE.accounts||[]).filter(function(a){ return a.platform!=='email' && a.id!==excludeId; })
+    .map(function(a){ return '<option value="'+a.id+'"'+(a.id===selectedId?' selected':'')+'>'+escapeHtml(accEntityName(a)+' · '+(ACC_PLAT_LABEL[a.platform]||a.platform||'account')+(a.handle?' '+a.handle:''))+'</option>'; });
+  sel.innerHTML='<option value="">— pick an account —</option>'+opts.join('');
+  if(selectedId) sel.value=selectedId;
 }
 async function saveAccount(){
   var g=function(x){return ((document.getElementById(x)||{}).value||'').trim();};
   var owner=g('acc-owner')||'agency';
-  var p={ owner_type: owner==='agency'?'agency':'model', model_id: owner==='agency'?null:owner, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled:document.getElementById('acc-proxy-enabled').checked, proxy_ip:g('acc-proxy-ip')||null, proxy_location:g('acc-proxy-location')||null, tier:g('acc-tier')||null, notes:g('acc-notes')||null };
+  var isEmail=g('acc-platform')==='email';
+  var p={ owner_type: owner==='agency'?'agency':'model', model_id: owner==='agency'?null:owner, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled: isEmail?false:document.getElementById('acc-proxy-enabled').checked, proxy_ip: isEmail?null:(g('acc-proxy-ip')||null), proxy_location: isEmail?null:(g('acc-proxy-location')||null), tier: isEmail?null:(g('acc-tier')||null), notes:g('acc-notes')||null,
+    email_provider: isEmail?(g('acc-email-provider')||null):null,
+    email_status: isEmail?(g('acc-email-status')||'free'):null,
+    linked_account_id: (isEmail && g('acc-email-status')==='connected')?(g('acc-linked-account')||null):null };
   var id=g('acc-id'); var al=document.getElementById('acc-modal-alert');
   var res = id ? await sb.from('accounts').update(p).eq('id',id).select() : await sb.from('accounts').insert(p).select();
   if(res.error){ if(al)al.textContent='Could not save — '+res.error.message; return; }
