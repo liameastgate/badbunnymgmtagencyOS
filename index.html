@@ -118,6 +118,27 @@
   .stat-value.blue { color: var(--accent2); }
   .stat-value.green { color: var(--green); } .stat-value.purple { color: var(--accent2); } .stat-value.blue { color: var(--blue); }
   .table-wrap { overflow-x: auto; }
+  /* Proxy Checker — Split Ops layout */
+  .px-split{display:grid;grid-template-columns:250px 1fr;gap:16px;}
+  @media(max-width:760px){.px-split{grid-template-columns:1fr;}}
+  .px-side{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;align-self:start;}
+  .px-donut{width:150px;height:150px;border-radius:50%;margin:2px auto 16px;display:flex;align-items:center;justify-content:center;}
+  .px-donut .hole{width:104px;height:104px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .px-donut .hole .n{font-size:28px;font-weight:800;color:#4ade80;line-height:1;}
+  .px-donut .hole .l{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin-top:3px;}
+  .px-leg{font-size:12.5px;color:var(--text);display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);}
+  .px-leg:last-child{border-bottom:none;}
+  .px-leg .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;}
+  .px-cred{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text2);}
+  .px-cred b{display:block;color:var(--text);font-size:15px;margin-top:2px;}
+  .px-main{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .px-main .ph{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  /* Content Scanner — thumbnail + hover preview */
+  .ch-thumb{position:relative;width:56px;height:34px;border-radius:6px;border:1px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;background-size:cover;background-position:center;background-color:var(--surface2);}
+  .ch-thumb .ch-pop{position:absolute;left:64px;top:50%;transform:translateY(-50%) scale(.92);width:240px;height:150px;border-radius:10px;border:1px solid var(--border);box-shadow:0 14px 44px rgba(0,0,0,.6);opacity:0;visibility:hidden;transition:opacity .14s,transform .14s;z-index:60;pointer-events:none;background:inherit;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;}
+  .ch-thumb:hover .ch-pop{opacity:1;visibility:visible;transform:translateY(-50%) scale(1);}
+  .ch-thumb .ch-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.28);font-size:12px;border-radius:6px;}
+  .ch-vid .ch-pop{background:var(--surface2)!important;color:var(--text2);font-size:12px;}
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; }
   td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
@@ -2342,6 +2363,14 @@
       <div id="acc-cards" class="acc-cards"></div>
       <div id="acc-empty" class="empty" style="display:none;padding:44px;text-align:center;color:var(--text2);"><p>Nothing stored here yet. Hit <strong>+ Add account</strong> to save the first one.</p></div>
     </div>
+    <!-- Content preview modal (thumbnail pop-out) -->
+    <div class="modal-overlay" id="scan-preview">
+      <div class="modal" style="max-width:660px;">
+        <div class="modal-title"><span id="scan-preview-title">Preview</span><button class="modal-close" onclick="closeScanPreview()">✕</button></div>
+        <div id="scan-preview-body" style="aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
+      </div>
+    </div>
+
     <!-- Account add/edit modal -->
     <div class="modal-overlay" id="account-modal">
       <div class="modal">
@@ -2741,14 +2770,15 @@ var NAV = [
 
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
-  { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Traffic' },
+
+  { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',   roles: ['admin','va'],                             section: 'Tools' },
+  { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Tools' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
   { id: 'content-plans', icon: '🧭', label: 'Content Plans',      roles: ['admin','va'],                             section: 'Models' },
-  { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',      roles: ['admin','va'],                     section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-invoices', icon: '💵', label: 'My Invoices',     roles: ['admin','model'],                          section: 'Models' },
@@ -3703,6 +3733,18 @@ function renderComplianceHub(){
     const names=Array.from(new Set(on.concat(ln))).sort();
     msel.innerHTML='<option value="">All models</option>'+names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join(''); msel.value=cur; }
   if(bulk) bulk.innerHTML=complianceBulkHtml();
+  // Outcome summary (KPI tiles) across all scannable orders + library videos
+  var _isVid=function(i){return /^video\//.test(i.content_type||'')||/\.(mp4|mov|webm|m4v)$/i.test(i.r2_key||'')||libScans[i.r2_key];};
+  var chG={distributed:0,not_recommended:0,removed:0,unscanned:0};
+  var _tally=function(s){ if(!s)chG.unscanned++; else if(s.instagram_outcome==='distributed')chG.distributed++; else if(s.instagram_outcome==='not_recommended')chG.not_recommended++; else if(s.instagram_outcome==='removed')chG.removed++; else chG.unscanned++; };
+  (STATE.contentOrders||[]).filter(function(o){return o.video_path||scans[o.id];}).forEach(function(o){_tally(scans[o.id]);});
+  (STATE.library||[]).filter(_isVid).forEach(function(i){_tally(libScans[i.r2_key]);});
+  var chKpi='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;">'
+    +'<div class="stat-card" style="border-top-color:#4ade80;"><div class="stat-label">✅ Reaches new people</div><div class="stat-value" style="color:#4ade80;">'+chG.distributed+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--yellow);"><div class="stat-label">⚠ Followers only</div><div class="stat-value" style="color:var(--yellow);">'+chG.not_recommended+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--red);"><div class="stat-label">⛔ Would be removed</div><div class="stat-value" style="color:var(--red);">'+chG.removed+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--border);"><div class="stat-label">🔍 Unscanned</div><div class="stat-value" style="color:var(--text2);">'+chG.unscanned+'</div></div>'
+  +'</div>';
   const outcome=(document.getElementById('ch-filter-outcome')||{}).value||'';
   const mfilter=(document.getElementById('ch-filter-model')||{}).value||'';
   const rank={removed:0,not_recommended:1,distributed:2};
@@ -3715,11 +3757,12 @@ function renderComplianceHub(){
   oItems.sort(function(a,b){ const sa=scans[a.id],sb=scans[b.id]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
   let ordersHtml='';
   if(oItems.length){
-    ordersHtml='<div class="card"><div class="card-title">🎬 Content Orders</div><div class="table-wrap"><table><thead><tr><th>#</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+oItems.map(function(o){
+    ordersHtml='<div class="card"><div class="card-title">🎬 Content Orders</div><div class="table-wrap"><table><thead><tr><th>Preview</th><th>#</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+oItems.map(function(o){
       const s=scans[o.id]; const num=o.order_number?('#'+String(o.order_number).padStart(3,'0')):'';
       let pill; if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; } else pill='<span class="cscan cscan-grey">🔍 Unscanned</span>';
       const act=s?'<button class="btn btn-sm btn-ghost" onclick="openCompliance(\''+o.id+'\',\'compliance-hub\')">Open</button>':'<button class="btn btn-sm btn-ghost" onclick="triggerScan(\''+o.id+'\')">Scan</button>';
-      return '<tr><td style="color:var(--accent2);font-weight:700;">'+num+'</td><td>'+escapeHtml(o.model_name||'—')+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
+      var oth; if(o.thumbnail_url){ oth='<div class="ch-thumb" style="background-image:url(\''+String(o.thumbnail_url).replace(/'/g,"%27")+'\')" onclick="scanPopOrder(\''+o.id+'\')">'+(o.video_path?'<span class="ch-play">▶</span>':'')+'<div class="ch-pop"></div></div>'; } else if(o.video_path){ oth='<div class="ch-thumb ch-vid" onclick="scanPopOrder(\''+o.id+'\')">🎬<span class="ch-play">▶</span><div class="ch-pop">click to play</div></div>'; } else oth='<span style="color:var(--text2);">—</span>';
+      return '<tr><td>'+oth+'</td><td style="color:var(--accent2);font-weight:700;">'+num+'</td><td>'+escapeHtml(o.model_name||'—')+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
   }
 
@@ -3731,18 +3774,19 @@ function renderComplianceHub(){
   lItems.sort(function(a,b){ const sa=libScans[a.r2_key],sb=libScans[b.r2_key]; const ra=sa?(rank[sa.instagram_outcome]==null?3:rank[sa.instagram_outcome]):4, rb=sb?(rank[sb.instagram_outcome]==null?3:rank[sb.instagram_outcome]):4; return ra-rb; });
   let libHtml='';
   if(lItems.length){
-    libHtml='<div class="card"><div class="card-title">📁 Content Library</div><div class="table-wrap"><table><thead><tr><th>Title</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+lItems.map(function(i){
+    libHtml='<div class="card"><div class="card-title">📁 Content Library</div><div class="table-wrap"><table><thead><tr><th>Preview</th><th>Title</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+lItems.map(function(i){
       const s=libScans[i.r2_key];
+      const lth='<div class="ch-thumb ch-vid" onclick="scanPopLib(\''+i.id+'\')">🎬<span class="ch-play">▶</span><div class="ch-pop">click to play</div></div>';
       let pill,act;
       if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; act='<button class="btn btn-sm btn-ghost" onclick="openLibCompliance(\''+i.id+'\')">Open</button>'; }
       else if(STATE.scanningLib&&STATE.scanningLib.has(i.r2_key)){ pill='<span class="cscan cscan-grey">⏳ Scanning…</span>'; act=''; }
       else { pill='<span class="cscan cscan-grey">🔍 Unscanned</span>'; act='<button class="btn btn-sm btn-ghost" onclick="scanLibraryItem(\''+i.id+'\')">🔍 Scan</button>'; }
-      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td><td>'+escapeHtml(modelName(i.model_id,i.owner_type))+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
+      return '<tr><td>'+lth+'</td><td><strong>'+escapeHtml(i.title||'—')+'</strong></td><td>'+escapeHtml(modelName(i.model_id,i.owner_type))+'</td><td>'+pill+'</td><td style="font-size:12px;color:var(--text2);max-width:320px;">'+escapeHtml(s?(s.primary_reason||''):'')+'</td><td>'+act+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
   }
 
-  if(!ordersHtml&&!libHtml){ list.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">🛡️</div><p>No content matches. Upload videos to Content Orders or the Content Library and scan them to populate this.</p></div>'; return; }
-  list.innerHTML=ordersHtml+libHtml;
+  if(!ordersHtml&&!libHtml){ list.innerHTML=chKpi+'<div class="empty" style="margin-top:24px;"><div class="empty-icon">🛡️</div><p>No content matches. Upload videos to Content Orders or the Content Library and scan them to populate this.</p></div>'; return; }
+  list.innerHTML=chKpi+ordersHtml+libHtml;
 }
 
 function filterContentOrders() {
@@ -9144,6 +9188,28 @@ function populateTrafficModelDropdowns(){
   if(uploadSel) uploadSel.innerHTML=opts||'<option value="">No models yet</option>';
 }
 
+// ── Content preview (thumbnail pop-out) ──
+function scanShow(title,html){ var t=document.getElementById('scan-preview-title'); if(t)t.textContent=title||'Preview'; var b=document.getElementById('scan-preview-body'); if(b)b.innerHTML=html; openModal('scan-preview'); }
+function closeScanPreview(){ var b=document.getElementById('scan-preview-body'); if(b)b.innerHTML=''; closeModal('scan-preview'); }
+function scanPopOrder(id){
+  var o=(STATE.contentOrders||[]).find(function(x){return x.id===id;}); if(!o)return;
+  var title=(o.order_number?('#'+String(o.order_number).padStart(3,'0')+' · '):'')+(o.model_name||'Preview');
+  if(o.video_path){
+    scanShow(title,'<div style="color:var(--text2);">Loading…</div>');
+    sb.storage.from('content-videos').createSignedUrl(o.video_path,3600).then(function(r){
+      if(r.data&&r.data.signedUrl) scanShow(title,'<video src="'+r.data.signedUrl+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>');
+      else if(o.thumbnail_url) scanShow(title,'<img src="'+o.thumbnail_url+'" style="width:100%;height:100%;object-fit:contain;">');
+      else scanShow(title,'<div style="color:var(--red);">Could not load preview.</div>');
+    }).catch(function(){ if(o.thumbnail_url) scanShow(title,'<img src="'+o.thumbnail_url+'" style="width:100%;height:100%;object-fit:contain;">'); else scanShow(title,'<div style="color:var(--red);">Could not load preview.</div>'); });
+  } else if(o.thumbnail_url){ scanShow(title,'<img src="'+o.thumbnail_url+'" style="width:100%;height:100%;object-fit:contain;">'); }
+}
+async function scanPopLib(id){
+  var i=(STATE.library||[]).find(function(x){return x.id===id;}); if(!i)return;
+  scanShow(i.title||'Preview','<div style="color:var(--text2);">Loading…</div>');
+  try{ var url=await r2SignedUrl(i.r2_key,'GET'); scanShow(i.title||'Preview','<video src="'+url+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>'); }
+  catch(e){ scanShow(i.title||'Preview','<div style="color:var(--red);">Could not load preview.</div>'); }
+}
+
 // ── Proxy Checker ───────────────────────────────────────────
 // UI over the Railway proxy-screening service. Submit goes through the
 // proxy-service edge function (keeps the bearer key server-side); results are
@@ -9211,16 +9277,38 @@ function renderBatch(){
   var b=PX_BATCH, checks=PX_CHECKS.slice();
   checks.sort(function(a,c){var d=(PX_ORDER[a.verdict]==null?9:PX_ORDER[a.verdict])-(PX_ORDER[c.verdict]==null?9:PX_ORDER[c.verdict]); return d||((a.score||0)-(c.score||0));});
   var counts={}; checks.forEach(function(x){counts[x.verdict]=(counts[x.verdict]||0)+1;});
-  var clean=checks.filter(function(x){return x.verdict==='CLEAN';});
+  var cleanRows=checks.filter(function(x){return x.verdict==='CLEAN';});
+  var cCLEAN=(counts['CLEAN']||0), cBAD=(counts['RES-PROXY']||0)+(counts['BLACKLIST']||0)+(counts['FLAGGED']||0), cDIRTY=(counts['WRONG-TYPE']||0)+(counts['DIRTY']||0), cDEAD=(counts['SCORE-FAIL']||0)+(counts['DEAD']||0)+(counts['UNKNOWN']||0);
+  var n=checks.length||1, s1=cCLEAN/n*100, s2=s1+cBAD/n*100, s3=s2+cDIRTY/n*100;
+  var grad='conic-gradient(#4ade80 0 '+s1+'%, var(--red) '+s1+'% '+s2+'%, var(--yellow) '+s2+'% '+s3+'%, rgba(255,255,255,.12) '+s3+'% 100%)';
+  var cleanPct=checks.length?Math.round(cCLEAN/checks.length*100):0;
   var pct=b.total?Math.round((b.done/b.total)*100):0;
   var stpill=b.status==='done'?'<span class="cscan cscan-green">done</span>':b.status==='failed'?'<span class="cscan cscan-red">failed</span>':'<span class="cscan cscan-amber">running…</span>';
   var chips=Object.keys(counts).sort(function(a,c){return (PX_ORDER[a]==null?9:PX_ORDER[a])-(PX_ORDER[c]==null?9:PX_ORDER[c]);}).map(function(v){return pxPill(v)+' <span style="color:var(--text2);font-size:12px;">'+counts[v]+'</span>';}).join(' &nbsp; ');
   var rows=checks.map(function(x){return '<tr><td>'+pxPill(x.verdict)+'</td><td class="mono" style="font-size:12px;">'+escapeHtml(x.ip||'—')+'</td><td>'+(x.score==null?'—':x.score)+'</td><td style="font-size:12px;">'+escapeHtml(x.isp||'—')+'</td><td style="font-size:12px;">'+escapeHtml(x.conn_type||'—')+'</td><td style="font-size:12px;">'+escapeHtml([x.city,x.country].filter(Boolean).join(', ')||'—')+'</td><td style="font-size:12px;color:var(--text2);">'+escapeHtml(x.proxy_provider||x.error||'')+'</td></tr>';}).join('');
-  el.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;"><div class="card-title" style="margin:0;">'+escapeHtml(b.label||'Batch')+' · '+stpill+'</div><div style="display:flex;gap:8px;"><button class="btn btn-sm btn-primary" onclick="pxCopyClean(this)">⧉ Copy '+clean.length+' clean</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadClean()">⬇ .txt</button></div></div>'
-    +'<div style="background:var(--surface2);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;"><div style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .3s;"></div></div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">'+b.done+' / '+b.total+' checked · '+clean.length+' clean</div>'
-    +'<div style="margin-bottom:12px;">'+(chips||'')+'</div>'
-    +'<div class="table-wrap"><table><thead><tr><th>Verdict</th><th>Exit IP</th><th>Score</th><th>ISP</th><th>Type</th><th>Location</th><th>Notes</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="color:var(--text2);">Waiting for results…</td></tr>')+'</tbody></table></div></div>';
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;">'
+    +'<div class="stat-card" style="border-top-color:#4ade80;"><div class="stat-label">Clean &amp; ready</div><div class="stat-value" style="color:#4ade80;">'+cCLEAN+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--red);"><div class="stat-label">Flagged</div><div class="stat-value" style="color:var(--red);">'+cBAD+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--yellow);"><div class="stat-label">Dirty / wrong</div><div class="stat-value" style="color:var(--yellow);">'+cDIRTY+'</div></div>'
+    +'<div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-label">Pass rate</div><div class="stat-value" style="color:var(--accent2);">'+cleanPct+'%</div></div>'
+  +'</div>'
+  +'<div class="px-split">'
+    +'<div class="px-side">'
+      +'<div class="px-donut" style="background:'+grad+'"><div class="hole"><div class="n">'+cleanPct+'%</div><div class="l">Clean</div></div></div>'
+      +'<div class="px-leg"><span><span class="dot" style="background:#4ade80;"></span>Clean</span><b>'+cCLEAN+'</b></div>'
+      +'<div class="px-leg"><span><span class="dot" style="background:var(--red);"></span>Flagged / bad</span><b>'+cBAD+'</b></div>'
+      +'<div class="px-leg"><span><span class="dot" style="background:var(--yellow);"></span>Dirty / wrong type</span><b>'+cDIRTY+'</b></div>'
+      +'<div class="px-leg"><span><span class="dot" style="background:rgba(255,255,255,.3);"></span>Dead</span><b>'+cDEAD+'</b></div>'
+      +'<div class="px-cred">Scamalytics this month<b id="px-cred-n">…</b></div>'
+    +'</div>'
+    +'<div class="px-main">'
+      +'<div class="ph"><div><b style="font-size:15px;">'+escapeHtml(b.label||'Batch')+'</b> &nbsp;'+stpill+'<div style="font-size:11px;color:var(--text2);margin-top:3px;">'+escapeHtml(b.provider||'')+' · '+b.done+' / '+b.total+' checked</div></div>'
+        +'<div style="display:flex;gap:8px;"><button class="btn btn-sm btn-primary" onclick="pxCopyClean(this)">⧉ Copy '+cleanRows.length+' clean</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadClean()">⬇ .txt</button></div></div>'
+      +'<div style="background:var(--surface2);height:6px;"><div style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .3s;"></div></div>'
+      +'<div class="table-wrap"><table><thead><tr><th>Verdict</th><th>Exit IP</th><th>Score</th><th>ISP</th><th>Type</th><th>Location</th><th>Notes</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="color:var(--text2);padding:16px;">Waiting for results…</td></tr>')+'</tbody></table></div>'
+    +'</div>'
+  +'</div>';
+  loadProxyCredits();
 }
 function pxCleanList(){ return PX_CHECKS.filter(function(x){return x.verdict==='CLEAN';}).map(function(x){return x.proxy;}).filter(Boolean); }
 function pxCopyClean(btn){ var t=pxCleanList().join('\n'); if(!t){alert('No clean proxies in this batch yet.');return;} if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){if(btn){var o=btn.textContent;btn.textContent='✓ Copied';setTimeout(function(){btn.textContent=o;},1200);}});} }
@@ -9235,7 +9323,10 @@ async function loadProxyCredits(){
   var host=document.getElementById('px-status'); if(!host)return;
   var now=new Date(); var monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
   var r=await sb.from('proxy_checks').select('id',{count:'exact',head:true}).gte('checked_at',monthStart);
-  var used=r.count||0; var existing=document.getElementById('px-credits-line'); if(existing)existing.remove();
+  var used=r.count||0;
+  var rail=document.getElementById('px-cred-n');
+  if(rail){ rail.textContent=used.toLocaleString()+' / 5,000'; rail.style.color=used>4000?'var(--red)':'var(--text)'; }
+  var existing=document.getElementById('px-credits-line'); if(existing)existing.remove();
   var d=document.createElement('div'); d.id='px-credits-line'; d.style.cssText='font-size:12px;color:'+(used>4000?'var(--red)':'var(--text2)')+';margin-top:6px;'; d.textContent='Scamalytics lookups this month: '+used+' / 5000'+(used>4000?' — approaching the shared limit':''); host.appendChild(d);
 }
 
