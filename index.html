@@ -1886,6 +1886,39 @@
       <div id="traffic-content"></div>
     </div>
 
+    <!-- Proxy Checker -->
+    <div class="page" id="page-proxy-checker">
+      <div class="page-title">🛰️ Proxy Checker</div>
+      <div class="page-sub">Paste bulk mobile proxies, get a scored table, copy the clean ones. Screens exit IPs against fraud/proxy databases.</div>
+      <div id="px-status" style="margin-bottom:14px;"></div>
+      <div class="two-col-wide">
+        <div class="card" style="max-width:560px;">
+          <div class="card-title">Check a batch</div>
+          <div class="form-group full"><label>Proxies — one per line (host:port:user:pass)</label>
+            <textarea id="px-list" rows="7" placeholder="Paste your list here. Blank lines and # comments are ignored." style="font-family:ui-monospace,Menlo,monospace;font-size:12px;"></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Provider</label><select id="px-provider"><option value="scamalytics">Scamalytics</option></select></div>
+            <div class="form-group"><label>Label</label><input id="px-label" placeholder='e.g. "iproyal sept"'></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Max score <span style="color:var(--text3);font-weight:400;">(25 for carrier IPs · 0 is unreachable)</span></label><input id="px-maxscore" type="number" value="25"></div>
+            <div class="form-group"><label>Connection type</label><select id="px-wanttype"><option value="any">Any</option><option value="wireless">Wireless (mobile)</option><option value="residential">Residential</option><option value="not-business">Not business</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Test N fresh sessions / line <span style="color:var(--text3);font-weight:400;">(0 = as pasted)</span></label><input id="px-generate" type="number" value="0"></div>
+            <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:24px;"><input type="checkbox" id="px-allowflagged" style="width:auto;"> Allow flagged</label></div>
+          </div>
+          <div id="px-submit-alert" style="color:var(--red);font-size:13px;margin:2px 0 8px;"></div>
+          <button class="btn btn-primary" id="px-submit-btn" onclick="submitProxyBatch()">🚀 Check proxies</button>
+        </div>
+        <div>
+          <div class="card-title" style="margin-bottom:8px;">History</div>
+          <div id="px-history" style="max-height:520px;overflow-y:auto;"></div>
+        </div>
+      </div>
+      <div id="px-batch" style="margin-top:20px;"></div>
+    </div>
+
     <!-- Expenses -->
     <div class="page" id="page-expenses">
       <div class="page-title">Expenses</div>
@@ -2708,6 +2741,7 @@ var NAV = [
 
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
+  { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va','model'],                     section: 'Models' },
@@ -2851,6 +2885,7 @@ function navigate(page) {
   if (page === 'model-invoices') renderModelInvoicePage();
   if (page === 'contract') loadContract();
   if (page === 'traffic') loadTraffic();
+  if (page === 'proxy-checker') renderProxyChecker();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -9107,6 +9142,101 @@ function populateTrafficModelDropdowns(){
   const uploadSel=document.getElementById('traffic-upload-model');
   if(viewSel) viewSel.innerHTML=opts||'<option value="">No models yet</option>';
   if(uploadSel) uploadSel.innerHTML=opts||'<option value="">No models yet</option>';
+}
+
+// ── Proxy Checker ───────────────────────────────────────────
+// UI over the Railway proxy-screening service. Submit goes through the
+// proxy-service edge function (keeps the bearer key server-side); results are
+// read straight from proxy_batches / proxy_checks (authenticated SELECT) and
+// polled every 3s while a batch runs.
+var PX_POLL=null, PX_BATCH=null, PX_CHECKS=[];
+var PX_VERDICT={'CLEAN':['cscan-green','✅'],'RES-PROXY':['cscan-red','⛔'],'BLACKLIST':['cscan-red','⛔'],'FLAGGED':['cscan-red','🚩'],'WRONG-TYPE':['cscan-amber','⚠'],'DIRTY':['cscan-amber','⚠'],'DEAD':['cscan-grey','💀'],'SCORE-FAIL':['cscan-grey','—'],'UNKNOWN':['cscan-grey','?']};
+var PX_ORDER={'CLEAN':0,'RES-PROXY':1,'BLACKLIST':2,'FLAGGED':3,'WRONG-TYPE':4,'DIRTY':5,'DEAD':6,'SCORE-FAIL':7,'UNKNOWN':8};
+function pxPill(v){var m=PX_VERDICT[v]||['cscan-grey','?'];return '<span class="cscan '+m[0]+'" style="cursor:default;">'+m[1]+' '+escapeHtml(v||'?')+'</span>';}
+async function renderProxyChecker(){
+  if(PX_POLL){clearInterval(PX_POLL);PX_POLL=null;}
+  var b=document.getElementById('px-batch'); if(b)b.innerHTML='';
+  pxLoadProviders(); pxHealth(); loadProxyHistory(); loadProxyCredits();
+}
+async function pxLoadProviders(){
+  try{
+    const{data}=await sb.functions.invoke('proxy-service',{body:{action:'providers'}});
+    var provs=data&&(data.providers||data.configured||data), list=[];
+    if(Array.isArray(provs)) list=provs;
+    else if(provs&&typeof provs==='object') list=Object.keys(provs).filter(function(k){return provs[k]===true;});
+    if(!list.length) list=['scamalytics'];
+    var sel=document.getElementById('px-provider');
+    if(sel) sel.innerHTML=list.map(function(p){return '<option value="'+escapeHtml(p)+'">'+escapeHtml(p.charAt(0).toUpperCase()+p.slice(1))+'</option>';}).join('')+'<option value="all">All (strictest)</option>';
+  }catch(e){}
+}
+async function pxHealth(){
+  var el=document.getElementById('px-status'); if(!el)return;
+  try{
+    const{data}=await sb.functions.invoke('proxy-service',{body:{action:'health'}});
+    var pp=(data&&data.proxy_providers)||{}; var on=Object.keys(pp).filter(function(k){return pp[k];});
+    if(on.length) el.innerHTML='<div style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.4);border-radius:10px;padding:10px 14px;font-size:13px;color:#4ade80;">● Service online · scoring providers: '+escapeHtml(on.join(', '))+'</div>';
+    else el.innerHTML='<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);">⚠️ No scoring provider is configured on the service yet — checks will come back <b>SCORE-FAIL</b>. On the Railway box: run <code>railway up</code> from <code>C:\\automation\\scan_service</code>, then <code>setup_railway.ps1</code> to push the Scamalytics key.</div>';
+  }catch(e){ el.innerHTML='<div style="background:rgba(220,60,60,.12);border:1px solid rgba(220,60,60,.4);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--red);">Could not reach the proxy service.</div>'; }
+}
+async function submitProxyBatch(){
+  var al=document.getElementById('px-submit-alert'); al.textContent='';
+  var lines=(document.getElementById('px-list').value||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(function(s){return s&&s[0]!=='#';});
+  if(!lines.length){ al.textContent='Paste at least one proxy line.'; return; }
+  var gen=parseInt(document.getElementById('px-generate').value||'0',10)||0;
+  var lookups=lines.length*(gen>0?gen:1);
+  if(lookups>2000){ al.textContent='That is '+lookups+' lookups — the server caps a batch at 2000. Trim the list or lower sessions per line.'; return; }
+  var btn=document.getElementById('px-submit-btn'); btn.disabled=true; var ot=btn.textContent; btn.textContent='Submitting…';
+  var payload={action:'submit',proxies:lines,provider:document.getElementById('px-provider').value,max_score:parseInt(document.getElementById('px-maxscore').value||'25',10),want_type:document.getElementById('px-wanttype').value,allow_flagged:document.getElementById('px-allowflagged').checked,generate:gen,label:document.getElementById('px-label').value||'',submitted_by:(STATE.profile&&STATE.profile.email)||''};
+  try{
+    const{data,error}=await sb.functions.invoke('proxy-service',{body:payload});
+    btn.disabled=false; btn.textContent=ot;
+    if(error||!data||data.error||!data.batch_id){ al.textContent='Could not start: '+((data&&data.error)||(error&&error.message)||'unknown error'); return; }
+    loadProxyHistory(); pxOpenBatch(data.batch_id);
+  }catch(e){ al.textContent='Request failed: '+e; btn.disabled=false; btn.textContent=ot; }
+}
+async function pxOpenBatch(batchId){
+  if(PX_POLL){clearInterval(PX_POLL);PX_POLL=null;}
+  var done=await pxRefresh(batchId);
+  if(!done) PX_POLL=setInterval(async function(){ var d=await pxRefresh(batchId); if(d){clearInterval(PX_POLL);PX_POLL=null;loadProxyHistory();loadProxyCredits();} },3000);
+}
+async function pxRefresh(batchId){
+  var b=await sb.from('proxy_batches').select('*').eq('id',batchId).single();
+  if(b.error||!b.data) return true;
+  var c=await sb.from('proxy_checks').select('*').eq('batch_id',batchId).order('checked_at',{ascending:true});
+  PX_BATCH=b.data; PX_CHECKS=c.data||[]; renderBatch();
+  return (b.data.status==='done'||b.data.status==='failed');
+}
+function renderBatch(){
+  var el=document.getElementById('px-batch'); if(!el||!PX_BATCH)return;
+  var b=PX_BATCH, checks=PX_CHECKS.slice();
+  checks.sort(function(a,c){var d=(PX_ORDER[a.verdict]==null?9:PX_ORDER[a.verdict])-(PX_ORDER[c.verdict]==null?9:PX_ORDER[c.verdict]); return d||((a.score||0)-(c.score||0));});
+  var counts={}; checks.forEach(function(x){counts[x.verdict]=(counts[x.verdict]||0)+1;});
+  var clean=checks.filter(function(x){return x.verdict==='CLEAN';});
+  var pct=b.total?Math.round((b.done/b.total)*100):0;
+  var stpill=b.status==='done'?'<span class="cscan cscan-green">done</span>':b.status==='failed'?'<span class="cscan cscan-red">failed</span>':'<span class="cscan cscan-amber">running…</span>';
+  var chips=Object.keys(counts).sort(function(a,c){return (PX_ORDER[a]==null?9:PX_ORDER[a])-(PX_ORDER[c]==null?9:PX_ORDER[c]);}).map(function(v){return pxPill(v)+' <span style="color:var(--text2);font-size:12px;">'+counts[v]+'</span>';}).join(' &nbsp; ');
+  var rows=checks.map(function(x){return '<tr><td>'+pxPill(x.verdict)+'</td><td class="mono" style="font-size:12px;">'+escapeHtml(x.ip||'—')+'</td><td>'+(x.score==null?'—':x.score)+'</td><td style="font-size:12px;">'+escapeHtml(x.isp||'—')+'</td><td style="font-size:12px;">'+escapeHtml(x.conn_type||'—')+'</td><td style="font-size:12px;">'+escapeHtml([x.city,x.country].filter(Boolean).join(', ')||'—')+'</td><td style="font-size:12px;color:var(--text2);">'+escapeHtml(x.proxy_provider||x.error||'')+'</td></tr>';}).join('');
+  el.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;"><div class="card-title" style="margin:0;">'+escapeHtml(b.label||'Batch')+' · '+stpill+'</div><div style="display:flex;gap:8px;"><button class="btn btn-sm btn-primary" onclick="pxCopyClean(this)">⧉ Copy '+clean.length+' clean</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadClean()">⬇ .txt</button></div></div>'
+    +'<div style="background:var(--surface2);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;"><div style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .3s;"></div></div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">'+b.done+' / '+b.total+' checked · '+clean.length+' clean</div>'
+    +'<div style="margin-bottom:12px;">'+(chips||'')+'</div>'
+    +'<div class="table-wrap"><table><thead><tr><th>Verdict</th><th>Exit IP</th><th>Score</th><th>ISP</th><th>Type</th><th>Location</th><th>Notes</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="color:var(--text2);">Waiting for results…</td></tr>')+'</tbody></table></div></div>';
+}
+function pxCleanList(){ return PX_CHECKS.filter(function(x){return x.verdict==='CLEAN';}).map(function(x){return x.proxy;}).filter(Boolean); }
+function pxCopyClean(btn){ var t=pxCleanList().join('\n'); if(!t){alert('No clean proxies in this batch yet.');return;} if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){if(btn){var o=btn.textContent;btn.textContent='✓ Copied';setTimeout(function(){btn.textContent=o;},1200);}});} }
+function pxDownloadClean(){ var t=pxCleanList().join('\n'); if(!t){alert('No clean proxies in this batch yet.');return;} var blob=new Blob([t],{type:'text/plain;charset=utf-8'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(((PX_BATCH&&PX_BATCH.label)||'clean-proxies').replace(/[^a-z0-9]+/gi,'-'))+'.txt'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); }
+async function loadProxyHistory(){
+  var el=document.getElementById('px-history'); if(!el)return;
+  var r=await sb.from('proxy_batches').select('*').order('created_at',{ascending:false}).limit(25); var rows=r.data||[];
+  if(!rows.length){ el.innerHTML='<div style="color:var(--text2);font-size:13px;">No batches yet.</div>'; return; }
+  el.innerHTML=rows.map(function(b){var st=b.status==='done'?'#4ade80':b.status==='failed'?'var(--red)':'#f59e0b'; return '<div onclick="pxOpenBatch(\''+b.id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;gap:8px;"><b style="font-size:13px;">'+escapeHtml(b.label||'(no label)')+'</b><span style="font-size:11px;color:'+st+';">'+escapeHtml(b.status||'')+'</span></div><div style="font-size:11px;color:var(--text2);margin-top:3px;">'+escapeHtml(b.provider||'')+' · '+(b.done||0)+'/'+(b.total||0)+' · '+escapeHtml((b.submitted_by||'').split('@')[0])+' · '+fmtDate(b.created_at)+'</div></div>';}).join('');
+}
+async function loadProxyCredits(){
+  var host=document.getElementById('px-status'); if(!host)return;
+  var now=new Date(); var monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
+  var r=await sb.from('proxy_checks').select('id',{count:'exact',head:true}).gte('checked_at',monthStart);
+  var used=r.count||0; var existing=document.getElementById('px-credits-line'); if(existing)existing.remove();
+  var d=document.createElement('div'); d.id='px-credits-line'; d.style.cssText='font-size:12px;color:'+(used>4000?'var(--red)':'var(--text2)')+';margin-top:6px;'; d.textContent='Scamalytics lookups this month: '+used+' / 5000'+(used>4000?' — approaching the shared limit':''); host.appendChild(d);
 }
 
 async function loadTraffic(){
