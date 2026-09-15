@@ -69,10 +69,26 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: false, error: 'no_preview_available' });
   }
 
+  // 3. Inline the image. Instagram/TikTok CDN URLs are signed and expire within days, so a
+  // stored URL goes blank on old orders. Returning the bytes lets the browser shrink it to a
+  // small data URL and store THAT (same as a manually uploaded thumbnail). Capped at 4 MB.
+  let thumbnail_data = null;
+  if (thumbnail_url) {
+    try {
+      const ir = await fetch(thumbnail_url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': url } });
+      const ct = ir.headers.get('content-type') || '';
+      if (ir.ok && /^image\//i.test(ct)) {
+        const buf = Buffer.from(await ir.arrayBuffer());
+        if (buf.length <= 4 * 1024 * 1024) thumbnail_data = 'data:' + ct.split(';')[0] + ';base64,' + buf.toString('base64');
+      }
+    } catch (e) { /* fall back to the URL */ }
+  }
+
   return res.status(200).json({
     ok: true,
     platform,
     thumbnail_url,
+    thumbnail_data,
     title,
     author_name,
   });
