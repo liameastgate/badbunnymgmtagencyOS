@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chatter Assessment — BadBunnyMGMT</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#0f0f10;--panel:#17171a;--ink:#f2f1ee;--mute:#9a9891;--line:#2a2a2e;--accent:#e0523f;--ok:#4cc38a;--focus:#e0523f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:36px 18px 80px}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
+  .lead{color:var(--mute);margin:0 0 26px}
+  .lead b{color:var(--ink)}
+  h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .card .sc{color:var(--mute);font-size:14px;margin:0 0 8px}
+  .card .q{font-weight:600;margin:0 0 10px}
+  label{display:block;font-size:13px;color:var(--mute);margin:0 0 6px}
+  input,select,textarea{width:100%;background:#0f0f10;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font:inherit}
+  textarea{min-height:96px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--focus)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:560px){.row{grid-template-columns:1fr}}
+  .field{margin-bottom:14px}
+  .btn{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:10px;padding:14px 22px;font:inherit;font-weight:700;cursor:pointer;width:100%;margin-top:10px}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .note{font-size:13px;color:var(--mute);margin-top:10px}
+  .err{color:#ff8a7a;font-size:14px;margin-top:10px;display:none}
+  .done{display:none;text-align:center;padding:60px 20px}
+  .done h1{margin-bottom:10px}
+  .done p{color:var(--mute)}
+  .hp{position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="wrap">
+<form id="f" novalidate>
+  <h1>Chatter Assessment</h1>
+  <p class="lead">This isn't a test of perfect answers. We're reading for <b>communication, emotional intelligence, problem-solving, sales instinct and professionalism</b>. Answer naturally, in your own words, and explain your thinking where you can. It takes about 20 minutes.</p>
+
+  <h2>About you</h2>
+  <div class="card">
+    <div class="row">
+      <div class="field"><label>Full name</label><input name="name" required autocomplete="name"></div>
+      <div class="field"><label>Email</label><input name="email" type="email" required autocomplete="email"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Telegram username</label><input name="telegram" placeholder="@yourhandle"></div>
+      <div class="field"><label>Your timezone</label><input name="timezone" placeholder="e.g. PHT, GMT+8"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Can you work 12am–8am PHT, 5+ nights a week?</label>
+        <select name="shift" required><option value="">Choose one</option><option>Yes, every night</option><option>Yes, most nights</option><option>Only some nights</option><option>No</option></select></div>
+      <div class="field"><label>Experience chatting for male creators with a gay audience</label>
+        <select name="experience" required><option value="">Choose one</option><option>None yet</option><option>Under 3 months</option><option>3–12 months</option><option>Over a year</option></select></div>
+    </div>
+    <div class="field"><label>Which CRMs have you used? (Infloww, Supercreator, Fanvue tools, none…)</label><input name="crm"></div>
+    <div class="hp"><label>Website</label><input name="website" tabindex="-1" autocomplete="off"></div>
+  </div>
+
+  <h2>1 · Changes in a fan's behaviour</h2>
+  <div class="card"><p class="sc">A fan you've been chatting with every day suddenly goes short — one-word replies, hours between messages.</p><p class="q">How do you handle the conversation from here, and what do you avoid doing?</p><textarea name="q1_1" required></textarea></div>
+  <div class="card"><p class="sc">A regular who normally talks a lot and spends consistently becomes cold and distant.</p><p class="q">What do you do?</p><textarea name="q1_2" required></textarea></div>
+  <div class="card"><p class="sc">A fan stops replying mid-conversation after being very engaged.</p><p class="q">What's your next move?</p><textarea name="q1_3" required></textarea></div>
+
+  <h2>2 · Emotional awareness and support</h2>
+  <div class="card"><p class="sc">A fan tells you he's had a terrible day and starts venting, but keeps steering back toward joking and flirting.</p><p class="q">How do you stay supportive without making it heavy or awkward?</p><textarea name="q2_1" required></textarea></div>
+  <div class="card"><p class="sc">A fan who enjoys the attention starts becoming emotionally dependent — messaging constantly through the day.</p><p class="q">How do you keep the relationship positive while holding healthy boundaries?</p><textarea name="q2_2" required></textarea></div>
+
+  <h2>3 · Reading emotional cues</h2>
+  <div class="card"><p class="sc">A fan says: <i>"You probably say this to everyone."</i></p><p class="q">What is he actually feeling, and what do you reply to keep his trust?</p><textarea name="q3_1" required></textarea></div>
+  <div class="card"><p class="sc">One fan responds well to compliments and attention. Another pulls away when things get too intense or affectionate.</p><p class="q">How do you adapt between the two?</p><textarea name="q3_2" required></textarea></div>
+
+  <h2>4 · Criticism and pushback</h2>
+  <div class="card"><p class="sc">A fan says: <i>"I bought this and honestly it wasn't worth it."</i></p><p class="q">How do you handle it?</p><textarea name="q4_1" required></textarea></div>
+  <div class="card"><p class="sc">A fan replies: <i>"You're boring."</i></p><p class="q">What do you say?</p><textarea name="q4_2" required></textarea></div>
+  <div class="card"><p class="sc">A fan says: <i>"Your content is too expensive."</i></p><p class="q">How do you respond without sounding defensive or pushy?</p><textarea name="q4_3" required></textarea></div>
+  <div class="card"><p class="sc">A fan says: <i>"If I don't get something extra, I'm not buying."</i></p><p class="q">How do you handle it?</p><textarea name="q4_4" required></textarea></div>
+  <div class="card"><p class="sc">A fan says: <i>"I'm probably going to unsubscribe soon."</i></p><p class="q">What do you reply?</p><textarea name="q4_5" required></textarea></div>
+
+  <h2>5 · Keeping a conversation alive</h2>
+  <div class="card"><p class="sc">A fan keeps replying with <i>"lol"</i>, <i>"yeah"</i>, <i>"nice"</i>.</p><p class="q">How do you make it engaging?</p><textarea name="q5_1" required></textarea></div>
+  <div class="card"><p class="sc">A fan messages: <i>"You take forever to reply. Other creators answer faster."</i></p><p class="q">What do you say?</p><textarea name="q5_2" required></textarea></div>
+  <div class="card"><p class="sc">A fan starts asking overly personal questions about the creator.</p><p class="q">How do you redirect while keeping him engaged?</p><textarea name="q5_3" required></textarea></div>
+
+  <h2>6 · Real experience</h2>
+  <div class="card"><p class="q">Tell us about a time you dealt with a difficult customer or difficult person. What did you do?</p><textarea name="q6_1" required></textarea></div>
+
+  <h2>7 · Write one message</h2>
+  <div class="card"><p class="sc">A new subscriber called Marcus just joined a straight-presenting gym guy's page. He hasn't said anything yet.</p><p class="q">Write the exact first message you'd send him.</p><textarea name="q7_1" required placeholder="Type it exactly as you'd send it"></textarea></div>
+
+  <button class="btn" id="submit" type="submit">Submit assessment</button>
+  <div class="err" id="err"></div>
+  <p class="note">Your answers go straight to the BadBunnyMGMT team. We'll reply on Telegram or email within a few days.</p>
+</form>
+
+<div class="done" id="done">
+  <h1>Got it — thank you</h1>
+  <p>Your assessment is in. We read every one and will be in touch within a few days.</p>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  var URL_='https://wdppbcmirldkviqxtjml.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcHBiY21pcmxka3ZpcXh0am1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDcyODQsImV4cCI6MjA5NjQyMzI4NH0.SDgLUJjzdREwhrkns6AeA9Y0Em6cOlfzLJjaNDW7raA';
+  var sb=window.supabase.createClient(URL_,KEY,{auth:{persistSession:false}});
+  var f=document.getElementById('f'), err=document.getElementById('err'), btn=document.getElementById('submit');
+  var QS={q1_1:'Fan goes short',q1_2:'Regular goes cold',q1_3:'Stops mid-convo',q2_1:'Venting but flirting',q2_2:'Emotionally dependent',q3_1:'"You say this to everyone"',q3_2:'Two different fans',q4_1:'"Wasn\'t worth it"',q4_2:'"You\'re boring"',q4_3:'"Too expensive"',q4_4:'"Something extra or no buy"',q4_5:'"Going to unsubscribe"',q5_1:'lol / yeah / nice',q5_2:'"You take forever"',q5_3:'Personal questions about creator',q6_1:'Difficult customer story',q7_1:'First message to Marcus'};
+  // keep drafts so a refresh doesn't lose 20 minutes of typing
+  try{ var d=JSON.parse(localStorage.getItem('bbm_test')||'{}'); Object.keys(d).forEach(function(k){ if(f.elements[k]) f.elements[k].value=d[k]; }); }catch(e){}
+  f.addEventListener('input',function(){ try{ var o={}; Array.prototype.forEach.call(f.elements,function(el){ if(el.name&&el.name!=='website') o[el.name]=el.value; }); localStorage.setItem('bbm_test',JSON.stringify(o)); }catch(e){} });
+  f.addEventListener('submit', async function(e){
+    e.preventDefault(); err.style.display='none';
+    if(f.elements.website.value){ return; }
+    var missing=[];
+    Array.prototype.forEach.call(f.elements,function(el){ if(el.required && !el.value.trim()) missing.push(el); });
+    if(missing.length){ err.textContent='Please answer every question — '+missing.length+' left.'; err.style.display='block'; missing[0].focus(); missing[0].scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    var short=Object.keys(QS).filter(function(k){ return f.elements[k].value.trim().length<25; });
+    if(short.length){ err.textContent='A few answers are very short — give us a sentence or two so we can see how you think ('+short.length+' to expand).'; err.style.display='block'; f.elements[short[0]].focus(); f.elements[short[0]].scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    var answers={}; Object.keys(QS).forEach(function(k){ answers[k]={q:QS[k],a:f.elements[k].value.trim()}; });
+    answers.crm=f.elements.crm.value.trim();
+    btn.disabled=true; btn.textContent='Sending…';
+    var r=await sb.from('chatter_applications').insert({
+      name:f.elements.name.value.trim(), email:f.elements.email.value.trim(), telegram:f.elements.telegram.value.trim()||null,
+      timezone:f.elements.timezone.value.trim()||null, shift:f.elements.shift.value, experience:f.elements.experience.value, answers:answers
+    });
+    if(r.error){ btn.disabled=false; btn.textContent='Submit assessment'; err.textContent='Something went wrong sending this. Please try again, or message us on Telegram.'; err.style.display='block'; return; }
+    try{ localStorage.removeItem('bbm_test'); }catch(e){}
+    f.style.display='none'; document.getElementById('done').style.display='block'; window.scrollTo(0,0);
+  });
+})();
+</script>
+</body>
+</html>
