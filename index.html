@@ -8946,9 +8946,9 @@ function nqPaint(){
 
   if(!list.length){
     h += '<div class="empty" style="margin-top:20px;"><div class="empty-icon">' + (NQ.tab === 'won' ? '💸' : '✅') + '</div><p>'
-      + (NQ.tab === 'won' ? 'No purchases from new subs in the last 14 days.'
-        : NQ.tab === 'mine' ? 'Nothing claimed. Take one from the waiting list.'
-        : 'Every new sub has been messaged. Go and work your inbox.') + '</p></div>';
+      + (NQ.tab === 'won' ? 'No purchases from new subs yet in the last 14 days — the next one is out there.'
+        : NQ.tab === 'mine' ? 'Nothing claimed yet. Grab one from the waiting list and make it count.'
+        : 'Every new sub has been welcomed — brilliant work. Keep the conversations going in your inbox.') + '</p></div>';
   } else {
     h += list.map(function(r){
       var hrs = nqHours(r), live = nqClaimLive(r), taken = live && r.claimed_by !== me, isMine = live && r.claimed_by === me;
