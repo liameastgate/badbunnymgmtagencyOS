@@ -771,10 +771,34 @@
     </div>
 
     <!-- Content Upload -->
+    <!-- Content Library (admin/va). Every upload — the models' order uploads and the loose
+         category uploads — lands here as a library item with a lifecycle state:
+           fresh    never posted; may go on ONE phone-stage account
+           in_use   posted on a phone-stage account (owned by it)
+           reusable that account moved to cloud phone; free to reuse on cloud accounts
+           retired  don't use
+         The state is driven by the Accounts page (☁️ To cloud) and by "Mark posted" here. -->
     <div class="page" id="page-content-upload">
-      <div class="page-title">Content Upload</div>
-      <div class="page-sub">Your Drive folder — where finished content goes</div>
+      <div class="page-title">Content Library</div>
+      <div class="page-sub">Every upload, sorted by what it can still be used for</div>
       <div id="cu-body"></div>
+    </div>
+
+    <!-- Model Upload (model role only). Deliberately dumb: three big buttons + their open
+         orders. No naming, no folders, no picking a destination. HD is enforced on the device
+         before anything is sent. -->
+    <div class="page" id="page-model-upload">
+      <div class="page-title">Upload</div>
+      <div class="page-sub">Send us your content — that's it</div>
+      <div id="mu-body"></div>
+    </div>
+
+    <!-- Mark-posted modal (Content Library) -->
+    <div class="modal-overlay" id="lib-post-modal">
+      <div class="modal" style="max-width:460px;">
+        <div class="modal-title"><span id="lib-post-title">Mark as posted</span><button class="modal-close" onclick="closeModal('lib-post-modal')">✕</button></div>
+        <div id="lib-post-body"></div>
+      </div>
     </div>
 
     <!-- Content Plans -- the niche workbook, one saved plan per model. Rendered from the
@@ -826,7 +850,7 @@
     <!-- Content Scheduling -->
 <!-- CONTENT FACTORY -->
     <div class="page" id="page-content-factory">
-      <div class="page-title">Content Factory</div>
+      <div class="page-title">Content Factory <button class="btn btn-sm btn-ghost" style="margin-left:10px;vertical-align:middle;" onclick="navigate('content-upload')" title="Every upload, with its lifecycle state">📁 Content Library ↗</button></div>
       <div class="page-sub">Upload photos, get posting-ready reels back. The rendering runs on a server, so nothing needs to be open on anyone's computer.</div>
 
       <div class="card">
@@ -1981,10 +2005,17 @@
       <div id="traffic-content"></div>
     </div>
 
+    <!-- Signup Desk -->
+    <div class="page" id="page-signup-desk">
+      <div class="page-title">🪪 Signup Desk</div>
+      <div class="page-sub">Work the queue one phone at a time: start it in Multilogin, type the persona shown, paste the code, mark the outcome. Screened proxies only.</div>
+      <div id="sd-wrap"></div>
+    </div>
+
     <!-- Proxy Checker -->
     <div class="page" id="page-proxy-checker">
       <div class="page-title">🛰️ Proxy Checker</div>
-      <div class="page-sub">Paste bulk mobile proxies, get a scored table, copy the clean ones. Screens exit IPs against fraud/proxy databases.</div>
+      <div class="page-sub">Paste proxies, get a scored table, copy what you need. Screens exit IPs for proxy flags, connection type (CGNAT/mobile vs wireline) and fraud score relative to the carrier.</div>
       <div id="px-status" style="margin-bottom:14px;"></div>
       <div class="two-col-wide">
         <div class="card" style="max-width:560px;">
@@ -1996,8 +2027,8 @@
             <div class="form-group"><label>Label</label><input id="px-label" placeholder='e.g. "iproyal sept"'></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Max score <span style="color:var(--text3);font-weight:400;">(25 for carrier IPs · 0 is unreachable)</span></label><input id="px-maxscore" type="number" value="25"></div>
-            <div class="form-group"><label>Connection type</label><select id="px-wanttype"><option value="any">Any</option><option value="wireless">Wireless (mobile)</option><option value="residential">Residential</option><option value="not-business">Not business</option></select></div>
+            <div class="form-group"><label>Max score <span style="color:var(--text3);font-weight:400;">(points above the carrier's own baseline · 0 = as clean as that carrier gets)</span></label><input id="px-maxscore" type="number" value="0"></div>
+            <div class="form-group"><label>Connection type</label><select id="px-wanttype"><option value="mobile" selected>Mobile / CGNAT only</option><option value="any">Any</option><option value="wireless">Wireless (mobile)</option><option value="residential">Residential</option><option value="not-business">Not business</option></select></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Test N fresh sessions / line <span style="color:var(--text3);font-weight:400;">(0 = as pasted)</span></label><input id="px-generate" type="number" value="0"></div>
@@ -2497,6 +2528,8 @@
           <div class="form-group"><label>Proxy location</label><input id="acc-proxy-location" placeholder="e.g. London, UK"></div>
         </div>
         <div class="form-group full" id="acc-tier-row"><label>Role in funnel</label><select id="acc-tier"><option value="">— none —</option><option value="mother">👑 Mother (protect)</option><option value="slave">🎬 Slave (expendable)</option></select></div>
+        <div class="form-group full" id="acc-stage-row"><label>Conveyor stage</label><select id="acc-stage"><option value="phone">📱 Phone — fresh content only</option><option value="cloud">☁️ Cloud phone — reusable content</option><option value="dead">💀 Dead</option></select>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">Moving an account to <b>Cloud phone</b> flips everything it ever posted to <b>Reusable</b> in the Content Library. Use the ☁️ button on the card so that happens in one step.</div></div>
         <div class="form-group full"><label>Notes</label><textarea id="acc-notes" rows="2" placeholder="Anything else worth remembering…"></textarea></div>
         <div id="acc-modal-alert" style="color:var(--red);font-size:13px;margin:2px 0 8px;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -2855,20 +2888,22 @@ var NAV = [
   { id: 'messages',   icon: '💬', label: 'Messages',            roles: ['admin','va','chatter'],                   section: 'Chatting' },
   { id: 'feedback',   icon: '📝', label: 'Feedback',            roles: ['admin','chatter'],                        section: 'Chatting' },
   { id: 'applications', icon: '🧑‍💻', label: 'Applications',      roles: ['admin','va'],                             section: 'Chatting' },
-  { id: 'chat-analyser', icon: '🧪', label: 'Chat Analyser',      roles: ['admin','va'],                             section: 'Chatting' },
   { id: 'invoices',   icon: '🧾', label: 'Invoices',            roles: ['admin','va','traffic'],                   section: 'Chatting' },
 
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
   { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',   roles: ['admin','va'],                             section: 'Tools' },
+  { id: 'content-factory', icon: '🏭', label: 'Content Factory',   roles: ['admin','va'],                             section: 'Tools' },
+  { id: 'chat-analyser', icon: '🧪', label: 'Chat Analyser',       roles: ['admin','va'],                             section: 'Tools' },
   { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Tools' },
+  { id: 'signup-desk', icon: '🪪', label: 'Signup Desk',        roles: ['admin','va','traffic'],                   section: 'Tools' },
 
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
-  { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va','model'],                     section: 'Models' },
+  { id: 'model-upload', icon: '📤', label: 'Upload',             roles: ['model'],                                  section: 'Models' },
+  { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va'],                             section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content-schedule', icon: '🗓️', label: 'Content Scheduling', roles: ['admin','va'],                     section: 'Models' },
-  { id: 'content-factory', icon: '🏭', label: 'Content Factory', roles: ['admin','va'],                     section: 'Models' },
   { id: 'content-plans', icon: '🧭', label: 'Content Plans',      roles: ['admin','va'],                             section: 'Models' },
   { id: 'ideas',      icon: '💡', label: 'Content Ideas',       roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'guides',     icon: '📚', label: 'Guides',              roles: ['admin','va','model'],                     section: 'Models' },
@@ -2998,6 +3033,8 @@ function renderContentFactory(){
       if(saved && models.some(m=>m.id===saved)) sel.value=saved;
     }catch(e){}
   }
+  if(sel && STATE._cfPreselect && Array.from(sel.options).some(o=>o.value===STATE._cfPreselect)){ sel.value=STATE._cfPreselect; }
+  STATE._cfPreselect=null;
   cfModelChanged();
   // Poll while the tab is open; a render is minutes long so there is no point
   // hammering it, and the interval is cleared as soon as you navigate away.
@@ -3166,6 +3203,7 @@ function navigate(page) {
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
+  if (page === 'model-upload') renderModelUpload();
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'content-schedule') loadContentSchedule();
   if (page === 'content-factory') renderContentFactory();
@@ -3177,6 +3215,7 @@ function navigate(page) {
   if (page === 'contract') loadContract();
   if (page === 'traffic') loadTraffic();
   if (page === 'proxy-checker') renderProxyChecker();
+  if (page === 'signup-desk') renderSignupDesk();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -3199,7 +3238,7 @@ function renderModelHome(){
   // for; everything else falls back to its NAV section name, so a brand new page never
   // needs an entry added here to show up correctly.
   const DESCS={
-    content:'Submit & track your content', 'content-upload':'Your Drive folder for finished content', contentperf:'See how your posts are doing',
+    content:'Submit & track your content', 'content-upload':'Every upload, sorted by what it can still be used for','model-upload':'Send us your content — that\'s it', contentperf:'See how your posts are doing',
     ideas:'Fresh ideas for your niche', guides:'Drip sets & weekly requirements',
     'model-invoices':'See the agency’s weekly commission', sheets:'View or edit your chatting script'
   };
@@ -3619,10 +3658,11 @@ async function bulkAddContentOrders(){
   syncBulkModelSelect();
 }
 
-// Content Upload page — a dedicated home for a model's Drive upload folder. Models see
-// their own folder (matched by email, same as everywhere else) plus the upload rules;
-// admin/va see every model's folder at a glance (mirrors the old Content Orders banner).
-// ── Content Library (R2-backed, replaces the Drive folder workflow) ──────────
+// ── Content Library + Model Upload (R2-backed) ───────────────────────────────
+// One library, two doors. Models use the Upload page (three category buttons + their open
+// orders). Admin/VA use the Content Library (every item, filtered by model / category /
+// lifecycle state, with the belt controls). Both write content_library rows with the media
+// probed on the device first, so the HD rule is enforced before a byte leaves the phone.
 async function r2SignedUrl(key,method){
   const{data,error}=await sb.functions.invoke('r2-sign',{body:{key,method}});
   if(error||!data||!data.url) throw new Error((error&&error.message)||(data&&data.error)||'Could not sign URL');
@@ -3632,76 +3672,166 @@ async function loadContentLibrary(){
   const{data,error}=await sb.from('content_library').select('*').order('created_at',{ascending:false});
   if(error){ console.error('loadContentLibrary',error); STATE.library=[]; return; }
   STATE.library=data||[];
+  if(['admin','va'].includes(STATE.profile?.role)){
+    const r=await sb.from('content_postings').select('*').order('posted_at',{ascending:false});
+    STATE.postings=r.data||[];
+  }
 }
-function renderContentUpload(){
-  const el=document.getElementById('cu-body'); if(!el) return;
-  const isModel=STATE.profile?.role==='model';
-  const modelPicker=isModel?'':'<select id="cl-upload-model" style="min-width:150px;"><option value="">🏢 Agency</option>'+(STATE.models||[]).map(m=>'<option value="'+m.id+'">'+escapeHtml(m.name||'')+'</option>').join('')+'</select>';
-  el.innerHTML=
-    '<div class="card"><div class="card-title">📁 Content Library</div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Upload finished, ready-to-post content. Stored securely and downloadable at full quality anytime.</div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+modelPicker
-    +'<button id="cl-upload-btn" class="btn btn-primary" onclick="uploadLibraryFile()">📤 Upload content</button>'
-    +'<input id="cl-search" placeholder="🔎 Search title / tags" oninput="renderLibraryList()" style="flex:1;min-width:180px;"></div></div>'
-    +'<div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
-  loadContentLibrary().then(renderLibraryList);
+var LIB_CATEGORIES={
+  social:  {label:'IG / TikTok / Snap', short:'Social',  icon:'📱', accept:'video/*,image/*', hint:'Reels, stories, snaps — anything for the phone accounts'},
+  reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
+  photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'}
+};
+var LIB_STATES={
+  fresh:   {label:'Fresh',    icon:'🟢', style:'background:rgba(46,196,120,.16);color:#4ade80;',  help:'Never posted. Can go on ONE phone account.'},
+  in_use:  {label:'In use',   icon:'📱', style:'background:rgba(230,180,40,.22);color:#e6b428;',  help:'Posted on a phone account — owned by it until that account moves to cloud.'},
+  reusable:{label:'Reusable', icon:'☁️', style:'background:rgba(107,143,255,.18);color:var(--accent2);', help:'Its account moved to cloud phone. Free to reuse on cloud accounts.'},
+  retired: {label:'Retired',  icon:'💤', style:'background:var(--surface2);color:var(--text2);',  help:'Do not use.'}
+};
+var LIB_MIN_SHORT_SIDE=1080;   // px — anything smaller has been compressed somewhere
+var LIB_MIN_VIDEO_KBPS=1200;   // chat apps re-encode to ~500-1000 kbps
+var LIB_LOW_STOCK=5;           // fresh items per model before we flag it
+var LIB_MAX_BYTES=2147483648;  // 2 GB sanity cap
+
+// ── Media probing (runs on the device, before upload) ──────────────────────
+function libThumbFrom(src,w,h){
+  if(!w||!h) return null;
+  const W=320, H=Math.max(1,Math.round(320*h/w));
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  c.getContext('2d').drawImage(src,0,0,W,H);
+  return c.toDataURL('image/jpeg',0.72);
 }
-function renderLibraryList(){
-  const wrap=document.getElementById('cl-list'); if(!wrap) return;
-  const q=((document.getElementById('cl-search')||{}).value||'').toLowerCase().trim();
-  let items=STATE.library||[];
-  if(q) items=items.filter(function(i){return ((i.title||'')+' '+(i.tags||'')).toLowerCase().includes(q);});
-  if(!items.length){ wrap.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>No content yet. Hit <strong>Upload content</strong> to add your first file.</p></div>'; return; }
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  wrap.innerHTML='<div class="card"><div class="table-wrap"><table><thead><tr><th>Title</th>'+(isAdmin?'<th>Owner</th>':'')+'<th>Tags</th>'+(isAdmin?'<th>Meta scan</th><th>Review</th>':'')+'<th>Size</th><th>Added</th><th></th></tr></thead><tbody>'
-    +items.map(function(i){
-      const mdl=isAdmin?('<td>'+escapeHtml((STATE.models.find(function(m){return m.id===i.model_id;})||{}).name||(i.owner_type==='agency'?'Agency':'—'))+'</td>'):'';
-      const size=i.size_bytes?(i.size_bytes>1048576?(i.size_bytes/1048576).toFixed(1)+' MB':(i.size_bytes/1024).toFixed(0)+' KB'):'';
-      const reviewCell=isAdmin
-        ? (i.review_status?libReviewBadge(i)+' <button class="btn btn-sm btn-ghost" title="clear" onclick="reviewLibraryItem(\''+i.id+'\',null)">✕</button>'
-            :'<button class="btn btn-sm btn-green" title="Approve" onclick="reviewLibraryItem(\''+i.id+'\',\'approved\')">✅</button> <button class="btn btn-sm btn-danger" title="Reject" onclick="reviewLibraryItem(\''+i.id+'\',\'rejected\')">⛔</button>')
-        : libReviewBadge(i);
-      return '<tr><td><strong>'+escapeHtml(i.title||'—')+'</strong></td>'+mdl+'<td style="font-size:12px;color:var(--text2);">'+escapeHtml(i.tags||'')+'</td>'
-        +(isAdmin?('<td style="white-space:nowrap;">'+libCompliancePill(i)+'</td><td style="white-space:nowrap;">'+reviewCell+'</td>'):'')
-        +'<td style="font-size:12px;white-space:nowrap;">'+size+'</td><td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+fmtDate(i.created_at)+'</td>'
-        +'<td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" title="Download" onclick="downloadLibraryItem(\''+i.id+'\')">⬇</button> <button class="btn btn-sm btn-ghost" title="Edit" onclick="editLibraryItem(\''+i.id+'\')">✏</button> <button class="btn btn-sm btn-danger" title="Delete" onclick="deleteLibraryItem(\''+i.id+'\')">✕</button></td></tr>';
-    }).join('')+'</tbody></table></div></div>';
+function libProbeFile(file){
+  return new Promise(function(resolve){
+    const url=URL.createObjectURL(file); let settled=false;
+    const done=function(r){ if(settled) return; settled=true; try{URL.revokeObjectURL(url);}catch(e){} resolve(r); };
+    const isVideo=/^video\//.test(file.type||'')||/\.(mp4|mov|m4v|webm)$/i.test(file.name||'');
+    const isImage=/^image\//.test(file.type||'')||/\.(jpe?g|png|webp|heic)$/i.test(file.name||'');
+    if(isImage){
+      const img=new Image();
+      img.onload=function(){ let th=null; try{ th=libThumbFrom(img,img.naturalWidth,img.naturalHeight); }catch(e){} done({kind:'image',width:img.naturalWidth,height:img.naturalHeight,duration:null,kbps:null,thumb:th}); };
+      img.onerror=function(){ done({kind:'image',error:'unreadable'}); };
+      img.src=url;
+    } else if(isVideo){
+      const v=document.createElement('video'); v.preload='metadata'; v.muted=true; v.playsInline=true; let meta=null;
+      const finish=function(th){ done({kind:'video',width:meta.w,height:meta.h,duration:meta.d,kbps:(meta.d&&isFinite(meta.d))?Math.round(file.size*8/meta.d/1000):null,thumb:th}); };
+      v.onloadedmetadata=function(){ meta={w:v.videoWidth,h:v.videoHeight,d:v.duration}; try{ v.currentTime=Math.min(1,(isFinite(v.duration)?v.duration:2)/2); }catch(e){ finish(null); } };
+      v.onseeked=function(){ let th=null; try{ th=libThumbFrom(v,v.videoWidth,v.videoHeight); }catch(e){} finish(th); };
+      v.onerror=function(){ done({kind:'video',error:'unreadable'}); };
+      setTimeout(function(){ if(meta) finish(null); else done({kind:'video',error:'timeout'}); },8000);
+      v.src=url;
+    } else done({kind:'other'});
+  });
 }
-async function uploadLibraryFile(){
-  const inp=document.createElement('input'); inp.type='file';
-  inp.onchange=async function(){
-    const file=inp.files&&inp.files[0]; if(!file) return;
-    let modelId,ownerType;
-    if(STATE.profile?.role==='model'){ modelId=(myOwnModel()||{}).id||null; ownerType='model'; }
-    else { modelId=(document.getElementById('cl-upload-model')||{}).value||null; ownerType=modelId?'model':'agency'; }
-    const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-    const key='library/'+(modelId||'agency')+'/'+Date.now()+'_'+safe;
-    const btn=document.getElementById('cl-upload-btn'); if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
+// null = fine; string = plain-English reason it fails the HD rule
+function libHdVerdict(p){
+  if(!p||p.kind==='other'||p.error) return null; // can't judge here (e.g. HEVC on a desktop browser) — let it through, dims stay blank
+  const s=Math.min(p.width||0,p.height||0);
+  if(s&&s<LIB_MIN_SHORT_SIDE) return 'This one is only '+p.width+'×'+p.height+' — it has been compressed. Please send the original from your camera roll, not from WhatsApp / Messenger / Snapchat.';
+  if(p.kind==='video'&&p.kbps&&p.kbps<LIB_MIN_VIDEO_KBPS) return 'This video\'s quality is too low ('+p.kbps+' kbps) — it looks like it went through a chat app. Please upload the original file.';
+  return null;
+}
+function libPutWithProgress(url,file,onProgress){
+  return new Promise(function(res,rej){
+    const x=new XMLHttpRequest(); x.open('PUT',url);
+    x.setRequestHeader('Content-Type',file.type||'application/octet-stream');
+    x.upload.onprogress=function(e){ if(e.lengthComputable&&onProgress) onProgress(e.loaded/e.total); };
+    x.onload=function(){ (x.status>=200&&x.status<300)?res():rej(new Error('upload failed ('+x.status+')')); };
+    x.onerror=function(){ rej(new Error('network error')); };
+    x.send(file);
+  });
+}
+// Upload N files as library items. strictHd: reject (models) vs confirm (agency).
+async function libUploadFiles(files,opt){
+  opt=opt||{}; const results=[];
+  for(let i=0;i<files.length;i++){
+    const file=files[i]; const label=(files.length>1?(i+1)+'/'+files.length+' · ':'')+file.name;
+    if(file.size>LIB_MAX_BYTES){ results.push({file,skipped:'over 2 GB'}); continue; }
+    opt.onStatus&&opt.onStatus(label,'Checking quality…',0);
+    const probe=await libProbeFile(file);
+    const bad=libHdVerdict(probe);
+    if(bad){
+      if(opt.strictHd){ results.push({file,skipped:bad}); opt.onStatus&&opt.onStatus(label,'Skipped — not HD',0); continue; }
+      if(!confirm(bad+'\n\nUpload anyway?')){ results.push({file,skipped:bad}); continue; }
+    }
+    const safe=(file.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const key='library/'+(opt.modelId||'agency')+'/'+Date.now()+'_'+i+'_'+safe;
     try{
       const url=await r2SignedUrl(key,'PUT');
-      const res=await fetch(url,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
-      if(!res.ok) throw new Error('upload failed ('+res.status+')');
-      const{data:ins,error}=await sb.from('content_library').insert({model_id:modelId,owner_type:ownerType,title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,uploaded_by_email:STATE.profile?.email||null}).select();
+      await libPutWithProgress(url,file,function(p){ opt.onStatus&&opt.onStatus(label,'Uploading…',p); });
+      const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,
+        uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
+        width:probe.width||null,height:probe.height||null,duration_sec:(probe.duration&&isFinite(probe.duration))?Math.round(probe.duration*10)/10:null,bitrate_kbps:probe.kbps||null,thumb_data:probe.thumb||null};
+      const{data:ins,error}=await sb.from('content_library').insert(row).select();
       if(error) throw new Error(error.message);
-      await loadContentLibrary(); renderLibraryList();
-      // auto-scan videos for Meta compliance the moment they land
-      if(ins&&ins[0]&&/^video\//.test(file.type||'')) scanLibraryItem(ins[0].id);
-    }catch(e){ alert('Upload failed: '+e.message); }
-    if(btn){ btn.textContent='📤 Upload content'; btn.disabled=false; }
-  };
-  inp.click();
+      const item=ins&&ins[0];
+      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video') scanLibraryItem(item.id); }
+      results.push({file,item,key});
+      opt.onStatus&&opt.onStatus(label,'Done ✓',1);
+    }catch(e){ results.push({file,error:e.message}); opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0); }
+  }
+  return results;
+}
+function libPickFiles(accept,multiple){
+  return new Promise(function(res){
+    const inp=document.createElement('input'); inp.type='file'; if(accept) inp.accept=accept; inp.multiple=!!multiple;
+    inp.onchange=function(){ res(Array.from(inp.files||[])); }; inp.click();
+  });
+}
+async function libItemUrl(it){
+  if((it.storage_bucket||'r2')==='r2') return r2SignedUrl(it.r2_key,'GET');
+  const r=await sb.storage.from(it.storage_bucket).createSignedUrl(it.r2_key,3600);
+  if(r.error||!r.data) throw new Error(r.error?r.error.message:'could not sign');
+  return r.data.signedUrl;
+}
+function libIsVideo(it){ return /^video\//.test(it.content_type||'')||/\.(mp4|mov|webm|m4v)$/i.test(it.r2_key||''); }
+function libFmtSize(b){ return b?(b>1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB'):''; }
+function libFmtDur(s){ if(!s) return ''; s=Math.round(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function libStateChip(it){ const s=LIB_STATES[it.state]||LIB_STATES.fresh; return '<span class="cscan" style="'+s.style+'" title="'+escapeHtml(s.help)+'">'+s.icon+' '+s.label+'</span>'; }
+function libCatChip(it){ const c=LIB_CATEGORIES[it.category]; return c?'<span class="cscan cscan-grey">'+c.icon+' '+c.short+'</span>':''; }
+function libThumbHtml(it,size){
+  const w=size||120, h=Math.round(w*0.62);
+  const inner=it.thumb_data?'<img src="'+it.thumb_data+'" style="width:100%;height:100%;object-fit:cover;display:block;">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);">'+(libIsVideo(it)?'🎬':'🖼')+'</div>';
+  const play=libIsVideo(it)?'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18);font-size:18px;pointer-events:none;">▶</div>':'';
+  return '<div onclick="libPreview(\''+it.id+'\')" style="position:relative;width:'+w+'px;height:'+h+'px;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer;flex-shrink:0;">'+inner+play+'</div>';
+}
+async function libPreview(id){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  scanShow(it.title||'Preview','<div style="color:var(--text2);">Loading…</div>');
+  try{ const u=await libItemUrl(it);
+    scanShow(it.title||'Preview', libIsVideo(it)?'<video src="'+u+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>':'<img src="'+u+'" style="width:100%;height:100%;object-fit:contain;">');
+  }catch(e){ scanShow(it.title||'Preview','<div style="color:var(--red);">Could not load: '+escapeHtml(e.message)+'</div>'); }
 }
 async function downloadLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  try{ const url=await r2SignedUrl(it.r2_key,'GET'); window.open(url,'_blank'); }catch(e){ alert('Could not get download link: '+e.message); }
+  try{ window.open(await libItemUrl(it),'_blank'); }catch(e){ alert('Could not get download link: '+e.message); }
+}
+// Phone: hand the original file to the native share sheet -> "Save Video" lands it in the
+// camera roll at full quality. Falls back to a plain download when sharing files isn't supported.
+async function libSaveToPhone(id,btn){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  const old=btn?btn.textContent:''; if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  try{
+    const url=await libItemUrl(it);
+    if(navigator.share&&navigator.canShare){
+      const res=await fetch(url); if(!res.ok) throw new Error('fetch '+res.status);
+      const blob=await res.blob();
+      const file=new File([blob],(it.title||'content').replace(/[^\w.\- ]/g,'_'),{type:it.content_type||blob.type||'application/octet-stream'});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return; }
+    }
+    window.open(url,'_blank');
+  }catch(e){ if(e&&e.name==='AbortError') return; try{ window.open(await libItemUrl(it),'_blank'); }catch(e2){ alert('Could not save: '+e.message); } }
+  finally{ if(btn){ btn.textContent=old; btn.disabled=false; } }
 }
 function editLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const title=prompt('Title:',it.title||''); if(title===null) return;
-  const tags=prompt('Tags (comma separated — e.g. bedroom, tease, feet):',it.tags||''); if(tags===null) return;
-  sb.from('content_library').update({title:title,tags:tags}).eq('id',id).select().then(function(r){
+  const tags=prompt('Tags (comma separated — e.g. bedroom, tease, gym):',it.tags||''); if(tags===null) return;
+  const cat=prompt('Category — social / reddit_x / photos (blank = none):',it.category||''); if(cat===null) return;
+  const category=LIB_CATEGORIES[(cat||'').trim()]?(cat||'').trim():null;
+  sb.from('content_library').update({title:title,tags:tags,category:category}).eq('id',id).select().then(function(r){
     if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
-    it.title=title; it.tags=tags; renderLibraryList();
+    it.title=title; it.tags=tags; it.category=category; renderLibraryList();
   });
 }
 async function deleteLibraryItem(id){
@@ -3709,9 +3839,207 @@ async function deleteLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;});
   const{error,data}=await sb.from('content_library').delete().eq('id',id).select();
   if(error||!data||!data.length){ alert('Could not delete — you may not have permission.'); return; }
-  if(it){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
+  if(it&&(it.storage_bucket||'r2')==='r2'){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
   STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
 }
+async function libSetState(id,state){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  const msg={retired:'Retire this item? It will be hidden from the pools and can\'t be posted.',fresh:'Put this back in the Fresh pool? Only do this if it was never actually posted.',reusable:'Force this to Reusable without moving its account to cloud?'}[state];
+  if(msg&&!confirm(msg)) return;
+  const r=await sb.from('content_library').update({state:state,state_changed_at:new Date().toISOString()}).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  it.state=state; renderLibraryList();
+}
+// ── Mark posted (writes content_postings via record_posting(), which enforces the belt rules) ──
+async function libOpenPost(id){
+  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  if(!STATE.accounts||!STATE.accounts.length) await loadAccounts();
+  const mine=(STATE.accounts||[]).filter(function(a){ return a.platform!=='email' && (a.stage||'phone')!=='dead' && (it.model_id?a.model_id===it.model_id:a.owner_type==='agency'); });
+  const allowed=it.state==='fresh'?mine.filter(function(a){return (a.stage||'phone')==='phone';}):mine;
+  const t=document.getElementById('lib-post-title'); if(t) t.textContent='Mark as posted · '+(it.title||'');
+  const body=document.getElementById('lib-post-body'); if(!body) return;
+  const rule=it.state==='fresh'?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">🟢 Fresh content — only <b>phone-stage</b> accounts are offered. After this it becomes <b>In use</b> by that account.</div>'
+           :it.state==='in_use'?'<div style="font-size:12px;color:#e6b428;margin-bottom:10px;">📱 Already in use on a phone account. You can log another post on the <b>same</b> account only.</div>'
+           :'<div style="font-size:12px;color:var(--accent2);margin-bottom:10px;">☁️ Reusable — post it on any account.</div>';
+  const opts=allowed.map(function(a){ return '<option value="'+a.id+'">'+escapeHtml((ACC_PLAT_LABEL[a.platform]||a.platform||'account')+(a.handle?' · '+a.handle:'')+' ('+(a.stage||'phone')+')')+'</option>'; }).join('');
+  body.innerHTML=rule+(allowed.length?
+     '<div class="form-group"><label>Account</label><select id="lib-post-account">'+opts+'</select></div>'
+    +'<div class="form-group"><label>Note (optional)</label><input id="lib-post-notes" placeholder="e.g. reel #3, posted 9pm"></div>'
+    +'<div class="btn-row"><button class="btn btn-primary" onclick="libRecordPosting(\''+it.id+'\')">📌 Record posting</button></div>'
+    :'<div class="empty" style="margin:12px 0;"><p>No eligible accounts for this item'+(it.state==='fresh'?' — it needs a <b>phone-stage</b> account for this model. Add one on the Accounts page.':'.')+'</p></div>');
+  openModal('lib-post-modal');
+}
+async function libRecordPosting(id){
+  const acc=(document.getElementById('lib-post-account')||{}).value; if(!acc) return;
+  const notes=((document.getElementById('lib-post-notes')||{}).value||'').trim()||null;
+  const r=await sb.rpc('record_posting',{p_item_id:id,p_account_id:acc,p_notes:notes});
+  if(r.error){ alert('Could not record — '+r.error.message); return; }
+  const it=(STATE.library||[]).find(function(x){return x.id===id;});
+  if(it&&it.state==='fresh') it.state='in_use';
+  STATE.postings=STATE.postings||[]; if(r.data) STATE.postings.unshift(r.data);
+  closeModal('lib-post-modal'); renderLibraryList();
+}
+function libPostingsFor(id){ return (STATE.postings||[]).filter(function(p){return p.library_item_id===id;}); }
+function libShowPostings(id){
+  const ps=libPostingsFor(id); if(!ps.length) return;
+  const lines=ps.map(function(p){ const a=(STATE.accounts||[]).find(function(x){return x.id===p.account_id;}); return fmtDate(p.posted_at)+' — '+(a?((ACC_PLAT_LABEL[a.platform]||a.platform)+(a.handle?' '+a.handle:'')+' ['+(a.stage||'phone')+']'):'account removed')+(p.notes?' · '+p.notes:''); });
+  alert('Posted '+ps.length+' time'+(ps.length===1?'':'s')+':\n\n'+lines.join('\n'));
+}
+function libPools(items){
+  const p={fresh:0,in_use:0,reusable:0,retired:0}; items.forEach(function(i){ p[i.state||'fresh']=(p[i.state||'fresh']||0)+1; }); return p;
+}
+
+// ── Agency Content Library page ─────────────────────────────────────────────
+var LIB_F={model:'',category:'',state:'',q:''};
+function renderContentUpload(){
+  const el=document.getElementById('cu-body'); if(!el) return;
+  if(!['admin','va'].includes(STATE.profile?.role)){ el.innerHTML='<div class="empty"><div class="empty-icon">📁</div><p>The Content Library is for the agency team. Use <b>Upload</b> to send your content.</p></div>'; return; }
+  const models=(STATE.models||[]);
+  el.innerHTML=
+    '<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    +'<select id="cl-f-model" onchange="LIB_F.model=this.value;renderLibraryList()" style="min-width:140px;"><option value="">All models</option><option value="agency">🏢 Agency</option>'+models.map(function(m){return '<option value="'+m.id+'"'+(LIB_F.model===m.id?' selected':'')+'>'+escapeHtml(m.name||'')+'</option>';}).join('')+'</select>'
+    +'<select id="cl-f-cat" onchange="LIB_F.category=this.value;renderLibraryList()"><option value="">All categories</option>'+Object.keys(LIB_CATEGORIES).map(function(k){return '<option value="'+k+'"'+(LIB_F.category===k?' selected':'')+'>'+LIB_CATEGORIES[k].icon+' '+LIB_CATEGORIES[k].label+'</option>';}).join('')+'<option value="none"'+(LIB_F.category==='none'?' selected':'')+'>— uncategorised</option></select>'
+    +'<select id="cl-f-state" onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">All states</option>'+Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
+    +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:160px;">'
+    +'<button id="cl-upload-btn" class="btn btn-primary" onclick="uploadLibraryFile()">📤 Upload</button>'
+    +'<button class="btn btn-ghost" onclick="libGoFactory()" title="Open the Content Factory with this model selected">🏭 Content Factory</button>'
+    +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>'
+    +'<div id="cl-pools"></div><div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
+  loadContentLibrary().then(renderLibraryList);
+}
+function libGoFactory(){ STATE._cfPreselect=LIB_F.model&&LIB_F.model!=='agency'?LIB_F.model:null; navigate('content-factory'); }
+function renderLibraryList(){
+  const wrap=document.getElementById('cl-list'); if(!wrap) return;
+  const pools=document.getElementById('cl-pools');
+  const all=STATE.library||[];
+  // Pools: for the selected model (or every model), what's still usable — plus a low-stock line across ALL models.
+  const scope=all.filter(function(i){ return !LIB_F.model || (LIB_F.model==='agency'?!i.model_id:i.model_id===LIB_F.model); });
+  const p=libPools(scope);
+  const low=(STATE.models||[]).map(function(m){ const f=all.filter(function(i){return i.model_id===m.id&&i.state==='fresh';}).length; return {m:m,f:f}; }).filter(function(x){return x.f<LIB_LOW_STOCK;});
+  if(pools) pools.innerHTML='<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">'
+    +statCard('🟢 Fresh',p.fresh,'green')+statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
+    +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+' — time to raise content orders.</div>':'');
+  const q=(LIB_F.q||'').toLowerCase().trim();
+  let items=scope;
+  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none'?!i.category:i.category===LIB_F.category; });
+  if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
+  if(q) items=items.filter(function(i){ const o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null; return ((i.title||'')+' '+(i.tags||'')+' '+(o&&o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')).toLowerCase().includes(q); });
+  if(!items.length){ wrap.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(all.length?' with these filters':' yet — hit <strong>Upload</strong>, or wait for the models to send content')+'.</p></div>'; return; }
+  wrap.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>';
+}
+function libCardHtml(i){
+  const mdl=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
+  const o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
+  const dims=(i.width&&i.height)?i.width+'×'+i.height:'';
+  const meta=[dims,libFmtDur(i.duration_sec),libFmtSize(i.size_bytes),fmtDate(i.created_at)].filter(Boolean).join(' · ');
+  const ps=libPostingsFor(i.id);
+  const postedChip=ps.length?'<span class="cscan cscan-grey" style="cursor:pointer;" onclick="libShowPostings(\''+i.id+'\')">📌 posted ×'+ps.length+'</span>':'';
+  const orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
+  const hdWarn=(i.width&&i.height&&Math.min(i.width,i.height)<LIB_MIN_SHORT_SIDE)?'<span class="cscan cscan-red" title="Below 1080 on the short side">⚠ not HD</span>':'';
+  const st=i.state||'fresh';
+  const stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩ Fresh</button>'
+    :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
+    +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
+  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:12px;">'+libThumbHtml(i,120)
+    +'<div style="flex:1;min-width:0;">'
+    +'<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.owner_type==='agency'?'Agency':'—'))+(meta?' · '+meta:'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;">'
+    +(st!=='retired'?'<button class="btn btn-sm btn-primary" onclick="libOpenPost(\''+i.id+'\')" title="Record that this went out on an account">📌 Posted</button>':'')
+    +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll (full quality)">📲</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')" title="Download">⬇</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit title / tags / category">✏</button>'
+    +stateBtns
+    +'<button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')" title="Delete">✕</button>'
+    +'</div></div></div>';
+}
+async function uploadLibraryFile(){
+  const modelSel=LIB_F.model; const modelId=(modelSel&&modelSel!=='agency')?modelSel:null;
+  let cat=LIB_F.category&&LIB_F.category!=='none'?LIB_F.category:null;
+  if(!cat){ const c=prompt('Category for these files — social / reddit_x / photos:','social'); if(c===null) return; cat=LIB_CATEGORIES[c.trim()]?c.trim():null; }
+  const files=await libPickFiles(cat?LIB_CATEGORIES[cat].accept:'video/*,image/*',true); if(!files.length) return;
+  const btn=document.getElementById('cl-upload-btn'); const st=document.getElementById('cl-upload-status');
+  if(btn){ btn.textContent='Uploading…'; btn.disabled=true; } if(st) st.style.display='block';
+  const res=await libUploadFiles(files,{modelId:modelId,ownerType:modelId?'model':'agency',category:cat,strictHd:false,onStatus:function(l,s,p){ if(st) st.textContent=l+' — '+s+(p&&p<1?' '+Math.round(p*100)+'%':''); }});
+  if(btn){ btn.textContent='📤 Upload'; btn.disabled=false; }
+  const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
+  if(st) st.textContent=ok+' uploaded'+(bad.length?' · '+bad.length+' not uploaded ('+bad.map(function(b){return b.file.name+': '+(b.error||b.skipped);}).join('; ')+')':'');
+  renderLibraryList();
+}
+
+// ── Model Upload page ───────────────────────────────────────────────────────
+async function renderModelUpload(){
+  const el=document.getElementById('mu-body'); if(!el) return;
+  const me=myOwnModel();
+  if(!me){ el.innerHTML='<div class="empty"><div class="empty-icon">📤</div><p>Your login isn\'t linked to a model profile yet — message the team and we\'ll sort it.</p></div>'; return; }
+  if(!STATE.library) await loadContentLibrary();
+  const openOrders=(STATE.contentOrders||[]).filter(function(o){ return o.model_id===me.id && o.status!=='done'; });
+  const mine=(STATE.library||[]).filter(function(i){ return i.model_id===me.id; }).slice(0,40);
+  const bigBtn=function(k){ const c=LIB_CATEGORIES[k]; return '<button class="btn" onclick="muUploadCategory(\''+k+'\')" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:left;margin-bottom:10px;"><span style="font-size:28px;">'+c.icon+'</span><span><span style="display:block;font-weight:800;font-size:15px;color:#fff;">'+c.label+'</span><span style="display:block;font-size:12px;color:var(--text2);margin-top:2px;">'+c.hint+'</span></span></button>'; };
+  const orderCard=function(o){
+    const pl=o.platform==='instagram'?'IG':o.platform==='tiktok'?'TikTok':(o.platform||'');
+    const thumb=o.thumbnail_url?'<img src="'+o.thumbnail_url+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--border);flex-shrink:0;">':'<div style="width:96px;height:96px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:11px;flex-shrink:0;">no preview</div>';
+    const done=!!o.video_path;
+    return '<div class="card" style="margin:0 0 10px;padding:12px;display:flex;gap:12px;align-items:center;">'+thumb+'<div style="flex:1;min-width:0;">'
+      +'<div style="font-weight:800;font-size:14px;">'+(o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')+' <span style="color:var(--text2);font-weight:600;font-size:12px;">'+pl+'</span></div>'
+      +(o.notes?'<div style="font-size:12px;color:var(--text2);margin:3px 0 8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">'+escapeHtml(o.notes)+'</div>':'<div style="height:8px;"></div>')
+      +(o.url?'<a href="'+escapeHtml(o.url)+'" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent2);">Watch the reference ↗</a> ':'')
+      +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+      +(done?'<span class="cscan cscan-green">✅ Uploaded</span>':'')
+      +'<button id="mu-ord-'+o.id+'" class="btn btn-sm '+(done?'btn-ghost':'btn-primary')+'" onclick="muUploadForOrder(\''+o.id+'\')">📤 '+(done?'Replace':'Upload for this')+'</button>'
+      +'</div></div></div>';
+  };
+  const histRow=function(i){
+    const used=(i.state==='in_use'||i.state==='reusable');
+    const chip=i.state==='retired'?'<span class="cscan cscan-grey">💤 Not used</span>':used?'<span class="cscan cscan-green">✅ Used</span>':'<span class="cscan cscan-grey">📥 Received</span>';
+    const o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
+    const what=o?('Order #'+String(o.order_number||'').padStart(3,'0')):(LIB_CATEGORIES[i.category]?LIB_CATEGORIES[i.category].icon+' '+LIB_CATEGORIES[i.category].short:'');
+    return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">'+libThumbHtml(i,64)
+      +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(i.title||'')+'</div><div style="font-size:11px;color:var(--text2);">'+what+(what?' · ':'')+fmtDate(i.created_at)+'</div></div>'+chip+'</div>';
+  };
+  el.innerHTML=
+     '<div id="mu-status" style="display:none;background:rgba(107,143,255,.12);border:1px solid rgba(107,143,255,.35);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>'
+    +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:4px 0 10px;">Send new content</div>'
+    +bigBtn('social')+bigBtn('reddit_x')+bigBtn('photos')
+    +'<div style="font-size:12px;color:var(--text2);margin:6px 0 18px;line-height:1.5;">📌 Always send the <b>original</b> from your camera roll — anything that went through WhatsApp or Messenger gets compressed and we can\'t use it. You can pick several at once.</div>'
+    +(openOrders.length?'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:4px 0 10px;">Your open orders ('+openOrders.length+')</div>'+openOrders.map(orderCard).join(''):'')
+    +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px;">Recent uploads</div>'
+    +(mine.length?'<div class="card" style="padding:4px 12px;">'+mine.map(histRow).join('')+'</div>':'<div style="font-size:12px;color:var(--text2);">Nothing yet.</div>');
+}
+function muStatus(text,show){ const s=document.getElementById('mu-status'); if(!s) return; s.style.display=show===false?'none':'block'; s.innerHTML=text; }
+async function muUploadCategory(cat){
+  const me=myOwnModel(); if(!me) return; const c=LIB_CATEGORIES[cat]; if(!c) return;
+  const files=await libPickFiles(c.accept,true); if(!files.length) return;
+  muStatus('Preparing…');
+  const res=await libUploadFiles(files,{modelId:me.id,ownerType:'model',category:cat,strictHd:true,onStatus:function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }});
+  const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
+  muStatus((ok?'✅ '+ok+' file'+(ok===1?'':'s')+' received — thank you!':'')+(bad.length?'<div style="margin-top:6px;color:#e6b428;">'+bad.map(function(b){return '⚠ <b>'+escapeHtml(b.file.name)+'</b>: '+escapeHtml(b.error||b.skipped);}).join('<br>')+'</div>':''));
+  renderModelUpload().then(function(){ muStatus(document.getElementById('mu-status')?document.getElementById('mu-status').innerHTML:'',true); });
+}
+// Upload against a content order: lands in the library (state fresh, linked to the order) and
+// on the order itself (video_path = 'r2:<key>', so the existing viewer/scanner paths pick it up).
+async function muUploadForOrder(orderId){
+  const o=(STATE.contentOrders||[]).find(function(x){return x.id===orderId;}); if(!o) return;
+  const isModel=STATE.profile?.role==='model';
+  const files=await libPickFiles('video/*,image/*',false); if(!files.length) return;
+  const btn=document.getElementById('mu-ord-'+orderId)||document.getElementById('co-up-'+orderId); const old=btn?btn.textContent:'';
+  if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
+  const statusFn=isModel?function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }:null;
+  const res=await libUploadFiles(files,{modelId:o.model_id,ownerType:'model',category:(o.platform==='instagram'||o.platform==='tiktok')?'social':null,sourceOrderId:orderId,strictHd:isModel,onStatus:statusFn});
+  const r=res[0];
+  if(r&&r.item){
+    const vp='r2:'+r.key;
+    await sb.from('content_orders').update({video_path:vp}).eq('id',orderId);
+    o.video_path=vp;
+    if(libIsVideo(r.item)) triggerScan(orderId,vp);
+    if(isModel) muStatus('✅ Received for order '+(o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')+' — thank you!');
+  } else if(r){ if(isModel) muStatus('⚠ <b>'+escapeHtml(r.file.name)+'</b>: '+escapeHtml(r.error||r.skipped)); else alert('Not uploaded: '+(r.error||r.skipped)); }
+  if(btn){ btn.textContent=old; btn.disabled=false; }
+  if(isModel) renderModelUpload().then(function(){ const s=document.getElementById('mu-status'); if(s&&r&&(r.item||r.error||r.skipped)) { s.style.display='block'; } });
+  else if(typeof filterContentOrders==='function') filterContentOrders();
+}
+
 // ── Content Library compliance (scan R2 videos via presigned URL) ──────────
 function libScan(it){ return it?((STATE.scansByLibKey||{})[it.r2_key]||null):null; }
 async function scanLibraryItem(id){
@@ -3832,34 +4160,21 @@ function renderContentOrders(filtered) {
   updateOrderBulkBar();
 }
 
-// In-app video upload per order. INTERIM: Supabase Storage (private bucket, signed-URL
-// playback). Migrating to Cloudflare R2 later swaps only these two functions.
-var CONTENT_VIDEO_MAX=524288000; // 500MB
-async function uploadOrderVideo(orderId){
-  const o=STATE.contentOrders.find(x=>x.id===orderId); if(!o) return;
-  const modelId=o.model_id;
-  if(!modelId){ alert('This order has no model assigned yet — an admin needs to assign it before a video can be attached.'); return; }
-  const inp=document.createElement('input'); inp.type='file'; inp.accept='video/*';
-  inp.onchange=async()=>{
-    const file=inp.files&&inp.files[0]; if(!file) return;
-    if(file.size>CONTENT_VIDEO_MAX){ alert('That video is '+(file.size/1048576).toFixed(0)+'MB — over the 500MB limit. Trim or compress it first.'); return; }
-    const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-    const path=`${modelId}/${orderId}/${Date.now()}_${safe}`;
-    const btn=document.getElementById('co-up-'+orderId); if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
-    const{error}=await sb.storage.from('content-videos').upload(path,file,{upsert:true,contentType:file.type||'video/mp4'});
-    if(error){ alert('Upload failed: '+error.message); if(btn){btn.textContent='📤 Upload';btn.disabled=false;} return; }
-    await sb.from('content_orders').update({video_path:path}).eq('id',orderId);
-    const co=STATE.contentOrders.find(x=>x.id===orderId); if(co) co.video_path=path;
-    triggerScan(orderId,path); // fire-and-forget Meta compliance scan
-    filterContentOrders();
-  };
-  inp.click();
+// Per-order upload (Content Orders page). Routes through the library uploader so the file
+// lands in Cloudflare R2 as a library item (state fresh, linked to the order) AND on the order
+// as video_path='r2:<key>'. Older orders still hold Supabase Storage paths; orderVideoUrl()
+// handles both.
+function uploadOrderVideo(orderId){ return muUploadForOrder(orderId); }
+async function orderVideoUrl(o){
+  const p=o&&o.video_path; if(!p) throw new Error('no video');
+  if(p.indexOf('r2:')===0) return r2SignedUrl(p.slice(3),'GET');
+  const r=await sb.storage.from('content-videos').createSignedUrl(p,3600);
+  if(r.error||!r.data) throw new Error(r.error?r.error.message:'could not sign');
+  return r.data.signedUrl;
 }
 async function openOrderVideo(orderId){
   const o=STATE.contentOrders.find(x=>x.id===orderId); if(!o||!o.video_path) return;
-  const{data,error}=await sb.storage.from('content-videos').createSignedUrl(o.video_path,3600);
-  if(error||!data){ alert('Could not open video: '+(error?error.message:'unknown')); return; }
-  window.open(data.signedUrl,'_blank');
+  try{ window.open(await orderVideoUrl(o),'_blank'); }catch(e){ alert('Could not open video: '+e.message); }
 }
 
 // ── Content compliance (Meta reach scanner) ──────────────────────────────────
@@ -3889,8 +4204,10 @@ async function triggerScan(orderId,path){
   const p=path||(o&&o.video_path); if(!p){ alert('Upload a video to this order first.'); return; }
   STATE.scanning=STATE.scanning||new Set(); STATE.scanning.add(orderId);
   const pc=document.getElementById('page-content'); if(pc&&pc.classList.contains('active')) filterContentOrders();
-  try{ await sb.functions.invoke('trigger-scan',{body:{bucket:'content-videos',path:p,content_order_id:orderId,frames:8}}); }
-  catch(e){ /* scanner writes the verdict asynchronously; ignore transport hiccups */ }
+  try{
+    if(p.indexOf('r2:')===0){ const key=p.slice(3); const url=await r2SignedUrl(key,'GET'); await sb.functions.invoke('trigger-scan',{body:{bucket:'bbm-content',path:key,url:url,content_order_id:orderId,frames:8}}); }
+    else await sb.functions.invoke('trigger-scan',{body:{bucket:'content-videos',path:p,content_order_id:orderId,frames:8}});
+  }catch(e){ /* scanner writes the verdict asynchronously; ignore transport hiccups */ }
   // verdict lands 30-90s later for video -- poll a few times, then stop showing "scanning"
   [15000,35000,70000].forEach(function(t){ setTimeout(function(){ if(STATE.scanning) STATE.scanning.delete(orderId); loadContentScans(); }, t); });
 }
@@ -3951,7 +4268,7 @@ async function renderCompliance(){
     +complianceGroundTruthHtml(s)
     +limits;
   if(o&&o.video_path){
-    sb.storage.from('content-videos').createSignedUrl(o.video_path,3600).then(function(r){
+    orderVideoUrl(o).then(function(u){return {data:{signedUrl:u}};}).catch(function(){return {};}).then(function(r){
       var m=document.getElementById('compliance-media'); if(!m) return;
       m.innerHTML=(r&&r.data&&r.data.signedUrl)?'<video src="'+r.data.signedUrl+'#t='+(peak?peak:0)+'" controls style="max-width:100%;max-height:440px;border-radius:10px;border:1px solid var(--border);"></video>':'<div style="color:var(--text2);font-size:12px;">Media unavailable.</div>';
     });
@@ -4037,7 +4354,9 @@ function renderComplianceHub(){
   if(lItems.length){
     libHtml='<div class="card"><div class="card-title">📁 Content Library</div><div class="table-wrap"><table><thead><tr><th>Preview</th><th>Title</th><th>Model</th><th>Meta outcome</th><th>Reason</th><th></th></tr></thead><tbody>'+lItems.map(function(i){
       const s=libScans[i.r2_key];
-      const lth='<div class="ch-thumb ch-vid" onclick="scanPopLib(\''+i.id+'\')">🎬<span class="ch-play">▶</span><div class="ch-pop">click to play</div></div>';
+      const lth=i.thumb_data
+        ? '<div class="ch-thumb" style="background-image:url(\''+i.thumb_data+'\')" onclick="scanPopLib(\''+i.id+'\')"><span class="ch-play">▶</span><div class="ch-pop" style="background-image:url(\''+i.thumb_data+'\')"></div></div>'
+        : '<div class="ch-thumb ch-vid" onclick="scanPopLib(\''+i.id+'\')">🎬<span class="ch-play">▶</span><div class="ch-pop">click to play</div></div>';
       let pill,act;
       if(s){ var m=COMPLIANCE_META[s.instagram_outcome]||{cls:'cscan-grey',short:s.instagram_outcome||'—',icon:''}; pill='<span class="cscan '+m.cls+'">'+m.icon+' '+m.short+'</span>'; act='<button class="btn btn-sm btn-ghost" onclick="openLibCompliance(\''+i.id+'\')">Open</button>'; }
       else if(STATE.scanningLib&&STATE.scanningLib.has(i.r2_key)){ pill='<span class="cscan cscan-grey">⏳ Scanning…</span>'; act=''; }
@@ -4222,8 +4541,25 @@ async function fetchOEmbed(url){
   try{
     const r=await fetch(`/api/oembed?url=${encodeURIComponent(url)}`);
     const j=await r.json();
-    return (j&&j.ok)?j:null;
+    if(!(j&&j.ok)) return null;
+    // Shrink the inlined image to the same 320px JPEG we store for manual thumbnails, so the
+    // stored value is small and permanent (the CDN URL alone expires within days).
+    if(j.thumbnail_data){ try{ j.thumbnail_url=await shrinkDataUrl(j.thumbnail_data); }catch(e){} }
+    return j;
   }catch(e){ return null; }
+}
+function shrinkDataUrl(dataUrl){
+  return new Promise(function(res,rej){
+    const img=new Image();
+    img.onload=function(){
+      const maxW=320,maxH=180; let w=img.width,h=img.height;
+      if(w>maxW||h>maxH){ const r=Math.min(maxW/w,maxH/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',0.8));
+    };
+    img.onerror=function(){ rej(new Error('bad image')); };
+    img.src=dataUrl;
+  });
 }
 
 async function autoFetchSingleThumb(){
@@ -6352,6 +6688,9 @@ function accCardHtml(a,isAdmin,showOwner){
   var stcls={active:'st-active',banned:'st-banned',warming:'st-warming',shadowbanned:'st-shadow',disabled:'st-disabled'}[st]||'st-active';
   var needs=['banned','shadowbanned'].includes(st);
   var tierChip=a.tier==='mother'?'<span class="acc-status" style="background:rgba(74,222,128,.16);color:#4ade80;">👑 Mother</span>':a.tier==='slave'?'<span class="acc-status" style="background:rgba(245,158,11,.16);color:#fbbf24;">🎬 Slave</span>':'';
+  var stg=a.stage||'phone';
+  var stageChip= a.platform==='email' ? '' : (stg==='cloud'?'<span class="acc-status" style="background:rgba(107,143,255,.16);color:var(--accent2);" title="Cloud phone — reusable content">☁️ Cloud</span>':stg==='dead'?'<span class="acc-status" style="background:rgba(255,255,255,.08);color:var(--text2);">💀 Dead</span>':'<span class="acc-status" style="background:rgba(74,222,128,.12);color:#4ade80;" title="Phone — fresh content only">📱 Phone</span>');
+  var moveBtn= (a.platform!=='email' && stg==='phone') ? '<button class="btn btn-sm btn-ghost" title="Move to cloud phone: this account + everything it posted becomes Reusable" onclick="moveAccountToCloud(\''+a.id+'\')">☁️ To cloud</button>' : '';
   var pwRow='';
   if(a.password){ pwRow= isAdmin ? '<div class="acc-row"><span class="k">Password</span><span class="v mono pw-val" onclick="togglePw(this)" title="click to reveal / hide">'+escapeHtml(a.password)+'</span>'+_accCbtn(a.password)+'</div>' : '<div class="acc-row"><span class="k">Password</span><span class="v" style="color:var(--text3);">•••••• admin only</span></div>'; }
   var isEmail=a.platform==='email';
@@ -6370,7 +6709,7 @@ function accCardHtml(a,isAdmin,showOwner){
   }
   var provChip= isEmail ? '<span class="acc-status" style="background:var(--surface2);color:var(--text2);">'+escapeHtml(a.email_provider||emailProvider(a.email))+'</span>' : '';
   var ownerChip= showOwner ? '<span class="acc-status" style="background:var(--surface2);color:var(--text2);">'+escapeHtml(accEntityName(a))+'</span>' : '';
-  return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+ownerChip+provChip+tierChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+_accLine('Handle',a.handle)+_accLine('Email',a.email)+pwRow+(isEmail?emailRow:proxyRow)+_accLine('Phone',a.phone_number)+_accPlain('Device',a.phone_device)+_accPlain('Operator',a.operator)+_accPlain('Notes',a.notes)+'</div><div class="acc-actions"><button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
+  return '<div class="acc-card '+(needs?'attn':'')+'"><div class="acc-head"><span class="acc-plat"><span class="pic">'+(ACC_PLAT[a.platform]||'🔗')+'</span>'+(ACC_PLAT_LABEL[a.platform]||a.platform||'Account')+'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+ownerChip+provChip+tierChip+stageChip+'<span class="acc-status '+stcls+'">'+st+'</span></span></div><div class="acc-rows">'+_accLine('Handle',a.handle)+_accLine('Email',a.email)+pwRow+(isEmail?emailRow:proxyRow)+_accLine('Phone',a.phone_number)+_accPlain('Device',a.phone_device)+_accPlain('Operator',a.operator)+_accPlain('Notes',a.notes)+'</div><div class="acc-actions">'+moveBtn+'<button class="btn btn-sm btn-ghost" onclick="openAccountModal(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteAccount(\''+a.id+'\')">✕</button></div></div>';
 }
 function renderAccounts(){
   const wrap=document.getElementById('acc-cards'); const empty=document.getElementById('acc-empty'); if(!wrap)return;
@@ -6427,7 +6766,7 @@ function openAccountModal(id){
   if(id){
     var a=(STATE.accounts||[]).find(function(x){return x.id===id;}); if(!a)return;
     document.getElementById('account-modal-title').textContent='Edit Account · '+entName;
-    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone-number',a.phone_number||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');
+    set('acc-id',a.id);set('acc-platform',a.platform||'other');set('acc-status',a.status||'active');set('acc-handle',a.handle||'');set('acc-email',a.email||'');set('acc-password',a.password||'');set('acc-phone-number',a.phone_number||'');set('acc-phone',a.phone_device||'');set('acc-operator',a.operator||'');set('acc-proxy-ip',a.proxy_ip||'');set('acc-proxy-location',a.proxy_location||'');set('acc-notes',a.notes||'');set('acc-tier',a.tier||'');set('acc-stage',a.stage||'phone');
     document.getElementById('acc-proxy-enabled').checked=!!a.proxy_enabled;
     document.getElementById('acc-proxy-fields').style.display=a.proxy_enabled?'grid':'none';
     set('acc-email-provider', a.email_provider || emailProvider(a.email));
@@ -6435,7 +6774,7 @@ function openAccountModal(id){
     fillLinkedAccountOptions(a.linked_account_id, a.id);
   } else {
     document.getElementById('account-modal-title').textContent='Add Account · '+entName;
-    ['acc-id','acc-handle','acc-email','acc-password','acc-phone-number','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');});
+    ['acc-id','acc-handle','acc-email','acc-password','acc-phone-number','acc-phone','acc-operator','acc-proxy-ip','acc-proxy-location','acc-notes','acc-tier'].forEach(function(x){set(x,'');}); set('acc-stage','phone');
     set('acc-platform', ent==='emails'?'email':(ent==='agency'?'other':'onlyfans')); set('acc-status','active');
     document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none';
     set('acc-email-provider','Gmail'); set('acc-email-status','free');
@@ -6450,6 +6789,7 @@ function accPlatformChanged(){
   show('acc-email-block', isEmail);
   show('acc-proxy-row', !isEmail);
   show('acc-tier-row', !isEmail);
+  show('acc-stage-row', !isEmail);
   if(isEmail){ document.getElementById('acc-proxy-enabled').checked=false; document.getElementById('acc-proxy-fields').style.display='none'; }
   if(isEmail) accEmailStatusChanged();
 }
@@ -6468,7 +6808,7 @@ async function saveAccount(){
   var g=function(x){return ((document.getElementById(x)||{}).value||'').trim();};
   var owner=g('acc-owner')||'agency';
   var isEmail=g('acc-platform')==='email';
-  var p={ owner_type: owner==='agency'?'agency':'model', model_id: owner==='agency'?null:owner, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled: isEmail?false:document.getElementById('acc-proxy-enabled').checked, proxy_ip: isEmail?null:(g('acc-proxy-ip')||null), proxy_location: isEmail?null:(g('acc-proxy-location')||null), tier: isEmail?null:(g('acc-tier')||null), notes:g('acc-notes')||null,
+  var p={ owner_type: owner==='agency'?'agency':'model', model_id: owner==='agency'?null:owner, platform:g('acc-platform'), status:g('acc-status'), handle:g('acc-handle')||null, email:g('acc-email')||null, password:g('acc-password')||null, phone_number:g('acc-phone-number')||null, phone_device:g('acc-phone')||null, operator:g('acc-operator')||null, proxy_enabled: isEmail?false:document.getElementById('acc-proxy-enabled').checked, proxy_ip: isEmail?null:(g('acc-proxy-ip')||null), proxy_location: isEmail?null:(g('acc-proxy-location')||null), tier: isEmail?null:(g('acc-tier')||null), stage: isEmail?'phone':(g('acc-stage')||'phone'), notes:g('acc-notes')||null,
     email_provider: isEmail?(g('acc-email-provider')||null):null,
     email_status: isEmail?(g('acc-email-status')||'free'):null,
     linked_account_id: (isEmail && g('acc-email-status')==='connected')?(g('acc-linked-account')||null):null };
@@ -6486,6 +6826,20 @@ async function deleteAccount(id){
   if(r.error){alert('Could not delete — '+r.error.message);return;}
   if(!r.data||!r.data.length){alert('Nothing deleted — check permissions.');return;}
   STATE.accounts=(STATE.accounts||[]).filter(function(a){return a.id!==id;}); renderAccEntities(); renderAccounts();
+}
+// Conveyor belt: phone account got suppressed -> it becomes a cloud-phone account and every
+// library item it ever posted flips to Reusable (server-side, atomic — see move_account_to_cloud()).
+async function moveAccountToCloud(id){
+  var a=(STATE.accounts||[]).find(function(x){return x.id===id;}); if(!a) return;
+  var label=(ACC_PLAT_LABEL[a.platform]||a.platform||'account')+(a.handle?' '+a.handle:'');
+  if(!confirm('Move '+label+' to the cloud phone stage?\n\nEverything this account posted becomes Reusable content, and fresh content can no longer be posted on it.')) return;
+  var r=await sb.rpc('move_account_to_cloud',{p_account_id:id});
+  if(r.error){ alert('Could not move — '+r.error.message); return; }
+  var flipped=(r.data&&r.data[0]&&r.data[0].items_flipped)||0;
+  a.stage='cloud'; a.stage_changed_at=new Date().toISOString();
+  renderAccounts();
+  STATE.library=null; // force the Content Library to reload with the new states next time it opens
+  alert('Done — '+label+' is now a cloud phone account. '+flipped+' library item'+(flipped===1?'':'s')+' flipped to Reusable.');
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -8376,7 +8730,7 @@ function renderMessages(){
   const labels={mm:'mass message',bump:'bump',welcome:'welcome message',winback:'win-back message'};
   const addFn={mm:'addMassMessage()',bump:'addBump()',welcome:'addWelcome()',winback:'addWinback()'}[kind];
   const addBtn=(isAdmin&&!archive)?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
-  const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Opening messages for new subs — reusable, use as often as you like. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
+  const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Cold opens for new subs — reusable. (name) = his real first name only, lowercase is fine, once. If his display name is a username or a number, drop it and send the line without it. No “Hey”, no “thanks for the sub”, no exclamation marks. Whatever he replies, message two names the content that matches his answer and drops a free preview. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
   const countHtml=reusable?(all.length+' message'+(all.length===1?'':'s')):(activeCount+' active · '+archCount+' archived');
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div>'+addBtn+'</div>'
     +'<span style="font-size:12px;color:var(--text2);">'+countHtml+'</span></div>'
@@ -9910,7 +10264,7 @@ function scanPopOrder(id){
   var title=(o.order_number?('#'+String(o.order_number).padStart(3,'0')+' · '):'')+(o.model_name||'Preview');
   if(o.video_path){
     scanShow(title,'<div style="color:var(--text2);">Loading…</div>');
-    sb.storage.from('content-videos').createSignedUrl(o.video_path,3600).then(function(r){
+    orderVideoUrl(o).then(function(u){return {data:{signedUrl:u}};}).catch(function(){return {};}).then(function(r){
       if(r.data&&r.data.signedUrl) scanShow(title,'<video src="'+r.data.signedUrl+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>');
       else if(o.thumbnail_url) scanShow(title,'<img src="'+o.thumbnail_url+'" style="width:100%;height:100%;object-fit:contain;">');
       else scanShow(title,'<div style="color:var(--red);">Could not load preview.</div>');
@@ -9933,6 +10287,59 @@ var PX_POLL=null, PX_BATCH=null, PX_CHECKS=[];
 var PX_VERDICT={'CLEAN':['cscan-green','✅'],'RES-PROXY':['cscan-red','⛔'],'BLACKLIST':['cscan-red','⛔'],'FLAGGED':['cscan-red','🚩'],'WRONG-TYPE':['cscan-amber','⚠'],'DIRTY':['cscan-amber','⚠'],'DEAD':['cscan-grey','💀'],'SCORE-FAIL':['cscan-grey','—'],'UNKNOWN':['cscan-grey','?']};
 var PX_ORDER={'CLEAN':0,'RES-PROXY':1,'BLACKLIST':2,'FLAGGED':3,'WRONG-TYPE':4,'DIRTY':5,'DEAD':6,'SCORE-FAIL':7,'UNKNOWN':8};
 function pxPill(v){var m=PX_VERDICT[v]||['cscan-grey','?'];return '<span class="cscan '+m[0]+'" style="cursor:default;">'+m[1]+' '+escapeHtml(v||'?')+'</span>';}
+async function renderSignupDesk(){
+  var wrap=document.getElementById('sd-wrap'); if(!wrap)return;
+  wrap.innerHTML='<div style="color:var(--text2);padding:16px;">Loading queue…</div>';
+  await sdRender();
+}
+var SD_ROWS=[];
+async function sdRender(){
+  var wrap=document.getElementById('sd-wrap'); if(!wrap)return;
+  var q=await sb.from('signup_queue').select('*').order('created_at',{ascending:true});
+  SD_ROWS=q.data||[];
+  var c={pending:0,in_progress:0,signed_up:0,captcha:0,failed:0};
+  SD_ROWS.forEach(function(r){c[r.status]=(c[r.status]||0)+1;});
+  var stat=function(l,n,col){return '<div class="stat-card" style="border-top-color:'+col+';"><div class="stat-label">'+l+'</div><div class="stat-value" style="color:'+col+';">'+n+'</div></div>';};
+  var head='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:16px;">'
+    +stat('Pending',c.pending,'var(--text2)')+stat('Signed up',c.signed_up,'#4ade80')
+    +stat('Captcha',c.captcha,'var(--yellow)')+stat('Failed',c.failed,'var(--red)')+'</div>';
+  var rows=SD_ROWS.map(function(r,i){
+    var pill=r.status==='signed_up'?'<span class="cscan cscan-green">signed up</span>':
+             r.status==='captcha'?'<span class="cscan cscan-amber">captcha</span>':
+             r.status==='failed'?'<span class="cscan cscan-red">failed</span>':
+             r.status==='in_progress'?'<span class="cscan cscan-amber">in progress</span>':'<span class="cscan">pending</span>';
+    var proxyStr=escapeHtml(r.proxy||'');
+    return '<div class="card" style="margin-bottom:10px;">'
+     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">'
+       +'<div><b style="font-size:15px;">'+escapeHtml(r.persona)+'</b> <span style="color:var(--text3);">('+escapeHtml(r.model||'')+')</span> &nbsp;'+pill+'</div>'
+       +'<div style="font-size:12px;color:var(--text2);">'+escapeHtml(r.isp||'')+' · '+escapeHtml(r.exit_ip||'')+' · '+escapeHtml(r.verdict||'')+'</div>'
+     +'</div>'
+     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0;font-size:13px;">'
+       +sdField('Name to type',r.persona)+sdField('DOB',r.dob||'')+sdField('Email',r.email||'')
+       +sdField('Phone ID',r.phone_id||'')
+     +'</div>'
+     +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">'
+       +'<span style="font-size:12px;color:var(--text3);">proxy</span>'
+       +'<code style="font-size:11px;background:var(--surface2);padding:4px 8px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px;">'+proxyStr+'</code>'
+       +'<button class="btn btn-sm btn-ghost" onclick="pxCopyText(this,'+JSON.stringify(r.proxy||'')+')">⧉</button>'
+     +'</div>'
+     +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+       +'<button class="btn btn-sm btn-primary" onclick="sdSet(\''+r.id+'\',\'signed_up\',false)">✓ Signed up</button>'
+       +'<button class="btn btn-sm btn-ghost" onclick="sdSet(\''+r.id+'\',\'captcha\',true)">⚠ Captcha</button>'
+       +'<button class="btn btn-sm btn-ghost" onclick="sdSet(\''+r.id+'\',\'failed\',null)">✕ Failed</button>'
+       +'<button class="btn btn-sm btn-ghost" onclick="sdSet(\''+r.id+'\',\'pending\',null)">↺ Reset</button>'
+     +'</div></div>';
+  }).join('');
+  wrap.innerHTML=head+'<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-sm btn-ghost" onclick="sdRender()">↻ Refresh</button></div>'+rows;
+}
+function sdField(l,v){return '<div><div style="color:var(--text3);font-size:11px;">'+escapeHtml(l)+'</div><div style="display:flex;gap:4px;align-items:center;"><span style="font-weight:600;">'+escapeHtml(String(v))+'</span>'+(v?'<button class="btn btn-sm btn-ghost" style="padding:0 6px;" onclick="pxCopyText(this,'+JSON.stringify(String(v))+')">⧉</button>':'')+'</div></div>';}
+async function sdSet(id,status,captcha){
+  var patch={status:status,updated_at:new Date().toISOString()};
+  if(captcha!==null) patch.captcha=captcha;
+  await sb.from('signup_queue').update(patch).eq('id',id);
+  sdRender();
+}
+
 async function renderProxyChecker(){
   if(PX_POLL){clearInterval(PX_POLL);PX_POLL=null;}
   var b=document.getElementById('px-batch'); if(b)b.innerHTML='';
@@ -9966,7 +10373,7 @@ async function submitProxyBatch(){
   var lookups=lines.length*(gen>0?gen:1);
   if(lookups>2000){ al.textContent='That is '+lookups+' lookups — the server caps a batch at 2000. Trim the list or lower sessions per line.'; return; }
   var btn=document.getElementById('px-submit-btn'); btn.disabled=true; var ot=btn.textContent; btn.textContent='Submitting…';
-  var payload={action:'submit',proxies:lines,provider:document.getElementById('px-provider').value,max_score:parseInt(document.getElementById('px-maxscore').value||'25',10),want_type:document.getElementById('px-wanttype').value,allow_flagged:document.getElementById('px-allowflagged').checked,generate:gen,label:document.getElementById('px-label').value||'',submitted_by:(STATE.profile&&STATE.profile.email)||''};
+  var payload={action:'submit',proxies:lines,provider:document.getElementById('px-provider').value,max_score:parseInt(document.getElementById('px-maxscore').value||'0',10),want_type:document.getElementById('px-wanttype').value,allow_flagged:document.getElementById('px-allowflagged').checked,generate:gen,label:document.getElementById('px-label').value||'',submitted_by:(STATE.profile&&STATE.profile.email)||''};
   try{
     const{data,error}=await sb.functions.invoke('proxy-service',{body:payload});
     btn.disabled=false; btn.textContent=ot;
@@ -9999,7 +10406,7 @@ function renderBatch(){
   var pct=b.total?Math.round((b.done/b.total)*100):0;
   var stpill=b.status==='done'?'<span class="cscan cscan-green">done</span>':b.status==='failed'?'<span class="cscan cscan-red">failed</span>':'<span class="cscan cscan-amber">running…</span>';
   var chips=Object.keys(counts).sort(function(a,c){return (PX_ORDER[a]==null?9:PX_ORDER[a])-(PX_ORDER[c]==null?9:PX_ORDER[c]);}).map(function(v){return pxPill(v)+' <span style="color:var(--text2);font-size:12px;">'+counts[v]+'</span>';}).join(' &nbsp; ');
-  var rows=checks.map(function(x){return '<tr><td>'+pxPill(x.verdict)+'</td><td class="mono" style="font-size:12px;">'+escapeHtml(x.ip||'—')+'</td><td>'+(x.score==null?'—':x.score)+'</td><td style="font-size:12px;">'+escapeHtml(x.isp||'—')+'</td><td style="font-size:12px;">'+escapeHtml(x.conn_type||'—')+'</td><td style="font-size:12px;">'+escapeHtml([x.city,x.country].filter(Boolean).join(', ')||'—')+'</td><td style="font-size:12px;color:var(--text2);">'+escapeHtml(x.proxy_provider||x.error||'')+'</td></tr>';}).join('');
+  var rows=checks.map(function(x){var sc=(x.score==null?'—':x.score)+(x.score_isp!=null?' <span style="color:var(--text3);font-size:11px;">/ '+x.score_isp+'</span>':''); var cp='<span style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" title="Copy proxy string" onclick="pxCopyText(this,'+JSON.stringify(x.proxy||'')+')">⧉</button> <button class="btn btn-sm btn-ghost" title="Copy exit IP" onclick="pxCopyText(this,'+JSON.stringify(x.ip||'')+')">IP</button></span>'; return '<tr><td>'+pxPill(x.verdict)+'</td><td class="mono" style="font-size:12px;">'+escapeHtml(x.ip||'—')+'</td><td title="IP score / carrier baseline">'+sc+'</td><td style="font-size:12px;">'+escapeHtml(x.isp||'—')+'</td><td style="font-size:12px;">'+escapeHtml(x.conn_type||'—')+'</td><td style="font-size:12px;">'+escapeHtml([x.city,x.country].filter(Boolean).join(', ')||'—')+'</td><td style="font-size:12px;color:var(--text2);">'+escapeHtml(x.proxy_provider||x.error||'')+'</td><td>'+cp+'</td></tr>';}).join('');
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;">'
     +'<div class="stat-card" style="border-top-color:#4ade80;"><div class="stat-label">Clean &amp; ready</div><div class="stat-value" style="color:#4ade80;">'+cCLEAN+'</div></div>'
     +'<div class="stat-card" style="border-top-color:var(--red);"><div class="stat-label">Flagged</div><div class="stat-value" style="color:var(--red);">'+cBAD+'</div></div>'
@@ -10017,13 +10424,16 @@ function renderBatch(){
     +'</div>'
     +'<div class="px-main">'
       +'<div class="ph"><div><b style="font-size:15px;">'+escapeHtml(b.label||'Batch')+'</b> &nbsp;'+stpill+'<div style="font-size:11px;color:var(--text2);margin-top:3px;">'+escapeHtml(b.provider||'')+' · '+b.done+' / '+b.total+' checked</div></div>'
-        +'<div style="display:flex;gap:8px;"><button class="btn btn-sm btn-primary" onclick="pxCopyClean(this)">⧉ Copy '+cleanRows.length+' clean</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadClean()">⬇ .txt</button></div></div>'
+        +'<div style="display:flex;gap:8px;"><button class="btn btn-sm btn-primary" onclick="pxCopyClean(this)">⧉ Copy '+cleanRows.length+' clean</button><button class="btn btn-sm btn-ghost" onclick="pxCopyAll(this)">⧉ Copy all '+checks.length+'</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadClean()">⬇ clean .txt</button><button class="btn btn-sm btn-ghost" onclick="pxDownloadAll()">⬇ all .csv</button></div></div>'
       +'<div style="background:var(--surface2);height:6px;"><div style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .3s;"></div></div>'
-      +'<div class="table-wrap"><table><thead><tr><th>Verdict</th><th>Exit IP</th><th>Score</th><th>ISP</th><th>Type</th><th>Location</th><th>Notes</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="color:var(--text2);padding:16px;">Waiting for results…</td></tr>')+'</tbody></table></div>'
+      +'<div class="table-wrap"><table><thead><tr><th>Verdict</th><th>Exit IP</th><th title="IP score / carrier baseline">Score</th><th>ISP</th><th>Type</th><th>Location</th><th>Notes</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="8" style="color:var(--text2);padding:16px;">Waiting for results…</td></tr>')+'</tbody></table></div>'
     +'</div>'
   +'</div>';
   loadProxyCredits();
 }
+function pxCopyText(btn,t){ if(!t){return;} if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){if(btn){var o=btn.textContent;btn.textContent='✓';setTimeout(function(){btn.textContent=o;},900);}});} }
+function pxCopyAll(btn){ var t=PX_CHECKS.map(function(x){return x.proxy;}).filter(Boolean).join('\n'); if(!t){alert('Nothing to copy yet.');return;} pxCopyText(btn,t); }
+function pxDownloadAll(){ var cols=['verdict','proxy','ip','score','score_ip','score_isp','isp','conn_type','country','region','city','proxy_flag','res_proxy','blacklisted','error']; var esc=function(v){v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}; var t=[cols.join(',')].concat(PX_CHECKS.map(function(x){return cols.map(function(c){return esc(x[c]);}).join(',');})).join('\n'); var blob=new Blob([t],{type:'text/csv;charset=utf-8'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(((PX_BATCH&&PX_BATCH.label)||'proxies').replace(/[^a-z0-9]+/gi,'-'))+'-all.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); }
 function pxCleanList(){ return PX_CHECKS.filter(function(x){return x.verdict==='CLEAN';}).map(function(x){return x.proxy;}).filter(Boolean); }
 function pxCopyClean(btn){ var t=pxCleanList().join('\n'); if(!t){alert('No clean proxies in this batch yet.');return;} if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){if(btn){var o=btn.textContent;btn.textContent='✓ Copied';setTimeout(function(){btn.textContent=o;},1200);}});} }
 function pxDownloadClean(){ var t=pxCleanList().join('\n'); if(!t){alert('No clean proxies in this batch yet.');return;} var blob=new Blob([t],{type:'text/plain;charset=utf-8'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(((PX_BATCH&&PX_BATCH.label)||'clean-proxies').replace(/[^a-z0-9]+/gi,'-'))+'.txt'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); }
