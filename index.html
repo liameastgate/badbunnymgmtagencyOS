@@ -2546,53 +2546,31 @@
       </div>
     </div>
 
+    <!-- Journal — replaces the old Drawing Board. Capture bar + four views (Today,
+         recurring Jobs, Ideas & goals, Brain dump). Built for someone who loses things
+         the moment they leave the screen: one capture box, a hard cap of three focus
+         items, nothing hidden in folders, and no red overdue shaming. -->
     <div class="page" id="page-management">
-      <div class="page-title">Drawing Board</div>
-      <div class="page-sub">Agency goals and KPI tracking</div>
-      <div class="two-col">
-        <div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-            <div class="stat-card accent">
-              <div class="stat-label">Revenue Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Model Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">models</span>
-              </div>
-            </div>
-            <div class="stat-card accent">
-              <div class="stat-label">Agency Net Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Renewal Rate Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">%</span>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title">Agency Notes</div>
-            <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:180px;background:var(--surface2);" onchange="saveKPI()"></textarea>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">KPI vs Actuals — Latest Week</div>
-          <div id="kpi-comparison"></div>
-        </div>
-      </div>
+      <div class="page-title">Journal</div>
+      <div class="page-sub">Jobs, ideas, goals — everything out of your head</div>
+      <div id="jn-body"></div>
     </div>
 
+  </div>
+</div>
+
+<div class="modal-overlay" id="jn-job-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-title"><span id="jn-job-modal-title">New job</span><button class="modal-close" onclick="closeModal('jn-job-modal')">✕</button></div>
+    <div class="form-group"><label>Job</label><input id="jn-job-title" placeholder="e.g. Check the sub queue" onkeydown="if(event.key==='Enter')jnSaveJob()"></div>
+    <div class="form-group"><label>How often</label><select id="jn-job-cad">
+      <option value="daily">🔁 Every day</option><option value="weekly">🗓 Every week (resets Monday)</option><option value="monthly">📆 Every month (resets on the 1st)</option>
+    </select></div>
+    <div class="form-group"><label>Notes (optional)</label><input id="jn-job-notes" placeholder="Anything you'll forget"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="jnSaveJob()">💾 Save</button>
+      <button class="btn btn-danger" id="jn-job-delete" onclick="jnDeleteJob()">Delete</button>
+    </div>
   </div>
 </div>
 
@@ -2921,7 +2899,7 @@ var NAV = [
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
   { id: 'accounts',   icon: '🔐', label: 'Accounts',            roles: ['admin','va'],                             section: 'Management' },
-  { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
+  { id: 'management', icon: '📓', label: 'Journal',             secret: true, roles: [],                            section: 'Management' },
   { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
   { id: 'team',       icon: '🔑', label: 'Team Access',         roles: ['admin'],                                  section: 'Management' },
   { id: 'personal-dashboard', icon: '🔒', label: 'Dashboard',          secret: true, roles: [], section: 'My Accounts' },
@@ -3202,7 +3180,7 @@ function navigate(page) {
   if (page === 'chat-analyser') renderChatAnalyser();
   if (page === 'sops') { SOP_CATEGORY='chatting'; loadSOPs(); }
   if (page === 'traffic-sops') { SOP_CATEGORY='traffic'; loadSOPs(); }
-  if (page === 'management') loadManagement();
+  if (page === 'management') renderJournal();
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') renderSchedulePage();
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
@@ -11735,74 +11713,439 @@ async function saveContentPerfRows(){
   }
 }
 
-// ── Management / KPIs ─────────────────────────────────────────
-async function loadManagement(){
-  const{data}=await sb.from('agency_settings').select('*').eq('key','kpis').single();
-  if(data){
-    const kpis=data.value||{};
-    document.getElementById('kpi-revenue-target').value=kpis.revenue||'';
-    document.getElementById('kpi-model-target').value=kpis.models||'';
-    document.getElementById('kpi-net-target').value=kpis.net||'';
-    document.getElementById('kpi-renew-target').value=kpis.renew||'';
-    document.getElementById('agency-notes').value=kpis.notes||'';
-  }
-  // Load latest week actuals for comparison
-  const{data:reports}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
-  if(reports&&reports.length){
-    const weeks=[...new Set(reports.map(r=>r.week_of))];
-    const latest=weeks[0];
-    const week=reports.filter(r=>r.week_of===latest);
-    const totalE=week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
-    const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
-    const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
-    const kpis=data?.value||{};
+// ── Journal ──────────────────────────────────────────────────────────────────
+// Replaces the old Drawing Board. Three jobs to do, in priority order:
+//   1. Recurring jobs (daily / weekly / monthly) you tick off and can un-tick.
+//   2. Somewhere to put a thought in under two seconds so it leaves your head.
+//   3. Somewhere to think — ideas, goals, brain dump.
+//
+// Design notes (deliberate, don't "tidy" these away):
+//   - A tick is a row in journal_job_done keyed to the PERIOD it belongs to, so a new
+//     day/week/month shows everything unticked with no reset job running anywhere, and
+//     un-ticking is just a delete. History is a free side-effect.
+//   - Today shows a hard maximum of three focus items. A list of forty is a list of none.
+//   - Nothing is red. Overdue reads "3 days ago" in amber at worst — guilt causes
+//     avoidance, avoidance kills the tool.
+//   - All dates are LOCAL. toISOString() would shift the day backwards for UTC+10 and
+//     silently tick the wrong period (this bug has bitten this codebase before).
 
-    // Chatter-side actuals for the same latest week -- same source/definitions as the
-    // Chatter Performance summary tab, just rolled into one number each rather than per-chatter.
-    const{data:cpData}=await sb.from('chatter_performance').select('*').eq('week_of',latest);
-    const cpRows=cpData||[];
-    let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0,unlockSum=0,unlockCount=0,dmsTotal=0,salesTotal=0,hoursTotal=0;
-    cpRows.forEach(r=>{
-      const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim()); if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
-      const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim()); if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
-      const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim()); if(!isNaN(unlockNum)){unlockSum+=unlockNum;unlockCount++;}
-      const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10); if(!isNaN(dmsNum)) dmsTotal+=dmsNum;
-      const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim()); if(!isNaN(hoursNum)) hoursTotal+=hoursNum;
-      salesTotal+=parseFloat(r.sales||0);
-    });
-    const salesPerHr=hoursTotal>0?salesTotal/hoursTotal:null;
+var JN = { tab:'today', jobCad:'daily', items:[], jobs:[], done:[], editing:null, timer:null };
 
-    document.getElementById('kpi-comparison').innerHTML=`
-      <div class="stats-grid" style="margin-top:0;">
-        ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
-        ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
-        ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
-        ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
-        ${statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'—','','green')}
-        ${statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'—','','blue')}
-        ${statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'—','','')}
-        ${statCard('DMs Sent',dmsTotal||'—','','')}
-        ${statCard('Sales/Hr',salesPerHr!==null?'$'+fmt(salesPerHr):'—','','purple')}
-        ${statCard('Total Sales','$'+fmt(salesTotal),'','purple')}
-      </div>`;
+function jnLocalISO(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function jnMonday(d){ d=new Date(d||new Date()); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d; }
+function jnIsoWeek(d){
+  // ISO-8601 week number, Monday-based. Kept explicit rather than clever.
+  var t=new Date(d||new Date()); t.setHours(0,0,0,0);
+  t.setDate(t.getDate()+3-((t.getDay()+6)%7));               // nearest Thursday
+  var week1=new Date(t.getFullYear(),0,4);
+  var n=1+Math.round(((t-week1)/86400000-3+((week1.getDay()+6)%7))/7);
+  return t.getFullYear()+'-W'+String(n).padStart(2,'0');
+}
+// The period a tick belongs to, for each cadence.
+function jnPeriodKey(cad,d){
+  d=d||new Date();
+  if(cad==='daily')  return jnLocalISO(d);
+  if(cad==='weekly') return jnIsoWeek(d);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function jnPeriodLabel(cad){
+  var d=new Date();
+  if(cad==='daily')  return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  if(cad==='weekly'){ var m=jnMonday(d), s=new Date(m); s.setDate(s.getDate()+6);
+    return 'Week of '+m.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+s.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+  return d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+}
+// Relative time. "in 2 days" / "3 days ago" lands; "17/09" does not.
+function jnWhen(dateStr){
+  if(!dateStr) return '';
+  var due=new Date(dateStr+'T00:00:00'), today=new Date(); today.setHours(0,0,0,0);
+  var n=Math.round((due-today)/86400000);
+  if(n===0) return 'today'; if(n===1) return 'tomorrow'; if(n===-1) return 'yesterday';
+  if(n>1&&n<7) return 'in '+n+' days'; if(n<-1&&n>-14) return Math.abs(n)+' days ago';
+  return due.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+function jnAge(ts){
+  if(!ts) return '';
+  var n=Math.floor((Date.now()-new Date(ts))/86400000);
+  return n<1?'today':n===1?'1 day':n+' days';
+}
+function jnMe(){ return (STATE.profile&&STATE.profile.email)||''; }
+function jnShortName(email){ return (email||'').split('@')[0]; }
+
+// ── Data ────────────────────────────────────────────────────────────────────
+async function jnLoad(){
+  // Brain dump lives in journal_notes (owner-only), not agency_settings.
+  if(JN.dumpText===undefined){
+    var d=await sb.from('journal_notes').select('text').eq('key','dump').maybeSingle();
+    JN.dumpText=(d.data&&d.data.text)||'';
   }
+  var r = await Promise.all([
+    sb.from('journal_jobs').select('*').eq('active',true).order('cadence').order('sort_order'),
+    sb.from('journal_items').select('*').order('created_at',{ascending:false}),
+    sb.from('journal_job_done').select('*').in('period_key',[jnPeriodKey('daily'),jnPeriodKey('weekly'),jnPeriodKey('monthly')])
+  ]);
+  JN.jobs=r[0].data||[]; JN.items=r[1].data||[]; JN.done=r[2].data||[];
+}
+function jnDoneRow(job){ return JN.done.find(function(d){ return d.job_id===job.id && d.period_key===jnPeriodKey(job.cadence); }); }
+
+async function jnToggleJob(id){
+  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
+  var key=jnPeriodKey(job.cadence), row=jnDoneRow(job);
+  if(row){
+    var r=await sb.from('journal_job_done').delete().eq('id',row.id).select();
+    if(r.error||!r.data||!r.data.length){ alert('Could not un-tick — '+(r.error?r.error.message:'no permission')); return; }
+    JN.done=JN.done.filter(function(d){return d.id!==row.id;});
+  } else {
+    var ins=await sb.from('journal_job_done').insert({job_id:id,period_key:key,done_by:jnMe()}).select();
+    if(ins.error||!ins.data||!ins.data.length){ alert('Could not tick — '+(ins.error?ins.error.message:'no permission')); return; }
+    JN.done.push(ins.data[0]);
+    jnCelebrate();
+  }
+  jnPaint();
+}
+async function jnSaveJob(){
+  var title=(document.getElementById('jn-job-title').value||'').trim(); if(!title) return;
+  var cad=document.getElementById('jn-job-cad').value;
+  var notes=(document.getElementById('jn-job-notes').value||'').trim()||null;
+  var res;
+  if(JN.editing){ res=await sb.from('journal_jobs').update({title:title,cadence:cad,notes:notes}).eq('id',JN.editing).select(); }
+  else { var max=Math.max(0,...JN.jobs.filter(function(j){return j.cadence===cad;}).map(function(j){return j.sort_order||0;}));
+         res=await sb.from('journal_jobs').insert({title:title,cadence:cad,notes:notes,sort_order:max+1,created_by:jnMe()}).select(); }
+  if(res.error||!res.data||!res.data.length){ alert('Could not save — '+(res.error?res.error.message:'no permission')); return; }
+  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
+}
+function jnOpenJob(id){
+  JN.editing=id||null;
+  var j=id?JN.jobs.find(function(x){return x.id===id;}):null;
+  document.getElementById('jn-job-modal-title').textContent=j?'Edit job':'New job';
+  document.getElementById('jn-job-title').value=j?j.title:'';
+  document.getElementById('jn-job-cad').value=j?j.cadence:JN.jobCad;
+  document.getElementById('jn-job-notes').value=(j&&j.notes)||'';
+  document.getElementById('jn-job-delete').style.display=j?'':'none';
+  openModal('jn-job-modal');
+  setTimeout(function(){ var el=document.getElementById('jn-job-title'); if(el) el.focus(); },50);
+}
+async function jnDeleteJob(){
+  if(!JN.editing) return;
+  if(!confirm('Delete this job? Its tick history goes too.')) return;
+  var r=await sb.from('journal_jobs').delete().eq('id',JN.editing).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
+}
+async function jnMoveJob(id,dir){
+  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
+  var list=JN.jobs.filter(function(j){return j.cadence===job.cadence;});
+  var i=list.findIndex(function(j){return j.id===id;}), k=i+dir;
+  if(k<0||k>=list.length) return;
+  var a=list[i], b=list[k];
+  await Promise.all([
+    sb.from('journal_jobs').update({sort_order:b.sort_order||k}).eq('id',a.id),
+    sb.from('journal_jobs').update({sort_order:a.sort_order||i}).eq('id',b.id)
+  ]);
+  await jnLoad(); jnPaint();
 }
 
-function kpiCard(label,actual,target,prefix,isPct=false){
-  const fmt2=v=>isPct?v.toFixed(1):fmt(v);
-  const hit=target>0&&actual>=target;
-  const pct=target>0?Math.min(100,(actual/target)*100):0;
-  return`<div class="stat-card">
-    <div class="stat-label">${label}</div>
-    <div style="font-size:20px;font-weight:800;color:${hit?'var(--green)':'var(--text)'};">${prefix}${fmt2(actual)}</div>
-    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Target: ${prefix}${fmt2(target)}</div>
-    <div style="background:var(--border);border-radius:4px;height:4px;margin-top:8px;"><div style="background:${hit?'var(--green)':'var(--accent)'};width:${pct}%;height:4px;border-radius:4px;"></div></div>
-  </div>`;
+// ── Capture ─────────────────────────────────────────────────────────────────
+// Under two seconds or it never gets captured. Type, Enter, gone. The prefixes are
+// optional sugar, not a syntax anyone has to learn.
+function jnParse(raw){
+  var t=raw.trim(), out={kind:'task',text:t,urgent:false,due_at:null,tags:null,status:'inbox'};
+  if(/^!!/.test(t)){ out.urgent=true; t=t.replace(/^!!\s*/,''); }
+  else if(/^!/.test(t)){ out.urgent=true; t=t.replace(/^!\s*/,''); }
+  if(/^\?/.test(t)){ out.kind='idea'; t=t.replace(/^\?\s*/,''); }
+  if(/^\*/.test(t)){ out.kind='goal'; t=t.replace(/^\*\s*/,''); }
+  var tags=t.match(/#[\w-]+/g);
+  if(tags){ out.tags=tags.map(function(s){return s.slice(1);}).join(','); t=t.replace(/#[\w-]+/g,'').trim(); }
+  var d=new Date(), hit=null;
+  if(/\btoday\b/i.test(t)){ hit=new Date(d); t=t.replace(/\btoday\b/i,''); }
+  else if(/\btomorrow\b/i.test(t)){ hit=new Date(d); hit.setDate(hit.getDate()+1); t=t.replace(/\btomorrow\b/i,''); }
+  else {
+    var days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    for(var i=0;i<7;i++){
+      var re=new RegExp('\\b(next\\s+)?'+days[i]+'\\b','i'), m=t.match(re);
+      if(m){ hit=new Date(d); var delta=(i-hit.getDay()+7)%7; if(delta===0||m[1]) delta=delta||7; hit.setDate(hit.getDate()+delta); t=t.replace(re,''); break; }
+    }
+  }
+  if(hit){ out.due_at=jnLocalISO(hit); out.status='today'; }
+  out.text=t.replace(/\s{2,}/g,' ').trim()||raw.trim();
+  return out;
+}
+async function jnCapture(ev){
+  if(ev && ev.key!=='Enter') return;
+  var el=document.getElementById('jn-capture'); var raw=(el.value||'').trim(); if(!raw) return;
+  el.value='';
+  var row=jnParse(raw); row.created_by=jnMe();
+  var r=await sb.from('journal_items').insert(row).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not save — '+(r.error?r.error.message:'no permission')); el.value=raw; return; }
+  JN.items.unshift(r.data[0]);
+  jnFlash('Captured ✓');
+  jnPaint();
+}
+function jnFlash(msg){
+  var b=document.getElementById('jn-flash'); if(!b) return;
+  b.textContent=msg; b.style.opacity='1';
+  clearTimeout(JN._flash); JN._flash=setTimeout(function(){ b.style.opacity='0'; },1400);
+}
+function jnCelebrate(){ jnFlash('Nice ✓'); }
+
+async function jnUpdate(id,patch){
+  patch.updated_at=new Date().toISOString();
+  var r=await sb.from('journal_items').update(patch).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  var i=JN.items.findIndex(function(x){return x.id===id;}); if(i>=0) JN.items[i]=r.data[0];
+  jnPaint();
+}
+async function jnComplete(id){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  if(it.status==='done'){ await jnUpdate(id,{status:'inbox',done_at:null,slot:null}); return; }
+  await jnUpdate(id,{status:'done',done_at:new Date().toISOString(),slot:null});
+  jnCelebrate();
+}
+async function jnDeleteItem(id){
+  var r=await sb.from('journal_items').delete().eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  JN.items=JN.items.filter(function(x){return x.id!==id;}); jnPaint();
+}
+function jnEditItem(id){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  var t=prompt('Edit:',it.text); if(t===null) return;
+  var d=prompt('Due date (YYYY-MM-DD, blank for none):',it.due_at||''); if(d===null) return;
+  jnUpdate(id,{text:t.trim()||it.text, due_at:(d||'').trim()||null});
+}
+// Today holds three. Asking for a fourth tells you to finish or bump one.
+async function jnToSlot(id){
+  var used=JN.items.filter(function(x){return x.status==='today'&&x.slot;});
+  var free=[1,2,3].find(function(n){ return !used.some(function(x){return x.slot===n;}); });
+  if(!free){ jnFlash('Today is full — finish or bump one first'); return; }
+  await jnUpdate(id,{status:'today',slot:free});
 }
 
-async function saveKPI(){
-  const kpis={revenue:document.getElementById('kpi-revenue-target').value,models:document.getElementById('kpi-model-target').value,net:document.getElementById('kpi-net-target').value,renew:document.getElementById('kpi-renew-target').value,notes:document.getElementById('agency-notes').value};
-  await sb.from('agency_settings').upsert({key:'kpis',value:kpis},{onConflict:'key'});
+// ── Focus timer ─────────────────────────────────────────────────────────────
+// Starting is the hard part, not finishing. A countdown gives it a ritual.
+function jnFocus(id,mins){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  if(JN.timer){ clearInterval(JN.timer.h); JN.timer=null; }
+  JN.timer={id:id, left:(mins||25)*60, total:(mins||25)*60};
+  JN.timer.h=setInterval(function(){
+    JN.timer.left--;
+    if(JN.timer.left<=0){
+      clearInterval(JN.timer.h);
+      sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+JN.timer.total}).eq('id',id).then(function(){});
+      JN.timer=null; jnFlash('Time — take a break'); jnLoad().then(jnPaint); return;
+    }
+    jnPaintTimer();
+  },1000);
+  jnPaint();
+}
+function jnStopFocus(save){
+  if(!JN.timer) return;
+  var spent=JN.timer.total-JN.timer.left, id=JN.timer.id;
+  clearInterval(JN.timer.h);
+  var it=JN.items.find(function(x){return x.id===id;});
+  if(save&&spent>30&&it) sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+spent}).eq('id',id).then(function(){ jnLoad().then(jnPaint); });
+  JN.timer=null; jnPaint();
+}
+function jnPaintTimer(){
+  var el=document.getElementById('jn-timer-clock'); if(!el||!JN.timer) return;
+  var m=Math.floor(JN.timer.left/60), s=JN.timer.left%60;
+  el.textContent=m+':'+String(s).padStart(2,'0');
+  var bar=document.getElementById('jn-timer-bar');
+  if(bar) bar.style.width=(100-(JN.timer.left/JN.timer.total*100))+'%';
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function jnTab(t){ JN.tab=t; jnPaint(); try{ localStorage.setItem('jn_tab',t); }catch(e){} }
+function jnCadTab(c){ JN.jobCad=c; jnPaint(); }
+
+async function renderJournal(){
+  var el=document.getElementById('jn-body'); if(!el) return;
+  el.innerHTML='<div style="color:var(--text2);padding:14px;">Loading…</div>';
+  try{ JN.tab=localStorage.getItem('jn_tab')||'today'; }catch(e){}
+  await jnLoad(); jnPaint();
+}
+
+function jnPaint(){
+  var el=document.getElementById('jn-body'); if(!el) return;
+  var tabs=[['today','☀️','Today'],['jobs','🔁','Jobs'],['ideas','💡','Ideas & goals'],['dump','🧠','Brain dump']];
+  var head='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">'
+    +'<input id="jn-capture" placeholder="Capture anything — type it and hit Enter" onkeydown="jnCapture(event)" '
+    +'style="flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:15px;color:var(--text);">'
+    +'<span id="jn-flash" style="font-size:12px;font-weight:700;color:#4ade80;opacity:0;transition:opacity .3s;min-width:70px;"></span></div>'
+    +'<div style="font-size:11px;color:var(--text3,var(--text2));margin-bottom:16px;">'
+    +'<b>tomorrow</b> / <b>friday</b> sets a date · <b>!</b> urgent · <b>?</b> idea · <b>*</b> goal · <b>#alex</b> tags a model</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">'
+    +tabs.map(function(t){ var on=JN.tab===t[0];
+      return '<button onclick="jnTab(\''+t[0]+'\')" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:10px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;">'+t[1]+' '+t[2]+'</button>';
+    }).join('')+'</div>';
+  el.innerHTML=head+(JN.tab==='today'?jnToday():JN.tab==='jobs'?jnJobs():JN.tab==='ideas'?jnIdeas():jnDump())+jnTimerBar();
+  if(JN.timer) jnPaintTimer();
+  var c=document.getElementById('jn-capture'); if(c&&JN.tab!=='dump') c.focus();
+}
+
+function jnTimerBar(){
+  if(!JN.timer) return '';
+  var it=JN.items.find(function(x){return x.id===JN.timer.id;});
+  return '<div style="position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--surface);border-top:1px solid var(--accent);padding:12px 20px;display:flex;align-items:center;gap:16px;">'
+    +'<div id="jn-timer-clock" style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent2);min-width:82px;">--:--</div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(it?it.text:'')+'</div>'
+    +'<div style="background:var(--border);height:4px;border-radius:3px;margin-top:6px;"><div id="jn-timer-bar" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 1s linear;"></div></div></div>'
+    +'<button class="btn btn-sm btn-green" onclick="jnComplete(\''+(it?it.id:'')+'\');jnStopFocus(true)">✓ Done</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="jnStopFocus(true)">Stop</button></div>';
+}
+
+function jnItemRow(it,opts){
+  opts=opts||{};
+  var done=it.status==='done';
+  var due=it.due_at?jnWhen(it.due_at):'';
+  var overdue=it.due_at && new Date(it.due_at+'T00:00:00')<new Date(new Date().toDateString());
+  var kindIcon={task:'',idea:'💡',goal:'🎯',note:'📝'}[it.kind]||'';
+  var tags=(it.tags||'').split(',').filter(Boolean).map(function(t){return '<span class="cscan cscan-grey">#'+escapeHtml(t)+'</span>';}).join(' ');
+  return '<div style="display:flex;gap:11px;align-items:flex-start;padding:11px 2px;border-bottom:1px solid var(--border);">'
+    +'<div onclick="jnComplete(\''+it.id+'\')" title="'+(done?'Put it back':'Done')+'" style="width:21px;height:21px;flex-shrink:0;margin-top:1px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
+    +'<div style="flex:1;min-width:0;">'
+    +'<div style="font-size:14px;line-height:1.45;'+(done?'opacity:.5;text-decoration:line-through;':'')+'">'
+    +(it.urgent&&!done?'<span style="color:#ffc83c;font-weight:900;">! </span>':'')+(kindIcon?kindIcon+' ':'')+escapeHtml(it.text)+'</div>'
+    +'<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:11px;color:var(--text2);">'
+    +(due?'<span style="color:'+(overdue&&!done?'#ffc83c':'var(--text2)')+';">'+(overdue&&!done?'⏳ ':'📅 ')+due+'</span>':'')
+    +(it.focus_seconds?'<span>⏱ '+Math.round(it.focus_seconds/60)+'m</span>':'')
+    +(!done&&!due?'<span>sat '+jnAge(it.created_at)+'</span>':'')
+    +tags+'</div></div>'
+    +'<div style="display:flex;gap:3px;flex-shrink:0;">'
+    +(!done&&opts.focus?'<button class="btn btn-sm btn-ghost" title="Focus 25 min" onclick="jnFocus(\''+it.id+'\',25)">⏱</button>':'')
+    +(!done&&opts.promote?'<button class="btn btn-sm btn-ghost" title="Move to Today" onclick="jnToSlot(\''+it.id+'\')">☀️</button>':'')
+    +(!done&&opts.bump?'<button class="btn btn-sm btn-ghost" title="Back to inbox" onclick="jnUpdate(\''+it.id+'\',{status:\'inbox\',slot:null})">↩</button>':'')
+    +(!done&&opts.later?'<button class="btn btn-sm btn-ghost" title="Someday" onclick="jnUpdate(\''+it.id+'\',{status:\'someday\',slot:null})">💤</button>':'')
+    +'<button class="btn btn-sm btn-ghost" title="Edit" onclick="jnEditItem(\''+it.id+'\')">✏</button>'
+    +'<button class="btn btn-sm btn-danger" title="Delete" onclick="jnDeleteItem(\''+it.id+'\')">✕</button>'
+    +'</div></div>';
+}
+
+function jnToday(){
+  var slots=JN.items.filter(function(x){return x.status==='today'&&x.slot;}).sort(function(a,b){return a.slot-b.slot;});
+  var dueToday=JN.items.filter(function(x){return x.status!=='done'&&x.status!=='archived'&&!x.slot&&x.due_at&&x.due_at<=jnLocalISO();});
+  var daily=JN.jobs.filter(function(j){return j.cadence==='daily';});
+  var dailyLeft=daily.filter(function(j){return !jnDoneRow(j);});
+  var doneToday=JN.items.filter(function(x){return x.done_at&&x.done_at.slice(0,10)===jnLocalISO();});
+
+  var h='<div class="card"><div class="card-title">☀️ Today\'s three</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Three. Not thirty. Pick them once and the rest can wait.</div>';
+  for(var n=1;n<=3;n++){
+    var it=slots.find(function(x){return x.slot===n;});
+    h+= it ? jnItemRow(it,{focus:true,bump:true})
+      : '<div style="display:flex;align-items:center;gap:11px;padding:13px 2px;border-bottom:1px dashed var(--border);color:var(--text3,var(--text2));font-size:13px;">'
+        +'<div style="width:21px;height:21px;border-radius:7px;border:2px dashed var(--border);"></div>Empty — pull one over from Ideas, or capture it above.</div>';
+  }
+  h+='</div>';
+
+  if(dueToday.length) h+='<div class="card"><div class="card-title">📅 Due</div>'+dueToday.map(function(x){return jnItemRow(x,{focus:true,promote:true,later:true});}).join('')+'</div>';
+
+  h+='<div class="card"><div class="card-title">🔁 Daily jobs · '+jnPeriodLabel('daily')+'</div>';
+  h+= daily.length
+    ? daily.map(jnJobRow).join('')+(dailyLeft.length?'':'<div style="text-align:center;padding:14px;color:#4ade80;font-size:13px;font-weight:700;">All daily jobs done ✓</div>')
+    : '<div style="font-size:13px;color:var(--text2);padding:6px 2px;">No daily jobs yet — add them in the <b>Jobs</b> tab.</div>';
+  h+='</div>';
+
+  h+='<div class="card"><div class="card-title">✅ Done today · '+doneToday.length+'</div>'
+    +(doneToday.length?doneToday.map(function(x){return jnItemRow(x,{});}).join('')
+      :'<div style="font-size:13px;color:var(--text2);padding:6px 2px;">Nothing yet. Tick one thing and it shows up here.</div>')+'</div>';
+  return h;
+}
+
+function jnJobRow(j){
+  var row=jnDoneRow(j), done=!!row;
+  return '<div style="display:flex;gap:11px;align-items:flex-start;padding:11px 2px;border-bottom:1px solid var(--border);">'
+    +'<div onclick="jnToggleJob(\''+j.id+'\')" title="'+(done?'Un-tick (not done properly)':'Tick off')+'" style="width:21px;height:21px;flex-shrink:0;margin-top:1px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:14px;line-height:1.45;'+(done?'opacity:.5;text-decoration:line-through;':'')+'">'+escapeHtml(j.title)+'</div>'
+    +(j.notes?'<div style="font-size:11.5px;color:var(--text2);margin-top:3px;">'+escapeHtml(j.notes)+'</div>':'')
+    +(done&&row.done_at?'<div style="font-size:11px;color:#4ade80;margin-top:3px;">ticked '+new Date(row.done_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div>':'')+'</div>'
+    +'<div style="display:flex;gap:3px;flex-shrink:0;">'
+    +'<button class="btn btn-sm btn-ghost" title="Move up" onclick="jnMoveJob(\''+j.id+'\',-1)">↑</button>'
+    +'<button class="btn btn-sm btn-ghost" title="Move down" onclick="jnMoveJob(\''+j.id+'\',1)">↓</button>'
+    +'<button class="btn btn-sm btn-ghost" title="Edit" onclick="jnOpenJob(\''+j.id+'\')">✏</button>'
+    +'</div></div>';
+}
+
+function jnJobs(){
+  var cads=[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly']];
+  var list=JN.jobs.filter(function(j){return j.cadence===JN.jobCad;});
+  var doneN=list.filter(function(j){return jnDoneRow(j);}).length;
+  var pct=list.length?Math.round(doneN/list.length*100):0;
+  var h='<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">'
+    +cads.map(function(c){ var on=JN.jobCad===c[0];
+      var l=JN.jobs.filter(function(j){return j.cadence===c[0];});
+      var d=l.filter(function(j){return jnDoneRow(j);}).length;
+      return '<button onclick="jnCadTab(\''+c[0]+'\')" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">'+c[1]+' <span style="color:var(--text2);font-weight:600;">'+d+'/'+l.length+'</span></button>';
+    }).join('')
+    +'<button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="jnOpenJob()">+ New job</button></div>';
+
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
+    +'<div class="card-title" style="margin:0;">'+jnPeriodLabel(JN.jobCad)+'</div>'
+    +'<div style="font-size:12px;font-weight:700;color:'+(pct===100?'#4ade80':'var(--text2)')+';">'+doneN+' / '+list.length+'</div></div>'
+    +'<div style="background:var(--border);height:5px;border-radius:3px;margin:8px 0 14px;"><div style="height:100%;width:'+pct+'%;background:'+(pct===100?'#4ade80':'var(--accent)')+';border-radius:3px;transition:width .3s;"></div></div>';
+  h+= list.length ? list.map(jnJobRow).join('')
+    : '<div class="empty" style="margin:10px 0;"><div class="empty-icon">🔁</div><p>No '+JN.jobCad+' jobs yet. Add the things you do every '+(JN.jobCad==='daily'?'day':JN.jobCad==='weekly'?'week':'month')+' and stop holding them in your head.</p></div>';
+  h+='</div>'
+    +'<div style="font-size:12px;color:var(--text2);padding:2px 4px;">Ticks reset on their own — daily at midnight, weekly on Monday, monthly on the 1st. Un-tick anything that wasn\'t done properly.</div>';
+  return h;
+}
+
+function jnIdeas(){
+  var inbox=JN.items.filter(function(x){return x.status==='inbox';});
+  var week=JN.items.filter(function(x){return x.status==='week';});
+  var someday=JN.items.filter(function(x){return x.status==='someday';});
+  var goals=JN.items.filter(function(x){return x.kind==='goal'&&x.status!=='done';});
+  var stale=inbox.filter(function(x){ return (Date.now()-new Date(x.created_at))/86400000>14; });
+
+  var h='';
+  if(stale.length>=3) h+='<div class="card" style="border:1px solid rgba(230,180,40,.35);background:rgba(230,180,40,.06);">'
+    +'<div style="font-size:13px;color:#e6b428;font-weight:700;margin-bottom:4px;">'+stale.length+' things have sat here over two weeks</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">No judgement — they were worth writing down. Clear them out or pick one.</div>'
+    +'<button class="btn btn-sm btn-ghost" onclick="jnArchiveStale()">💤 Move them all to Someday</button></div>';
+
+  if(goals.length) h+='<div class="card"><div class="card-title">🎯 Goals</div>'+goals.map(function(x){return jnItemRow(x,{promote:true});}).join('')+'</div>';
+
+  h+='<div class="card"><div class="card-title">📥 Inbox · '+inbox.length+'</div>'
+    +(inbox.length?inbox.map(function(x){return jnItemRow(x,{promote:true,later:true,focus:true});}).join('')
+      :'<div style="font-size:13px;color:var(--text2);padding:6px 2px;">Empty. Capture anything at the top — sort it out later.</div>')+'</div>';
+
+  if(week.length) h+='<div class="card"><div class="card-title">🗓 This week</div>'+week.map(function(x){return jnItemRow(x,{promote:true,later:true});}).join('')+'</div>';
+
+  h+='<div class="card"><div class="card-title">💤 Someday · '+someday.length+'</div>'
+    +(someday.length?someday.map(function(x){return jnItemRow(x,{promote:true});}).join('')
+      :'<div style="font-size:13px;color:var(--text2);padding:6px 2px;">Nothing parked.</div>')+'</div>';
+  return h;
+}
+async function jnArchiveStale(){
+  var stale=JN.items.filter(function(x){return x.status==='inbox'&&(Date.now()-new Date(x.created_at))/86400000>14;});
+  await Promise.all(stale.map(function(x){ return sb.from('journal_items').update({status:'someday'}).eq('id',x.id); }));
+  await jnLoad(); jnPaint(); jnFlash('Parked '+stale.length);
+}
+
+function jnDump(){
+  return '<div class="card"><div class="card-title">🧠 Brain dump</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">No structure, no rules. Get it out of your head first — turn it into tasks after.</div>'
+    +'<textarea id="jn-dump" placeholder="Everything that\'s rattling around…" style="width:100%;min-height:340px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:14px;font-size:14px;line-height:1.7;resize:vertical;">'+escapeHtml(JN.dumpText||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary" onclick="jnSaveDump()">💾 Save</button>'
+    +'<button class="btn btn-ghost" onclick="jnExtract()">✨ Turn each line into a task</button>'
+    +'<span id="jn-dump-note" style="font-size:12px;color:var(--text2);align-self:center;"></span></div></div>';
+}
+async function jnSaveDump(){
+  var t=(document.getElementById('jn-dump')||{}).value||'';
+  JN.dumpText=t;
+  var r=await sb.from('journal_notes').upsert({key:'dump',text:t,updated_at:new Date().toISOString()},{onConflict:'key'});
+  if(r.error){ alert('Could not save — '+r.error.message); return; }
+  var n=document.getElementById('jn-dump-note'); if(n){ n.textContent='Saved ✓'; setTimeout(function(){ n.textContent=''; },1600); }
+}
+async function jnExtract(){
+  var t=(document.getElementById('jn-dump')||{}).value||'';
+  var lines=t.split('\n').map(function(s){return s.replace(/^[-*•\s]+/,'').trim();}).filter(function(s){return s.length>2;});
+  if(!lines.length){ jnFlash('Nothing to pull out'); return; }
+  if(!confirm('Create '+lines.length+' item'+(lines.length===1?'':'s')+' in your Inbox?\n\nThe dump text stays as it is.')) return;
+  var rows=lines.map(function(l){ var p=jnParse(l); p.created_by=jnMe(); p.status='inbox'; p.slot=null; return p; });
+  var r=await sb.from('journal_items').insert(rows).select();
+  if(r.error){ alert('Could not create — '+r.error.message); return; }
+  await jnLoad(); JN.tab='ideas'; jnPaint(); jnFlash('Added '+lines.length);
 }
 
 // ── Utils ────────────────────────────────────────────────────
