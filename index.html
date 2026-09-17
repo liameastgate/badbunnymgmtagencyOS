@@ -8852,7 +8852,7 @@ function setFbTab(t){ FB_TAB=t; renderFeedbackPage(); }
 // actually sent it a first message. Claim/skip is live coordination between
 // chatters on shift; the real truth comes from the next export, so a row the
 // watcher sees as contacted drops off whether or not anyone ticked it.
-var NQ = { rows: [], tab: 'waiting', creator: 'all', loading: false };
+var NQ = { rows: [], tab: 'waiting', creator: 'all', sort: 'smart', loading: false };
 
 // From the 90-day audit: a sub a chatter handled inside 72h was worth $12.70,
 // an unhandled one $1.47. That gap is what's on the table per fan.
@@ -8913,32 +8913,53 @@ function nqPaint(){
   var el = document.getElementById('new-subs-body'); if(!el) return;
   var me = nqMe();
   var all = NQ.rows;
-  var waiting = all.filter(function(r){ return !r.contacted_at && !r.outcome; });
+  var open_   = all.filter(function(r){ return !r.contacted_at && !r.outcome; });
+  var waiting = open_.filter(function(r){ return nqHours(r) < 72; });
+  var missed  = open_.filter(function(r){ return nqHours(r) >= 72; });
   var mine    = all.filter(function(r){ return nqClaimLive(r) && r.claimed_by === me && !r.contacted_at && !r.outcome; });
   var won     = all.filter(function(r){ return r.first_purchase_at; });
-  var fresh   = waiting.filter(function(r){ return nqHours(r) < 72; });
-  var onTable = fresh.length * (NQ_WORTH - NQ_COLD);
+  var onTable = waiting.length * (NQ_WORTH - NQ_COLD);
 
   var creators = [];
   all.forEach(function(r){ if(creators.indexOf(r.creator) < 0) creators.push(r.creator); });
   creators.sort();
 
-  var list = NQ.tab === 'mine' ? mine : NQ.tab === 'won' ? won.slice().reverse() : waiting;
+  var list = NQ.tab === 'mine' ? mine
+           : NQ.tab === 'won'    ? won.slice()
+           : NQ.tab === 'missed' ? missed.slice()
+           : waiting.slice();
   if(NQ.creator !== 'all') list = list.filter(function(r){ return r.creator === NQ.creator; });
+  var T = function(r){ return new Date(r.subscribed_at).getTime(); };
+  if(NQ.tab === 'won') list.sort(function(a,b){ return new Date(b.first_purchase_at||b.subscribed_at) - new Date(a.first_purchase_at||a.subscribed_at); });
+  else if(NQ.sort === 'oldest') list.sort(function(a,b){ return T(a) - T(b); });
+  else if(NQ.sort === 'newest') list.sort(function(a,b){ return T(b) - T(a); });
+  else if(NQ.sort === 'page')   list.sort(function(a,b){ return a.creator.localeCompare(b.creator) || T(b) - T(a); });
+  else list.sort(function(a,b){        // smart: expiring soonest first, then freshest of the rest
+      var ai = nqHours(a) < 72, bi = nqHours(b) < 72;
+      if(ai !== bi) return ai ? -1 : 1;
+      return ai ? T(a) - T(b) : T(b) - T(a);
+    });
 
   var h = '<div class="nq-strip">'
-    + '<div class="nq-kpi ' + (waiting.length > 20 ? 'bad' : waiting.length ? 'hot' : 'good') + '"><div class="n">' + waiting.length + '</div><div class="l">waiting for a first message</div></div>'
+    + '<div class="nq-kpi ' + (waiting.length > 20 ? 'bad' : waiting.length ? 'hot' : 'good') + '"><div class="n">' + waiting.length + '</div><div class="l">waiting, still inside 72h</div></div>'
     + '<div class="nq-kpi hot"><div class="n">$' + Math.round(onTable) + '</div><div class="l">expected if these get opened today (avg $12.70 a sub worked in 72h vs $1.47 not)</div></div>'
-    + '<div class="nq-kpi"><div class="n">' + mine.length + '</div><div class="l">claimed by you</div></div>'
+    + '<div class="nq-kpi' + (missed.length > 50 ? ' bad' : '') + '"><div class="n">' + missed.length + '</div><div class="l">past 72h — worth ~$1.47 each now</div></div>'
     + '<div class="nq-kpi good"><div class="n">' + won.length + '</div><div class="l">bought since subscribing</div></div>'
     + '</div>';
 
   h += '<div class="nq-filters">'
-    + ['waiting','mine','won'].map(function(t){
-        var lab = t === 'waiting' ? '⏰ Waiting (' + waiting.length + ')' : t === 'mine' ? '🙋 Mine (' + mine.length + ')' : '💸 Bought (' + won.length + ')';
+    + ['waiting','missed','mine','won'].map(function(t){
+        var lab = t === 'waiting' ? '⏰ Waiting (' + waiting.length + ')'
+                : t === 'missed'  ? '🕐 Missed (' + missed.length + ')'
+                : t === 'mine'    ? '🙋 Mine (' + mine.length + ')'
+                                  : '💸 Bought (' + won.length + ')';
         return '<button class="nq-f' + (NQ.tab === t ? ' on' : '') + '" onclick="NQ.tab=\'' + t + '\';nqPaint();">' + lab + '</button>';
       }).join('')
     + '<span style="flex:1;"></span>'
+    + (NQ.tab === 'won' ? '' : '<select class="nq-f" style="padding:6px 10px;" onchange="NQ.sort=this.value;nqPaint();">'
+        + [['smart','Most urgent'],['newest','Newest first'],['oldest','Oldest first'],['page','By page']].map(function(o){
+            return '<option value="' + o[0] + '"' + (NQ.sort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        + '</select>')
     + '<button class="nq-f' + (NQ.creator === 'all' ? ' on' : '') + '" onclick="NQ.creator=\'all\';nqPaint();">All pages</button>'
     + creators.map(function(c){ return '<button class="nq-f' + (NQ.creator === c ? ' on' : '') + '" onclick="NQ.creator=\'' + c.replace(/'/g,"\\'") + '\';nqPaint();">' + escapeHtml(c) + '</button>'; }).join('')
     + '<button class="nq-f" onclick="nqRefresh()">↻</button>'
@@ -8948,7 +8969,8 @@ function nqPaint(){
     h += '<div class="empty" style="margin-top:20px;"><div class="empty-icon">' + (NQ.tab === 'won' ? '💸' : '✅') + '</div><p>'
       + (NQ.tab === 'won' ? 'No purchases from new subs yet in the last 14 days — the next one is out there.'
         : NQ.tab === 'mine' ? 'Nothing claimed yet. Grab one from the waiting list and make it count.'
-        : 'Every new sub has been welcomed — brilliant work. Keep the conversations going in your inbox.') + '</p></div>';
+        : NQ.tab === 'missed' ? 'Nothing has slipped past 72 hours. That is the whole game.'
+        : 'Every new sub inside the window has been welcomed — brilliant work. Keep the conversations going in your inbox.') + '</p></div>';
   } else {
     h += list.map(function(r){
       var hrs = nqHours(r), live = nqClaimLive(r), taken = live && r.claimed_by !== me, isMine = live && r.claimed_by === me;
