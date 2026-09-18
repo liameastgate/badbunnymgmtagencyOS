@@ -4039,7 +4039,23 @@ function libPools(items){
 // inside their content. Every file carries model + category + lifecycle state, so the
 // "folders" are just saved filters -- nothing is physically filed anywhere, and a file
 // can be re-filed without moving bytes.
-var LIB_F={model:'',category:'',state:'',q:'',view:'folders'};
+var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders'};
+// What the Meta scanner said, as a filter you can act on. The verdict lives in
+// content_scans, so this is a view over existing data -- nothing is copied or moved.
+var LIB_OUTCOMES={
+  distributed:     {icon:'✅', label:'Will reach new people', cls:'cscan-green'},
+  not_recommended: {icon:'⚠',  label:'Followers only',        cls:'cscan-amber'},
+  removed:         {icon:'⛔', label:'Would be removed',      cls:'cscan-red'},
+  failed:          {icon:'↻',  label:'Scan failed',           cls:'cscan-grey'},
+  none:            {icon:'🔍', label:'Not scanned',           cls:'cscan-grey'}
+};
+// Which bucket an item falls into. Photos have no scan, so they read as "not scanned".
+function libOutcomeOf(i){
+  var s=libScan(i);
+  if(!s) return 'none';
+  if(s.scan_error) return 'failed';
+  return LIB_OUTCOMES[s.instagram_outcome] ? s.instagram_outcome : 'none';
+}
 var LIB_SEL={};                                   // id -> true, for bulk actions
 
 function libSelCount(){ return Object.keys(LIB_SEL).length; }
@@ -4072,6 +4088,7 @@ function libFiltered(){
   if(LIB_F.model) items=items.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
   if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : i.category===LIB_F.category; });
   if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
+  if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
   var q=(LIB_F.q||'').toLowerCase().trim();
   if(q) items=items.filter(function(i){
     var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
@@ -4109,12 +4126,18 @@ function renderLibraryList(){
           return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+n+'</b></div>';
         }).join('');
         var unfiled=mine.filter(function(i){return !i.category;}).length;
+        var vids=mine.filter(libIsVideo);
+        var oc=['distributed','not_recommended','removed'].map(function(k){
+          var n=vids.filter(function(i){return libOutcomeOf(i)===k;}).length;
+          return n?'<span class="cscan '+LIB_OUTCOMES[k].cls+'" title="'+LIB_OUTCOMES[k].label+'">'+LIB_OUTCOMES[k].icon+' '+n+'</span>':'';
+        }).filter(Boolean).join(' ');
         return '<div class="card" style="margin:0;cursor:pointer;" onclick="libOpenModel(\''+key+'\')">'
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
           +'<div style="font-size:15px;font-weight:800;">'+escapeHtml(libOwnerName(key))+'</div>'
           +'<div style="font-size:11px;color:var(--text2);">'+mine.length+' file'+(mine.length===1?'':'s')+'</div></div>'
           +cats
           +(unfiled?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e6b428;"><span>⚠ Uncategorised</span><b>'+unfiled+'</b></div>':'')
+          +(oc?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px;">'+oc+'</div>':'')
           +'<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
           +'<span style="color:'+(fresh<LIB_LOW_STOCK?'#e6b428':'#4ade80')+';">🟢 '+fresh+' fresh</span><span>'+libFmtSize(bytes)+'</span></div></div>';
       }).join('')+'</div>';
@@ -4138,6 +4161,19 @@ function renderLibraryList(){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
     +catTab('','All')+Object.keys(LIB_CATEGORIES).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
     +(mine.some(function(i){return !i.category;})?catTab('none','Uncategorised','⚠'):'')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
+    +'<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-right:2px;">Scan result</span>'
+    +(function(){
+      var scoped=mine.filter(function(i){ return !LIB_F.category || (LIB_F.category==='none'?!i.category:i.category===LIB_F.category); });
+      var btn=function(val,label,icon){
+        var n=(val?scoped.filter(function(i){return libOutcomeOf(i)===val;}):scoped).length;
+        var on=LIB_F.outcome===val;
+        return '<button onclick="LIB_F.outcome=\''+val+'\';renderLibraryList()" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">'+(icon?icon+' ':'')+label+' <span style="opacity:.7;">'+n+'</span></button>';
+      };
+      return btn('','Any')+Object.keys(LIB_OUTCOMES).map(function(k){ return btn(k,LIB_OUTCOMES[k].label,LIB_OUTCOMES[k].icon); }).join('');
+    })()
+    +(LIB_F.outcome?'<span style="font-size:11.5px;color:var(--text2);margin-left:4px;">— select all, then <b>Set category</b> to file them</span>':'')
+    +'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     +'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
     +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
@@ -4164,8 +4200,8 @@ function renderLibraryList(){
     ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>'
     : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
 }
-function libOpenModel(key){ LIB_F.model=key; LIB_F.category=''; LIB_F.state=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
-function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.state=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+function libOpenModel(key){ LIB_F.model=key; LIB_F.category=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
 
 function libCardHtml(i){
   var mdl=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
