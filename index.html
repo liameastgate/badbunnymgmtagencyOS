@@ -819,6 +819,7 @@
           <option value="social">📱 IG / TikTok / Snap</option>
           <option value="reddit_x">🔞 Reddit / X</option>
           <option value="photos">📸 Non-nude photos</option>
+          <option value="nsfw">🔥 NSFW · OnlyFans only</option>
         </select></div>
         <div id="cl-up-alert" style="font-size:12px;color:#e6b428;min-height:16px;"></div>
         <div class="btn-row"><button class="btn btn-primary" onclick="libDoUpload()">📤 Choose files…</button></div>
@@ -3761,7 +3762,10 @@ async function loadContentLibrary(){
 var LIB_CATEGORIES={
   social:  {label:'IG / TikTok / Snap', short:'Social',  icon:'📱', accept:'video/*,image/*', hint:'Reels, stories, snaps — anything for the phone accounts'},
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
-  photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'}
+  photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
+  // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
+  // slips through into a social category and can't actually be posted there.
+  nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'🔥', accept:'video/*,image/*', hint:'Too explicit to promote anywhere — paid page only'}
 };
 var LIB_STATES={
   fresh:   {label:'Fresh',    icon:'🟢', style:'background:rgba(46,196,120,.16);color:#4ade80;',  help:'Never posted. Can go on ONE phone account.'},
@@ -4013,6 +4017,13 @@ async function libScanUnscanned(){
     renderLibraryList();
   }
 }
+// "This slipped through" -- one tap to reclassify something that can't be promoted.
+async function libMarkNsfw(id){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  var r=await sb.from('content_library').update({category:'nsfw'}).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
+  it.category='nsfw'; renderLibraryList();
+}
 async function libSetState(id,state){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const msg={retired:'Retire this item? It will be hidden from the pools and can\'t be posted.',fresh:'Put this back in the Fresh pool? Only do this if it was never actually posted.',reusable:'Force this to Reusable without moving its account to cloud?'}[state];
@@ -4240,6 +4251,8 @@ function libCardHtml(i){
   var orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
   var hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
   var st=i.state||'fresh';
+  var nsfwBtn = i.category==='nsfw' ? '' :
+    '<button class="btn btn-sm btn-ghost" title="Too explicit to promote — move to NSFW (OnlyFans only)" onclick="libMarkNsfw(\''+i.id+'\')">🔥</button>';
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
     +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
@@ -4255,7 +4268,7 @@ function libCardHtml(i){
     +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll">📲</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')" title="Download">⬇</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit">✏</button>'
-    +stateBtns
+    +nsfwBtn+stateBtns
     +'<button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')" title="Delete">✕</button>'
     +'</div></div></div>';
 }
