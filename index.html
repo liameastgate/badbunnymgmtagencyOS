@@ -3769,6 +3769,10 @@ var LIB_CATEGORIES={
 };
 var LIB_STATES={
   fresh:   {label:'Fresh',    icon:'🟢', style:'background:rgba(46,196,120,.16);color:#4ade80;',  help:'Never posted. Can go on ONE phone account.'},
+  // The scanner said Instagram would remove this, so it is held out of the posting pool
+  // until someone decides: re-file it, clear it, or bin it. Set automatically by a DB
+  // trigger the moment a verdict lands, and released automatically if a re-scan is clean.
+  needs_review:{label:'Needs review', icon:'🛑', style:'background:rgba(239,68,68,.16);color:var(--red);', help:'Would be removed by Instagram. Held back until you decide.'},
   in_use:  {label:'In use',   icon:'📱', style:'background:rgba(230,180,40,.22);color:#e6b428;',  help:'Posted on a phone account — owned by it until that account moves to cloud.'},
   reusable:{label:'Reusable', icon:'☁️', style:'background:rgba(107,143,255,.18);color:var(--accent2);', help:'Its account moved to cloud phone. Free to reuse on cloud accounts.'},
   retired: {label:'Retired',  icon:'💤', style:'background:var(--surface2);color:var(--text2);',  help:'Do not use.'}
@@ -4017,6 +4021,14 @@ async function libScanUnscanned(){
     renderLibraryList();
   }
 }
+// Reviewing a held item: re-file it AND release it in one step, so it stops blocking.
+async function libReview(id,category){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  var patch={category:category, state:'fresh', state_changed_at:new Date().toISOString()};
+  var r=await sb.from('content_library').update(patch).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  Object.assign(it,patch); renderLibraryList();
+}
 // "This slipped through" -- one tap to reclassify something that can't be promoted.
 async function libMarkNsfw(id){
   var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
@@ -4068,7 +4080,8 @@ function libShowPostings(id){
   alert('Posted '+ps.length+' time'+(ps.length===1?'':'s')+':\n\n'+lines.join('\n'));
 }
 function libPools(items){
-  const p={fresh:0,in_use:0,reusable:0,retired:0}; items.forEach(function(i){ p[i.state||'fresh']=(p[i.state||'fresh']||0)+1; }); return p;
+  const p={fresh:0,needs_review:0,in_use:0,reusable:0,retired:0};
+  items.forEach(function(i){ p[i.state||'fresh']=(p[i.state||'fresh']||0)+1; }); return p;
 }
 
 // ── Agency Content Library page ─────────────────────────────────────────────
@@ -4176,6 +4189,8 @@ function renderLibraryList(){
           +cats
           +(unfiled?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e6b428;"><span>⚠ Uncategorised</span><b>'+unfiled+'</b></div>':'')
           +(oc?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px;">'+oc+'</div>':'')
+          +(function(){ var nr=mine.filter(function(i){return i.state==='needs_review';}).length;
+            return nr?'<div style="margin-top:6px;font-size:11.5px;color:var(--red);font-weight:700;">🛑 '+nr+' held for review</div>':''; })()
           +'<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
           +'<span style="color:'+(fresh<LIB_LOW_STOCK?'#e6b428':'#4ade80')+';">🟢 '+fresh+' fresh</span><span>'+libFmtSize(bytes)+'</span></div></div>';
       }).join('')+'</div>';
@@ -4221,8 +4236,12 @@ function renderLibraryList(){
 
   var p=libPools(mine);
   var low=(STATE.models||[]).map(function(m){ return {m:m,f:all.filter(function(i){return i.model_id===m.id&&i.state==='fresh';}).length}; }).filter(function(x){return x.f<LIB_LOW_STOCK;});
-  if(pools) pools.innerHTML='<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">'
-    +statCard('🟢 Fresh',p.fresh,'green')+statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
+  if(pools) pools.innerHTML='<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">'
+    +statCard('🟢 Fresh',p.fresh,'green')+statCard('🛑 Needs review',p.needs_review||0,p.needs_review?'red':'')
+    +statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
+    +((p.needs_review||0)?'<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 13px;font-size:12.5px;color:var(--red);margin:-4px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+      +'<b>🛑 '+p.needs_review+' held for review</b><span style="color:var(--text2);">— the scanner says Instagram would remove them. They can\'t be posted until you clear or re-file them.</span>'
+      +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="LIB_F.state=\'needs_review\';renderLibraryList()">Show them</button></div>':'')
     +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+'</div>':'');
 
   var items=libFiltered();
@@ -4251,6 +4270,10 @@ function libCardHtml(i){
   var orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
   var hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
   var st=i.state||'fresh';
+  var reviewBtns = (st==='needs_review')
+    ? '<button class="btn btn-sm btn-green" title="Looks fine — put it back in the Fresh pool" onclick="libSetState(\''+i.id+'\',\'fresh\')">✓ Clear</button>'
+      +'<button class="btn btn-sm btn-ghost" title="Can\'t be promoted on IG — move to Reddit/X and release it" onclick="libReview(\''+i.id+'\',\'reddit_x\')">🔞</button>'
+    : '';
   var nsfwBtn = i.category==='nsfw' ? '' :
     '<button class="btn btn-sm btn-ghost" title="Too explicit to promote — move to NSFW (OnlyFans only)" onclick="libMarkNsfw(\''+i.id+'\')">🔥</button>';
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
@@ -4268,7 +4291,7 @@ function libCardHtml(i){
     +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll">📲</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')" title="Download">⬇</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit">✏</button>'
-    +nsfwBtn+stateBtns
+    +reviewBtns+nsfwBtn+stateBtns
     +'<button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')" title="Delete">✕</button>'
     +'</div></div></div>';
 }
