@@ -3757,6 +3757,11 @@ var LIB_MIN_SHORT_SIDE=1080;   // px — anything smaller has been compressed so
 var LIB_MIN_VIDEO_KBPS=1200;   // chat apps re-encode to ~500-1000 kbps
 var LIB_LOW_STOCK=5;           // fresh items per model before we flag it
 var LIB_MAX_BYTES=2147483648;  // 2 GB sanity cap
+// Auto-scan is right for one or two files. On a bulk drop it would fire a Railway scan job
+// per video (8 frames each through Sightengine) -- slow, and it spends scan credits on
+// content nobody has asked about yet. Above this many files in one go we skip it and offer
+// a "Scan unscanned" button on the library instead.
+var LIB_AUTOSCAN_MAX=5;
 
 // ── Media probing (runs on the device, before upload) ──────────────────────
 function libThumbFrom(src,w,h){
@@ -3809,6 +3814,7 @@ function libPutWithProgress(url,file,onProgress){
 // Upload N files as library items. strictHd: reject (models) vs confirm (agency).
 async function libUploadFiles(files,opt){
   opt=opt||{}; const results=[];
+  const autoScan = files.length<=LIB_AUTOSCAN_MAX;
   for(let i=0;i<files.length;i++){
     const file=files[i]; const label=(files.length>1?(i+1)+'/'+files.length+' · ':'')+file.name;
     if(file.size>LIB_MAX_BYTES){ results.push({file,skipped:'over 2 GB'}); continue; }
@@ -3830,7 +3836,7 @@ async function libUploadFiles(files,opt){
       const{data:ins,error}=await sb.from('content_library').insert(row).select();
       if(error) throw new Error(error.message);
       const item=ins&&ins[0];
-      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video') scanLibraryItem(item.id); }
+      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video'&&autoScan) scanLibraryItem(item.id); }
       results.push({file,item,key});
       opt.onStatus&&opt.onStatus(label,'Done ✓',1);
     }catch(e){ results.push({file,error:e.message}); opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0); }
@@ -3907,6 +3913,22 @@ async function deleteLibraryItem(id){
   if(it&&(it.storage_bucket||'r2')==='r2'){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
   STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
 }
+// Scan whatever in the current filter hasn't been scanned yet, a few at a time so the
+// Railway scanner isn't hit with fifty jobs at once.
+async function libScanUnscanned(){
+  var vids=(STATE.library||[]).filter(function(i){
+    if(!libIsVideo(i)) return false;
+    if(LIB_F.model && (LIB_F.model==='agency' ? !!i.model_id : i.model_id!==LIB_F.model)) return false;
+    return !libScan(i);
+  });
+  if(!vids.length){ alert('Nothing left to scan in this view.'); return; }
+  if(!confirm('Scan '+vids.length+' video'+(vids.length===1?'':'s')+'?\n\nThey go through in batches of 3 — leave the page open.')) return;
+  for(var i=0;i<vids.length;i+=3){
+    await Promise.all(vids.slice(i,i+3).map(function(v){ return scanLibraryItem(v.id); }));
+    var st=document.getElementById('cl-upload-status');
+    if(st){ st.style.display='block'; st.textContent='Queued '+Math.min(i+3,vids.length)+' / '+vids.length+' for scanning…'; }
+  }
+}
 async function libSetState(id,state){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const msg={retired:'Retire this item? It will be hidden from the pools and can\'t be posted.',fresh:'Put this back in the Fresh pool? Only do this if it was never actually posted.',reusable:'Force this to Reusable without moving its account to cloud?'}[state];
@@ -3967,6 +3989,7 @@ function renderContentUpload(){
     +'<select id="cl-f-state" onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">All states</option>'+Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
     +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:160px;">'
     +'<button id="cl-upload-btn" class="btn btn-primary" onclick="uploadLibraryFile()">📤 Upload</button>'
+    +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan any videos here that have not been scanned yet">🔍 Scan unscanned</button>'
     +'<button class="btn btn-ghost" onclick="libGoFactory()" title="Open the Content Factory with this model selected">🏭 Content Factory</button>'
     +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>'
     +'<div id="cl-pools"></div><div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
@@ -4029,7 +4052,8 @@ async function uploadLibraryFile(){
   const res=await libUploadFiles(files,{modelId:modelId,ownerType:modelId?'model':'agency',category:cat,strictHd:false,onStatus:function(l,s,p){ if(st) st.textContent=l+' — '+s+(p&&p<1?' '+Math.round(p*100)+'%':''); }});
   if(btn){ btn.textContent='📤 Upload'; btn.disabled=false; }
   const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
-  if(st) st.textContent=ok+' uploaded'+(bad.length?' · '+bad.length+' not uploaded ('+bad.map(function(b){return b.file.name+': '+(b.error||b.skipped);}).join('; ')+')':'');
+  if(st) st.textContent=ok+' uploaded'+(files.length>LIB_AUTOSCAN_MAX?' · scan skipped for a bulk drop — use “Scan unscanned” when you want it':'')
+    +(bad.length?' · '+bad.length+' not uploaded ('+bad.map(function(b){return b.file.name+': '+(b.error||b.skipped);}).join('; ')+')':'');
   renderLibraryList();
 }
 
