@@ -3964,27 +3964,54 @@ async function deleteLibraryItem(id){
   if(it&&(it.storage_bucket||'r2')==='r2'){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
   STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
 }
-// Scan anything in view that has never been scanned OR whose last scan errored.
-// Batched small and paced: firing 40 jobs at once is what produced 33 x "could not
-// extract frames" -- the Railway box runs an ffmpeg per job and simply ran out of room.
+// Scan anything in view with no verdict yet, and keep going until it's done.
+// One click, then walk away: it fires a batch, waits for the verdicts to land,
+// re-checks what's still missing, and retries -- up to LIB_SCAN_PASSES rounds.
+// The scanner itself now queues (SCAN_CONCURRENCY), so batches are safe.
+var LIB_SCAN_BATCH=4, LIB_SCAN_PASSES=4, LIB_SCAN_RUNNING=false;
+function libNeedsScan(i){
+  if(!libIsVideo(i)) return false;
+  var s=libScan(i);
+  return !s || !!s.scan_error;
+}
 async function libScanUnscanned(){
-  var todo=libFiltered().filter(function(i){
-    if(!libIsVideo(i)) return false;
-    var s=libScan(i);
-    return !s || !!s.scan_error;          // never scanned, or the last attempt failed
-  });
+  if(LIB_SCAN_RUNNING){ alert('Already scanning — leave it running.'); return; }
+  var todo=libFiltered().filter(libNeedsScan);
   if(!todo.length){ alert('Nothing to scan here — everything in view already has a verdict.'); return; }
-  var failed=todo.filter(function(i){ var s=libScan(i); return s&&s.scan_error; }).length;
-  if(!confirm('Scan '+todo.length+' video'+(todo.length===1?'':'s')+'?'
-    +(failed?'\n('+failed+' of them failed last time and will be retried.)':'')
-    +'\n\nThey go through two at a time so the scanner keeps up. Leave this page open — it takes about a minute per pair.')) return;
+  if(!confirm('Scan '+todo.length+' video'+(todo.length===1?'':'s')+'?\n\nThis runs by itself — it keeps retrying until they all have a verdict. Leave the page open; roughly a minute per '+LIB_SCAN_BATCH+'.')) return;
+
+  LIB_SCAN_RUNNING=true;
   var st=document.getElementById('cl-upload-status');
-  for(var i=0;i<todo.length;i+=2){
-    if(st){ st.style.display='block'; st.textContent='Scanning '+Math.min(i+2,todo.length)+' / '+todo.length+'…'; }
-    await Promise.all(todo.slice(i,i+2).map(function(v){ return scanLibraryItem(v.id); }));
-    await new Promise(function(r){ setTimeout(r,4000); });   // let ffmpeg finish before the next pair
+  var say=function(m){ if(st){ st.style.display='block'; st.textContent=m; } };
+  var total=todo.length, pass=0;
+  try{
+    while(pass<LIB_SCAN_PASSES){
+      pass++;
+      var remaining=libFiltered().filter(libNeedsScan);
+      if(!remaining.length) break;
+      for(var i=0;i<remaining.length;i+=LIB_SCAN_BATCH){
+        var chunk=remaining.slice(i,i+LIB_SCAN_BATCH);
+        say('Pass '+pass+' — sending '+Math.min(i+chunk.length,remaining.length)+' / '+remaining.length+'…');
+        await Promise.all(chunk.map(function(v){ return scanLibraryItem(v.id); }));
+        await new Promise(function(r){ setTimeout(r,3000); });
+      }
+      // verdicts land 30-90s after the job starts; poll rather than guess
+      for(var w=0;w<8;w++){
+        await new Promise(function(r){ setTimeout(r,15000); });
+        await loadContentScans();
+        var left=libFiltered().filter(libNeedsScan).length;
+        say('Pass '+pass+' — waiting on verdicts · '+(total-left)+' / '+total+' done');
+        if(!left) break;
+      }
+      if(!libFiltered().filter(libNeedsScan).length) break;
+    }
+    var stillLeft=libFiltered().filter(libNeedsScan).length;
+    say(stillLeft ? (total-stillLeft)+' of '+total+' scanned. '+stillLeft+' still failing — those are usually the very large files; try them on their own.'
+                  : 'All '+total+' scanned ✓');
+  } finally {
+    LIB_SCAN_RUNNING=false;
+    renderLibraryList();
   }
-  if(st) st.textContent='Queued all '+todo.length+'. Verdicts land over the next minute or two — the page refreshes them on its own.';
 }
 async function libSetState(id,state){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
