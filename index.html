@@ -3753,7 +3753,9 @@ var LIB_STATES={
   reusable:{label:'Reusable', icon:'☁️', style:'background:rgba(107,143,255,.18);color:var(--accent2);', help:'Its account moved to cloud phone. Free to reuse on cloud accounts.'},
   retired: {label:'Retired',  icon:'💤', style:'background:var(--surface2);color:var(--text2);',  help:'Do not use.'}
 };
-var LIB_MIN_SHORT_SIDE=1080;   // px — anything smaller has been compressed somewhere
+var LIB_MIN_LONG_SIDE=1080;    // px on the LONGEST edge. A vertical clip at 888x1920 is
+                               // full-HD by height -- testing the short side wrongly failed
+                               // anything that isn't exactly 9:16 (crops, screen recordings).
 var LIB_MIN_VIDEO_KBPS=1200;   // chat apps re-encode to ~500-1000 kbps
 var LIB_LOW_STOCK=5;           // fresh items per model before we flag it
 var LIB_MAX_BYTES=2147483648;  // 2 GB sanity cap
@@ -3793,12 +3795,14 @@ function libProbeFile(file){
     } else done({kind:'other'});
   });
 }
-// null = fine; string = plain-English reason it fails the HD rule
+// null = fine; string = plain-English reason it fails the HD rule.
+// Judge on the LONGEST edge: 1080x1920, 888x1920 and 1920x1080 are all HD; 720x1280 is not.
+// Bitrate is the better tell for chat-app re-encodes, so it's checked separately.
 function libHdVerdict(p){
-  if(!p||p.kind==='other'||p.error) return null; // can't judge here (e.g. HEVC on a desktop browser) — let it through, dims stay blank
-  const s=Math.min(p.width||0,p.height||0);
-  if(s&&s<LIB_MIN_SHORT_SIDE) return 'This one is only '+p.width+'×'+p.height+' — it has been compressed. Please send the original from your camera roll, not from WhatsApp / Messenger / Snapchat.';
-  if(p.kind==='video'&&p.kbps&&p.kbps<LIB_MIN_VIDEO_KBPS) return 'This video\'s quality is too low ('+p.kbps+' kbps) — it looks like it went through a chat app. Please upload the original file.';
+  if(!p||p.kind==='other'||p.error) return null; // can't judge (e.g. HEVC on desktop) — let it through, dims stay blank
+  const long=Math.max(p.width||0,p.height||0);
+  if(long&&long<LIB_MIN_LONG_SIDE) return 'This one is only '+p.width+'×'+p.height+' — too small to post. Please send the original from your camera roll, not from WhatsApp / Messenger / Snapchat.';
+  if(p.kind==='video'&&p.kbps&&p.kbps<LIB_MIN_VIDEO_KBPS) return 'This video\'s quality is low ('+p.kbps+' kbps) — it looks like it went through a chat app. Please upload the original if you have it.';
   return null;
 }
 function libPutWithProgress(url,file,onProgress){
@@ -3811,25 +3815,56 @@ function libPutWithProgress(url,file,onProgress){
     x.send(file);
   });
 }
-// Upload N files as library items. strictHd: reject (models) vs confirm (agency).
+// Upload N files as library items. strictHd: reject outright (models) vs ask (agency).
+// Everything is probed FIRST, then you get ONE question about the whole batch -- dragging
+// in 43 clips must never mean 43 dialogs.
 async function libUploadFiles(files,opt){
   opt=opt||{}; const results=[];
   const autoScan = files.length<=LIB_AUTOSCAN_MAX;
+
+  // ── pass 1: read dimensions/bitrate off each file (metadata only, no network) ──
+  const probes=[];
   for(let i=0;i<files.length;i++){
-    const file=files[i]; const label=(files.length>1?(i+1)+'/'+files.length+' · ':'')+file.name;
+    const file=files[i];
     if(file.size>LIB_MAX_BYTES){ results.push({file,skipped:'over 2 GB'}); continue; }
-    opt.onStatus&&opt.onStatus(label,'Checking quality…',0);
-    const probe=await libProbeFile(file);
-    const bad=libHdVerdict(probe);
-    if(bad){
-      if(opt.strictHd){ results.push({file,skipped:bad}); opt.onStatus&&opt.onStatus(label,'Skipped — not HD',0); continue; }
-      if(!confirm(bad+'\n\nUpload anyway?')){ results.push({file,skipped:bad}); continue; }
+    opt.onStatus&&opt.onStatus((i+1)+'/'+files.length+' · '+file.name,'Checking quality…',0);
+    probes.push({file, probe:await libProbeFile(file)});
+  }
+  if(!probes.length) return results;
+
+  // ── one decision for the whole batch ──
+  const bad=probes.filter(function(x){ return libHdVerdict(x.probe); });
+  let use=probes;
+  if(bad.length){
+    if(opt.strictHd){
+      bad.forEach(function(x){ results.push({file:x.file, skipped:libHdVerdict(x.probe)}); });
+      use=probes.filter(function(x){ return !libHdVerdict(x.probe); });
+      if(!use.length){
+        opt.onStatus&&opt.onStatus('','Nothing uploaded — every file was too low quality.',0);
+        return results;
+      }
+    } else {
+      const sample=bad.slice(0,5).map(function(x){ return '• '+x.file.name+' ('+(x.probe.width||'?')+'×'+(x.probe.height||'?')+')'; }).join('\n');
+      const msg = bad.length+' of '+probes.length+' file'+(probes.length===1?'':'s')+' look low quality:\n\n'+sample
+        +(bad.length>5?'\n…and '+(bad.length-5)+' more':'')
+        +'\n\nOK = upload everything anyway.\nCancel = skip just these '+bad.length+' and upload the rest.';
+      if(!confirm(msg)){
+        bad.forEach(function(x){ results.push({file:x.file, skipped:'below HD — skipped'}); });
+        use=probes.filter(function(x){ return !libHdVerdict(x.probe); });
+        if(!use.length){ opt.onStatus&&opt.onStatus('','Nothing uploaded — all files were skipped.',0); return results; }
+      }
     }
+  }
+
+  // ── pass 2: upload ──
+  for(let i=0;i<use.length;i++){
+    const file=use[i].file, probe=use[i].probe;
+    const label=(use.length>1?(i+1)+'/'+use.length+' · ':'')+file.name;
     const safe=(file.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
     const key='library/'+(opt.modelId||'agency')+'/'+Date.now()+'_'+i+'_'+safe;
     try{
       const url=await r2SignedUrl(key,'PUT');
-      await libPutWithProgress(url,file,function(p){ opt.onStatus&&opt.onStatus(label,'Uploading…',p); });
+      await libPutWithProgress(url,file,function(pc){ opt.onStatus&&opt.onStatus(label,'Uploading…',pc); });
       const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,
         uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
         width:probe.width||null,height:probe.height||null,duration_sec:(probe.duration&&isFinite(probe.duration))?Math.round(probe.duration*10)/10:null,bitrate_kbps:probe.kbps||null,thumb_data:probe.thumb||null};
@@ -4023,7 +4058,7 @@ function libCardHtml(i){
   const ps=libPostingsFor(i.id);
   const postedChip=ps.length?'<span class="cscan cscan-grey" style="cursor:pointer;" onclick="libShowPostings(\''+i.id+'\')">📌 posted ×'+ps.length+'</span>':'';
   const orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
-  const hdWarn=(i.width&&i.height&&Math.min(i.width,i.height)<LIB_MIN_SHORT_SIDE)?'<span class="cscan cscan-red" title="Below 1080 on the short side">⚠ not HD</span>':'';
+  const hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
   const st=i.state||'fresh';
   const stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩ Fresh</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
