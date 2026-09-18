@@ -565,6 +565,22 @@
       if(lang==='es'){ document.cookie='googtrans=/en/es;path=/;'; document.cookie='googtrans=/en/es;path=/;domain=.'+host+';'; }
       location.reload();
     }
+    // Who may see a translated chatting script.
+    //   chatter -> NO. They copy these lines straight to a fan, so the English must stay
+    //              exactly as written. A machine-translated PPV line would go out wrong.
+    //   model   -> YES. Checo reads Spanish and Raul reads no English at all; the script
+    //              is useless to them untranslated.
+    //   admin/va-> yes, their call.
+    // Google Translate honours class="notranslate" on any ancestor, so marking the page
+    // wrapper covers everything rendered into it afterwards.
+    function applyTranslationPolicy(role){
+      var lock = (role === 'chatter');
+      ['page-sheets','page-messages'].forEach(function(id){
+        var el=document.getElementById(id); if(!el) return;
+        el.classList.toggle('notranslate', lock);
+        if(lock) el.setAttribute('translate','no'); else el.removeAttribute('translate');
+      });
+    }
     function _highlightLang(){ var es=(document.cookie.indexOf('googtrans=/en/es')>-1); var n=document.querySelectorAll('.lang-opt'); for(var i=0;i<n.length;i++){ n[i].classList.toggle('active', n[i].getAttribute('data-lang')===(es?'es':'en')); } }
     document.addEventListener('DOMContentLoaded',_highlightLang);
   </script>
@@ -2944,6 +2960,7 @@ async function initApp(user) {
   }
   document.getElementById('user-email-display').textContent = profile.email;
   document.getElementById('user-role-display').textContent = profile.role;
+  applyTranslationPolicy(profile.role);
   buildNav(profile.role);
   await loadAllData();
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
