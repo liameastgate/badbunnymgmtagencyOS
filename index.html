@@ -4216,8 +4216,8 @@ function libCardHtml(i){
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
     +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
-  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:10px;'+(LIB_SEL[i.id]?'border-color:var(--accent);':'')+'">'
-    +'<input type="checkbox" '+(LIB_SEL[i.id]?'checked':'')+' onchange="libToggleSel(\''+i.id+'\',this.checked)" style="margin-top:4px;flex-shrink:0;">'
+  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:10px;align-items:flex-start;'+(LIB_SEL[i.id]?'border-color:var(--accent);':'')+'">'
+    +'<input type="checkbox" '+(LIB_SEL[i.id]?'checked':'')+' onchange="libToggleSel(\''+i.id+'\',this.checked)" style="flex:0 0 17px;width:17px;height:17px;min-width:17px;max-width:17px;margin:3px 0 0;align-self:flex-start;cursor:pointer;accent-color:var(--accent);">'
     +libThumbHtml(i,104)
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
