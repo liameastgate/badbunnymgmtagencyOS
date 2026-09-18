@@ -809,6 +809,22 @@
       <div id="mu-body"></div>
     </div>
 
+    <!-- Upload modal (Content Library) — model + category are chosen BEFORE the file
+     picker opens, so files can never land unfiled. -->
+    <div class="modal-overlay" id="cl-upload-modal">
+      <div class="modal" style="max-width:430px;">
+        <div class="modal-title"><span>Upload content</span><button class="modal-close" onclick="closeModal('cl-upload-modal')">✕</button></div>
+        <div class="form-group"><label>Model</label><select id="cl-up-model"></select></div>
+        <div class="form-group"><label>Category</label><select id="cl-up-cat">
+          <option value="social">📱 IG / TikTok / Snap</option>
+          <option value="reddit_x">🔞 Reddit / X</option>
+          <option value="photos">📸 Non-nude photos</option>
+        </select></div>
+        <div id="cl-up-alert" style="font-size:12px;color:#e6b428;min-height:16px;"></div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="libDoUpload()">📤 Choose files…</button></div>
+      </div>
+    </div>
+
     <!-- Mark-posted modal (Content Library) -->
     <div class="modal-overlay" id="lib-post-modal">
       <div class="modal" style="max-width:460px;">
@@ -3948,21 +3964,27 @@ async function deleteLibraryItem(id){
   if(it&&(it.storage_bucket||'r2')==='r2'){ try{ const url=await r2SignedUrl(it.r2_key,'DELETE'); fetch(url,{method:'DELETE'}); }catch(e){} }
   STATE.library=(STATE.library||[]).filter(function(x){return x.id!==id;}); renderLibraryList();
 }
-// Scan whatever in the current filter hasn't been scanned yet, a few at a time so the
-// Railway scanner isn't hit with fifty jobs at once.
+// Scan anything in view that has never been scanned OR whose last scan errored.
+// Batched small and paced: firing 40 jobs at once is what produced 33 x "could not
+// extract frames" -- the Railway box runs an ffmpeg per job and simply ran out of room.
 async function libScanUnscanned(){
-  var vids=(STATE.library||[]).filter(function(i){
+  var todo=libFiltered().filter(function(i){
     if(!libIsVideo(i)) return false;
-    if(LIB_F.model && (LIB_F.model==='agency' ? !!i.model_id : i.model_id!==LIB_F.model)) return false;
-    return !libScan(i);
+    var s=libScan(i);
+    return !s || !!s.scan_error;          // never scanned, or the last attempt failed
   });
-  if(!vids.length){ alert('Nothing left to scan in this view.'); return; }
-  if(!confirm('Scan '+vids.length+' video'+(vids.length===1?'':'s')+'?\n\nThey go through in batches of 3 — leave the page open.')) return;
-  for(var i=0;i<vids.length;i+=3){
-    await Promise.all(vids.slice(i,i+3).map(function(v){ return scanLibraryItem(v.id); }));
-    var st=document.getElementById('cl-upload-status');
-    if(st){ st.style.display='block'; st.textContent='Queued '+Math.min(i+3,vids.length)+' / '+vids.length+' for scanning…'; }
+  if(!todo.length){ alert('Nothing to scan here — everything in view already has a verdict.'); return; }
+  var failed=todo.filter(function(i){ var s=libScan(i); return s&&s.scan_error; }).length;
+  if(!confirm('Scan '+todo.length+' video'+(todo.length===1?'':'s')+'?'
+    +(failed?'\n('+failed+' of them failed last time and will be retried.)':'')
+    +'\n\nThey go through two at a time so the scanner keeps up. Leave this page open — it takes about a minute per pair.')) return;
+  var st=document.getElementById('cl-upload-status');
+  for(var i=0;i<todo.length;i+=2){
+    if(st){ st.style.display='block'; st.textContent='Scanning '+Math.min(i+2,todo.length)+' / '+todo.length+'…'; }
+    await Promise.all(todo.slice(i,i+2).map(function(v){ return scanLibraryItem(v.id); }));
+    await new Promise(function(r){ setTimeout(r,4000); });   // let ffmpeg finish before the next pair
   }
+  if(st) st.textContent='Queued all '+todo.length+'. Verdicts land over the next minute or two — the page refreshes them on its own.';
 }
 async function libSetState(id,state){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
@@ -4012,87 +4034,247 @@ function libPools(items){
 }
 
 // ── Agency Content Library page ─────────────────────────────────────────────
-var LIB_F={model:'',category:'',state:'',q:''};
+// ── Agency Content Library ───────────────────────────────────────────────────
+// Two levels, matching how the folders on disk already work: pick a model, then work
+// inside their content. Every file carries model + category + lifecycle state, so the
+// "folders" are just saved filters -- nothing is physically filed anywhere, and a file
+// can be re-filed without moving bytes.
+var LIB_F={model:'',category:'',state:'',q:'',view:'folders'};
+var LIB_SEL={};                                   // id -> true, for bulk actions
+
+function libSelCount(){ return Object.keys(LIB_SEL).length; }
+function libClearSel(){ LIB_SEL={}; renderLibraryList(); }
+function libToggleSel(id,on){ if(on) LIB_SEL[id]=true; else delete LIB_SEL[id]; renderLibraryList(); }
+function libSelectAllShown(){
+  var shown=libFiltered();
+  var all=shown.every(function(i){ return LIB_SEL[i.id]; });
+  shown.forEach(function(i){ if(all) delete LIB_SEL[i.id]; else LIB_SEL[i.id]=true; });
+  renderLibraryList();
+}
+function libOwnerKey(i){ return i.model_id || 'agency'; }
+function libOwnerName(key){
+  if(key==='agency') return '🏢 Agency';
+  var m=(STATE.models||[]).find(function(x){return x.id===key;});
+  return m?m.name:'Unknown';
+}
+
 function renderContentUpload(){
   const el=document.getElementById('cu-body'); if(!el) return;
   if(!['admin','va'].includes(STATE.profile?.role)){ el.innerHTML='<div class="empty"><div class="empty-icon">📁</div><p>The Content Library is for the agency team. Use <b>Upload</b> to send your content.</p></div>'; return; }
-  const models=(STATE.models||[]);
-  el.innerHTML=
-    '<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-    +'<select id="cl-f-model" onchange="LIB_F.model=this.value;renderLibraryList()" style="min-width:140px;"><option value="">All models</option><option value="agency">🏢 Agency</option>'+models.map(function(m){return '<option value="'+m.id+'"'+(LIB_F.model===m.id?' selected':'')+'>'+escapeHtml(m.name||'')+'</option>';}).join('')+'</select>'
-    +'<select id="cl-f-cat" onchange="LIB_F.category=this.value;renderLibraryList()"><option value="">All categories</option>'+Object.keys(LIB_CATEGORIES).map(function(k){return '<option value="'+k+'"'+(LIB_F.category===k?' selected':'')+'>'+LIB_CATEGORIES[k].icon+' '+LIB_CATEGORIES[k].label+'</option>';}).join('')+'<option value="none"'+(LIB_F.category==='none'?' selected':'')+'>— uncategorised</option></select>'
-    +'<select id="cl-f-state" onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">All states</option>'+Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
-    +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:160px;">'
-    +'<button id="cl-upload-btn" class="btn btn-primary" onclick="uploadLibraryFile()">📤 Upload</button>'
-    +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan any videos here that have not been scanned yet">🔍 Scan unscanned</button>'
-    +'<button class="btn btn-ghost" onclick="libGoFactory()" title="Open the Content Factory with this model selected">🏭 Content Factory</button>'
-    +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>'
-    +'<div id="cl-pools"></div><div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
+  el.innerHTML='<div id="cl-head"></div><div id="cl-pools"></div><div id="cl-list"><div style="color:var(--text2);font-size:12px;padding:12px;">Loading…</div></div>';
   loadContentLibrary().then(renderLibraryList);
 }
-function libGoFactory(){ STATE._cfPreselect=LIB_F.model&&LIB_F.model!=='agency'?LIB_F.model:null; navigate('content-factory'); }
+function libGoFactory(){ STATE._cfPreselect=(LIB_F.model&&LIB_F.model!=='agency')?LIB_F.model:null; navigate('content-factory'); }
+
+// Everything matching the current filters (used by the list, select-all and bulk actions).
+function libFiltered(){
+  var items=(STATE.library||[]);
+  if(LIB_F.model) items=items.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
+  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : i.category===LIB_F.category; });
+  if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
+  var q=(LIB_F.q||'').toLowerCase().trim();
+  if(q) items=items.filter(function(i){
+    var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
+    return ((i.title||'')+' '+(i.tags||'')+' '+(o&&o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')).toLowerCase().includes(q);
+  });
+  return items;
+}
+
 function renderLibraryList(){
-  const wrap=document.getElementById('cl-list'); if(!wrap) return;
-  const pools=document.getElementById('cl-pools');
-  const all=STATE.library||[];
-  // Pools: for the selected model (or every model), what's still usable — plus a low-stock line across ALL models.
-  const scope=all.filter(function(i){ return !LIB_F.model || (LIB_F.model==='agency'?!i.model_id:i.model_id===LIB_F.model); });
-  const p=libPools(scope);
-  const low=(STATE.models||[]).map(function(m){ const f=all.filter(function(i){return i.model_id===m.id&&i.state==='fresh';}).length; return {m:m,f:f}; }).filter(function(x){return x.f<LIB_LOW_STOCK;});
+  var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
+  if(!wrap) return;
+  var all=STATE.library||[];
+
+  // ── Level 1: a card per model ───────────────────────────────────────────
+  if(!LIB_F.model){
+    if(head) head.innerHTML='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text2);flex:1;">Pick a model</div>'
+      +'<button class="btn btn-primary" onclick="libOpenUpload()">📤 Upload</button>'
+      +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned, and retry anything that failed">🔍 Scan / retry failed</button>'
+      +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'
+      +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
+    if(pools) pools.innerHTML='';
+
+    var owners=[];
+    (STATE.models||[]).forEach(function(m){ owners.push(m.id); });
+    if(all.some(function(i){return !i.model_id;})) owners.push('agency');
+
+    wrap.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;">'
+      +owners.map(function(key){
+        var mine=all.filter(function(i){ return key==='agency' ? !i.model_id : i.model_id===key; });
+        var fresh=mine.filter(function(i){return (i.state||'fresh')==='fresh';}).length;
+        var bytes=mine.reduce(function(s,i){return s+(i.size_bytes||0);},0);
+        var cats=Object.keys(LIB_CATEGORIES).map(function(c){
+          var n=mine.filter(function(i){return i.category===c;}).length;
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+n+'</b></div>';
+        }).join('');
+        var unfiled=mine.filter(function(i){return !i.category;}).length;
+        return '<div class="card" style="margin:0;cursor:pointer;" onclick="libOpenModel(\''+key+'\')">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+          +'<div style="font-size:15px;font-weight:800;">'+escapeHtml(libOwnerName(key))+'</div>'
+          +'<div style="font-size:11px;color:var(--text2);">'+mine.length+' file'+(mine.length===1?'':'s')+'</div></div>'
+          +cats
+          +(unfiled?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e6b428;"><span>⚠ Uncategorised</span><b>'+unfiled+'</b></div>':'')
+          +'<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
+          +'<span style="color:'+(fresh<LIB_LOW_STOCK?'#e6b428':'#4ade80')+';">🟢 '+fresh+' fresh</span><span>'+libFmtSize(bytes)+'</span></div></div>';
+      }).join('')+'</div>';
+    return;
+  }
+
+  // ── Level 2: inside one model ───────────────────────────────────────────
+  var mine=all.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
+  var catTab=function(val,label,icon){
+    var n=(val==='none'?mine.filter(function(i){return !i.category;}):val?mine.filter(function(i){return i.category===val;}):mine).length;
+    var on=LIB_F.category===val;
+    return '<button onclick="LIB_F.category=\''+val+'\';renderLibraryList()" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;">'+(icon?icon+' ':'')+label+' <span style="opacity:.7;">'+n+'</span></button>';
+  };
+  if(head) head.innerHTML='<div class="card">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+    +'<button class="btn btn-ghost btn-sm" onclick="libBackToFolders()">← All models</button>'
+    +'<div style="font-size:16px;font-weight:800;flex:1;">'+escapeHtml(libOwnerName(LIB_F.model))+'</div>'
+    +'<button class="btn btn-primary" onclick="libOpenUpload()">📤 Upload</button>'
+    +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned here, and retry anything that failed">🔍 Scan / retry failed</button>'
+    +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+    +catTab('','All')+Object.keys(LIB_CATEGORIES).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
+    +(mine.some(function(i){return !i.category;})?catTab('none','Uncategorised','⚠'):'')+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    +'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
+    +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
+    +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
+    +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
+    +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
+
+  var p=libPools(mine);
+  var low=(STATE.models||[]).map(function(m){ return {m:m,f:all.filter(function(i){return i.model_id===m.id&&i.state==='fresh';}).length}; }).filter(function(x){return x.f<LIB_LOW_STOCK;});
   if(pools) pools.innerHTML='<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">'
     +statCard('🟢 Fresh',p.fresh,'green')+statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
-    +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+' — time to raise content orders.</div>':'');
-  const q=(LIB_F.q||'').toLowerCase().trim();
-  let items=scope;
-  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none'?!i.category:i.category===LIB_F.category; });
-  if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
-  if(q) items=items.filter(function(i){ const o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null; return ((i.title||'')+' '+(i.tags||'')+' '+(o&&o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')).toLowerCase().includes(q); });
-  if(!items.length){ wrap.innerHTML='<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(all.length?' with these filters':' yet — hit <strong>Upload</strong>, or wait for the models to send content')+'.</p></div>'; return; }
-  wrap.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>';
+    +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+'</div>':'');
+
+  var items=libFiltered();
+  var bar=libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'category\')">🏷 Set category</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
+    +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
+    +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
+
+  wrap.innerHTML=bar+(items.length
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>'
+    : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
 }
+function libOpenModel(key){ LIB_F.model=key; LIB_F.category=''; LIB_F.state=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.state=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+
 function libCardHtml(i){
-  const mdl=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
-  const o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
-  const dims=(i.width&&i.height)?i.width+'×'+i.height:'';
-  const meta=[dims,libFmtDur(i.duration_sec),libFmtSize(i.size_bytes),fmtDate(i.created_at)].filter(Boolean).join(' · ');
-  const ps=libPostingsFor(i.id);
-  const postedChip=ps.length?'<span class="cscan cscan-grey" style="cursor:pointer;" onclick="libShowPostings(\''+i.id+'\')">📌 posted ×'+ps.length+'</span>':'';
-  const orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
-  const hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
-  const st=i.state||'fresh';
-  const stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩ Fresh</button>'
+  var mdl=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
+  var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
+  var dims=(i.width&&i.height)?i.width+'×'+i.height:'';
+  var meta=[dims,libFmtDur(i.duration_sec),libFmtSize(i.size_bytes),fmtDate(i.created_at)].filter(Boolean).join(' · ');
+  var ps=libPostingsFor(i.id);
+  var postedChip=ps.length?'<span class="cscan cscan-grey" style="cursor:pointer;" onclick="libShowPostings(\''+i.id+'\')">📌 ×'+ps.length+'</span>':'';
+  var orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
+  var hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
+  var st=i.state||'fresh';
+  var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
     +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
-  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:12px;">'+libThumbHtml(i,120)
+  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:10px;'+(LIB_SEL[i.id]?'border-color:var(--accent);':'')+'">'
+    +'<input type="checkbox" '+(LIB_SEL[i.id]?'checked':'')+' onchange="libToggleSel(\''+i.id+'\',this.checked)" style="margin-top:4px;flex-shrink:0;">'
+    +libThumbHtml(i,104)
     +'<div style="flex:1;min-width:0;">'
-    +'<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
-    +'<div style="font-size:11px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.owner_type==='agency'?'Agency':'—'))+(meta?' · '+meta:'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;">'
-    +(st!=='retired'?'<button class="btn btn-sm btn-primary" onclick="libOpenPost(\''+i.id+'\')" title="Record that this went out on an account">📌 Posted</button>':'')
-    +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll (full quality)">📲</button>'
+    +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
+    +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:3px;flex-wrap:wrap;">'
+    +(st!=='retired'?'<button class="btn btn-sm btn-primary" onclick="libOpenPost(\''+i.id+'\')" title="Record that this went out on an account">📌</button>':'')
+    +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll">📲</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')" title="Download">⬇</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit title / tags / category">✏</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit">✏</button>'
     +stateBtns
     +'<button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')" title="Delete">✕</button>'
     +'</div></div></div>';
 }
-async function uploadLibraryFile(){
-  const modelSel=LIB_F.model; const modelId=(modelSel&&modelSel!=='agency')?modelSel:null;
-  let cat=LIB_F.category&&LIB_F.category!=='none'?LIB_F.category:null;
-  if(!cat){ const c=prompt('Category for these files — social / reddit_x / photos:','social'); if(c===null) return; cat=LIB_CATEGORIES[c.trim()]?c.trim():null; }
-  const files=await libPickFiles(cat?LIB_CATEGORIES[cat].accept:'video/*,image/*',true); if(!files.length) return;
-  const btn=document.getElementById('cl-upload-btn'); const st=document.getElementById('cl-upload-status');
-  if(btn){ btn.textContent='Uploading…'; btn.disabled=true; } if(st) st.style.display='block';
-  const res=await libUploadFiles(files,{modelId:modelId,ownerType:modelId?'model':'agency',category:cat,strictHd:false,onStatus:function(l,s,p){ if(st) st.textContent=l+' — '+s+(p&&p<1?' '+Math.round(p*100)+'%':''); }});
-  if(btn){ btn.textContent='📤 Upload'; btn.disabled=false; }
-  const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
+
+// ── Bulk actions ────────────────────────────────────────────────────────────
+async function libBulkMove(what){
+  var ids=Object.keys(LIB_SEL); if(!ids.length) return;
+  var patch=null, label='';
+  if(what==='model'){
+    var opts=(STATE.models||[]).map(function(m,n){return (n+1)+' = '+m.name;}).join('\n');
+    var pick=prompt('Move '+ids.length+' file'+(ids.length===1?'':'s')+' to which model?\n\n'+opts+'\n0 = Agency (no model)','1');
+    if(pick===null) return;
+    var n=parseInt(pick,10);
+    if(n===0){ patch={model_id:null}; label='Agency'; }
+    else { var m=(STATE.models||[])[n-1]; if(!m){ alert('No model '+pick); return; } patch={model_id:m.id}; label=m.name; }
+  } else if(what==='category'){
+    var keys=Object.keys(LIB_CATEGORIES);
+    var co=keys.map(function(k,n){return (n+1)+' = '+LIB_CATEGORIES[k].label;}).join('\n');
+    var cp=prompt('Set the category for '+ids.length+' file'+(ids.length===1?'':'s')+':\n\n'+co,'1');
+    if(cp===null) return;
+    var ci=parseInt(cp,10)-1; if(!keys[ci]){ alert('No category '+cp); return; }
+    patch={category:keys[ci]}; label=LIB_CATEGORIES[keys[ci]].label;
+  } else {
+    var sk=Object.keys(LIB_STATES);
+    var so=sk.map(function(k,n){return (n+1)+' = '+LIB_STATES[k].label;}).join('\n');
+    var sp=prompt('Set the state for '+ids.length+' file'+(ids.length===1?'':'s')+':\n\n'+so,'1');
+    if(sp===null) return;
+    var si=parseInt(sp,10)-1; if(!sk[si]){ alert('No state '+sp); return; }
+    patch={state:sk[si],state_changed_at:new Date().toISOString()}; label=LIB_STATES[sk[si]].label;
+  }
+  var r=await sb.from('content_library').update(patch).in('id',ids).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  (STATE.library||[]).forEach(function(i){ if(LIB_SEL[i.id]) Object.assign(i,patch); });
+  LIB_SEL={}; renderLibraryList();
+  var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
+}
+async function libBulkDelete(){
+  var ids=Object.keys(LIB_SEL); if(!ids.length) return;
+  if(!confirm('Delete '+ids.length+' file'+(ids.length===1?'':'s')+' permanently? This cannot be undone.')) return;
+  var gone=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]; });
+  var r=await sb.from('content_library').delete().in('id',ids).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  gone.forEach(function(i){ if((i.storage_bucket||'r2')==='r2'){ r2SignedUrl(i.r2_key,'DELETE').then(function(u){ fetch(u,{method:'DELETE'}); }).catch(function(){}); } });
+  STATE.library=(STATE.library||[]).filter(function(i){ return !LIB_SEL[i.id]; });
+  LIB_SEL={}; renderLibraryList();
+}
+
+// ── Upload (asks for model + category BEFORE the file picker) ──────────────
+function libOpenUpload(){
+  var sel=document.getElementById('cl-up-model');
+  if(sel){
+    sel.innerHTML='<option value="">— pick a model —</option>'
+      +(STATE.models||[]).map(function(m){return '<option value="'+m.id+'">'+escapeHtml(m.name||'')+'</option>';}).join('')
+      +'<option value="agency">🏢 Agency (no model)</option>';
+    sel.value=(LIB_F.model||'');
+  }
+  var c=document.getElementById('cl-up-cat');
+  if(c) c.value=(LIB_F.category&&LIB_F.category!=='none')?LIB_F.category:'social';
+  var a=document.getElementById('cl-up-alert'); if(a) a.textContent='';
+  openModal('cl-upload-modal');
+}
+async function libDoUpload(){
+  var owner=(document.getElementById('cl-up-model')||{}).value||'';
+  var cat=(document.getElementById('cl-up-cat')||{}).value||'';
+  var a=document.getElementById('cl-up-alert');
+  if(!owner){ if(a) a.textContent='Pick a model first — otherwise the files land unfiled.'; return; }
+  if(!cat){ if(a) a.textContent='Pick a category.'; return; }
+  var modelId = owner==='agency' ? null : owner;
+  var files=await libPickFiles(LIB_CATEGORIES[cat].accept,true);
+  if(!files.length) return;
+  closeModal('cl-upload-modal');
+  // jump to where the files will land so the progress is visible
+  LIB_F.model=owner; LIB_F.category=cat; renderLibraryList();
+  var st=document.getElementById('cl-upload-status'); if(st) st.style.display='block';
+  var res=await libUploadFiles(files,{modelId:modelId,ownerType:modelId?'model':'agency',category:cat,strictHd:false,
+    onStatus:function(l,s,p){ if(st) st.textContent=l+' — '+s+(p&&p<1?' '+Math.round(p*100)+'%':''); }});
+  var ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
   if(st) st.textContent=ok+' uploaded'+(files.length>LIB_AUTOSCAN_MAX?' · scan skipped for a bulk drop — use “Scan unscanned” when you want it':'')
-    +(bad.length?' · '+bad.length+' not uploaded ('+bad.map(function(b){return b.file.name+': '+(b.error||b.skipped);}).join('; ')+')':'');
+    +(bad.length?' · '+bad.length+' not uploaded ('+bad.slice(0,3).map(function(b){return b.file.name;}).join(', ')+(bad.length>3?'…':'')+')':'');
   renderLibraryList();
 }
 
-// ── Model Upload page ───────────────────────────────────────────────────────
 async function renderModelUpload(){
   const el=document.getElementById('mu-body'); if(!el) return;
   const me=myOwnModel();
