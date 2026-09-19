@@ -2224,6 +2224,7 @@
       <div class="page-title">Fans</div>
       <div class="page-sub">New subs waiting for a first message, and everything we know about the ones who talk.</div>
       <div id="fans-tabs"></div>
+      <div id="today-body"></div>
       <div id="new-subs-body"></div>
       <div id="fan-stats-body" hidden></div>
     </div>
@@ -9479,6 +9480,20 @@ function fsCss(){
     +'.fs-hours i.peak{opacity:1;background:var(--yellow);}'
     +'.fs-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);}'
     +'.fs-ai{border-left:3px solid var(--accent);}'
+    +'.fs-care{border-radius:12px;padding:14px 16px;margin-bottom:14px;border:1px solid;font-size:13px;line-height:1.55;}'
+    +'.fs-care .lv{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;}'
+    +'.fs-care q{display:block;font-style:italic;margin:6px 0 0;opacity:.85;} .fs-care q:before,.fs-care q:after{content:\"\";}'
+    +'.fs-care .g{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12);}'
+    +'.fs-care.gentle{background:rgba(234,179,8,.10);border-color:rgba(234,179,8,.45);} .fs-care.gentle .lv{color:var(--yellow);}'
+    +'.fs-care.no_selling{background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.5);} .fs-care.no_selling .lv{color:#fb923c;}'
+    +'.fs-care.urgent{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.6);} .fs-care.urgent .lv{color:var(--red);}'
+    +'.fs-care .stale{float:right;font-weight:600;opacity:.7;text-transform:none;letter-spacing:0;}'
+    +'.fs-band{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 8px;}'
+    +'.fs-band span{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}'
+    +'.fs-band .ok{background:rgba(34,197,94,.15);color:var(--green);}'
+    +'.fs-band .no{background:rgba(239,68,68,.15);color:var(--red);}'
+    +'.fs-band .none{background:var(--surface);color:var(--text2);font-weight:600;}'
+    +'.fs-over{color:var(--red);font-weight:700;}'
     +'.fs-fact{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}'
     +'.fs-fact:last-child{border-bottom:0;} .fs-fact b{min-width:84px;color:var(--text2);font-weight:600;}'
     +'.fs-fact q{display:block;color:var(--text2);font-size:12px;font-style:italic;margin-top:2px;} .fs-fact q:before,.fs-fact q:after{content:"";}'
@@ -9559,6 +9574,44 @@ function fsPaint(){
   el.innerHTML=h;
 }
 
+var FS_CARE={gentle:'Go gently with him',no_selling:'No paid asks right now',urgent:'Read this before you message him'};
+
+// Anything he has said about money or his life is dated. A fact keeps, a state
+// goes stale - after 6 weeks we show it greyed rather than pretending it's now.
+function fsStale(at){
+  if(!at) return '';
+  var d=Math.round((Date.now()-new Date(at).getTime())/864e5);
+  return d>42?'said '+Math.round(d/7)+' weeks ago \u2014 check it still stands':'said '+(d<1?'today':d+'d ago');
+}
+
+function fsCareBlock(P){
+  var c=P.care||{}; if(!c.level) return '';
+  return '<div class="fs-care '+c.level+'"><span class="lv">'+(FS_CARE[c.level]||c.level)
+    +'<span class="stale">'+escapeHtml(fsStale(c.at))+'</span></span>'
+    +escapeHtml(c.what||'')
+    +(c.quote?'<q>'+escapeHtml(c.quote)+'</q>':'')
+    +(c.guidance?'<div class="g">'+escapeHtml(c.guidance)+'</div>':'')
+    +'</div>';
+}
+
+function fsLimitBlock(P,f){
+  var L=P.limits||{}; if(!L.cap&&L.ok==null&&L.too_much==null) return '';
+  var band='<div class="fs-band">'
+    +(L.ok!=null?'<span class="ok">fine with '+fsMoney(L.ok)+'</span>':'')
+    +(L.too_much!=null?'<span class="no">called '+fsMoney(L.too_much)+' too much</span>':'')
+    +(L.ok==null&&L.too_much==null?'<span class="none">no number yet</span>':'')
+    +'<span class="none">'+escapeHtml(fsStale(L.at))+'</span></div>';
+  var over='';
+  if(L.too_much!=null&&(FS.msgs||[]).length){
+    var bad=FS.msgs.filter(function(m){return m.direction==='out'&&m.price>=L.too_much&&!m.purchased;});
+    if(bad.length) over='<div class="fs-sub" style="margin-top:8px;"><span class="fs-over">'+bad.length+' PPV sent at or above that</span> and not opened. Price under '+fsMoney(L.too_much)+' next time.</div>';
+  }
+  return '<div class="fs-card"><div class="fs-sec">What he can spend \u2014 in his words</div>'+band
+    +'<div style="font-size:13px;line-height:1.55;">'+escapeHtml(L.cap||'')+'</div>'
+    +(L.quote?'<q style="display:block;color:var(--text2);font-size:12px;font-style:italic;margin-top:6px;">'+escapeHtml(L.quote)+'</q>':'')
+    +over+'</div>';
+}
+
 function fsCard(f){
   var tier=fsTier(f), P=FS.profile||{};
   var quietDays=f.last_msg_in_at?Math.round((Date.now()-new Date(f.last_msg_in_at).getTime())/864e5):null;
@@ -9576,6 +9629,8 @@ function fsCard(f){
     +'<div class="fs-st"><div class="v '+(quietDays==null?'':quietDays>=7&&f.total_net>=50?'bad':quietDays>=3?'warn':'')+'">'+(quietDays==null?'—':quietDays+'d')+'</div><div class="k">since he last messaged</div></div>'
     +'<div class="fs-st"><div class="v">'+f.msgs_in+' / '+f.msgs_out+'</div><div class="k">his msgs / ours · mostly '+escapeHtml(f.top_chatter||'—')+'</div></div>'
     +'</div></div>';
+
+  h+=fsCareBlock(P)+fsLimitBlock(P,f);
 
   // what to do with him — stage, flags, next move (Section 6)
   var flags=(f.flags||[]);
@@ -9638,16 +9693,167 @@ async function fsSaveNote(fanId, val){
 }
 
 // ── Fans page: one nav item, the queue + the profiles ────────────────────────
-var FANS_TAB = 'new';
+var FANS_TAB = 'today';
+// ── Today: the worklist ──────────────────────────────────────────────────────
+// One ordered list of who to message next, built server-side in fan_worklist so
+// every chatter on shift sees the same order and nobody works the same man twice.
+var WL={rows:[],q:'',page:'',loaded:false,busy:false,show:25};
+var WL_Q={care:'Care',vip:'VIP gone cold',untapped:'Untapped',unopened:'Unopened PPV',winback:'Win-back',talks:'Talks, never bought',cold:'Never messaged'};
+var WL_ORDER=['care','vip','untapped','unopened','winback','talks','cold'];
+var WL_CLAIM_HOURS=4;
+
+function wlCss(){
+  if(document.getElementById('wl-css')) return;
+  var s=document.createElement('style'); s.id='wl-css';
+  s.textContent='.wl-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}'
+    +'.wl-kpi{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;cursor:pointer;min-width:96px;}'
+    +'.wl-kpi.on{border-color:var(--accent);background:rgba(74,158,255,.08);}'
+    +'.wl-kpi .v{font-size:19px;font-weight:700;line-height:1.1;}'
+    +'.wl-kpi .k{font-size:11px;color:var(--text2);margin-top:2px;}'
+    +'.wl-kpi .m{font-size:11px;color:var(--green);font-weight:600;}'
+    +'.wl-row{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}'
+    +'.wl-row.mine{border-color:var(--accent);}'
+    +'.wl-row.taken{opacity:.55;}'
+    +'.wl-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}'
+    +'.wl-nm{font-weight:700;font-size:15px;cursor:pointer;} .wl-nm:hover{text-decoration:underline;}'
+    +'.wl-pg{font-size:12px;color:var(--text2);}'
+    +'.wl-q{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;background:var(--surface);color:var(--text2);}'
+    +'.wl-q.care{background:rgba(239,68,68,.16);color:var(--red);}'
+    +'.wl-q.vip{background:rgba(234,179,8,.16);color:var(--yellow);}'
+    +'.wl-q.untapped{background:rgba(34,197,94,.16);color:var(--green);}'
+    +'.wl-q.unopened{background:rgba(249,115,22,.16);color:#fb923c;}'
+    +'.wl-why{font-size:13px;margin:5px 0 0;}'
+    +'.wl-sum{font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5;}'
+    +'.wl-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}'
+    +'.wl-chips span{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;}'
+    +'.wl-chips .ok{background:rgba(34,197,94,.15);color:var(--green);}'
+    +'.wl-chips .no{background:rgba(239,68,68,.15);color:var(--red);}'
+    +'.wl-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;}'
+    +'.wl-act .who{font-size:12px;color:var(--text2);margin-right:4px;}'
+    +'.wl-more{text-align:center;margin:14px 0;}';
+  document.head.appendChild(s);
+}
+
+function wlClaimLive(r){ return r.claimed_by && r.claimed_at && !r.done_at && (Date.now()-new Date(r.claimed_at).getTime()) < WL_CLAIM_HOURS*36e5; }
+
+async function wlLoad(){
+  var r=await sb.from('fan_worklist').select('*').limit(600);
+  WL.rows=r.data||[]; WL.loaded=true;
+}
+
+async function renderToday(){
+  var el=document.getElementById('today-body'); if(!el) return;
+  fsCss(); wlCss();
+  if(!WL.loaded){ el.innerHTML='<div class="empty"><p>Building the list…</p></div>'; await wlLoad(); }
+  wlPaint();
+}
+
+function wlPaint(){
+  var el=document.getElementById('today-body'); if(!el) return;
+  var me=nqMe();
+  var pages=[]; WL.rows.forEach(function(r){ if(pages.indexOf(r.creator)<0) pages.push(r.creator); }); pages.sort();
+  var byQ={}; WL.rows.forEach(function(r){ if(WL.page&&r.creator!==WL.page) return; (byQ[r.queue]=byQ[r.queue]||[]).push(r); });
+
+  var h='<div class="fs-sub" style="margin-bottom:10px;">Worked top to bottom. The order is the same for everyone on shift — claim a man before you open him so two of you don\'t land in the same inbox.</div>';
+
+  h+='<div class="wl-kpis">';
+  h+='<div class="wl-kpi'+(WL.q===''?' on':'')+'" onclick="WL.q=\'\';WL.show=25;wlPaint()"><div class="v">'+WL.rows.filter(function(r){return !WL.page||r.creator===WL.page;}).length+'</div><div class="k">everyone</div></div>';
+  WL_ORDER.forEach(function(q){
+    var rows=byQ[q]||[]; if(!rows.length) return;
+    var net=rows.reduce(function(a,r){return a+Number(r.total_net||0);},0);
+    h+='<div class="wl-kpi'+(WL.q===q?' on':'')+'" onclick="WL.q=\''+q+'\';WL.show=25;wlPaint()">'
+      +'<div class="v">'+rows.length+'</div><div class="k">'+WL_Q[q]+'</div>'
+      +(net>=1?'<div class="m">'+fsMoney(net)+' lifetime</div>':'')+'</div>';
+  });
+  h+='</div>';
+
+  if(pages.length>1){
+    h+='<div class="wl-kpis" style="margin-bottom:14px;"><div class="wl-kpi'+(WL.page===''?' on':'')+'" style="min-width:0;padding:6px 12px;" onclick="WL.page=\'\';WL.show=25;wlPaint()"><div class="k">all pages</div></div>'
+      +pages.map(function(p){ return '<div class="wl-kpi'+(WL.page===p?' on':'')+'" style="min-width:0;padding:6px 12px;" onclick="WL.page=\''+p.replace(/'/g,"\\'")+'\';WL.show=25;wlPaint()"><div class="k">'+escapeHtml(p)+'</div></div>'; }).join('')+'</div>';
+  }
+
+  var list=WL.rows.filter(function(r){ return (!WL.q||r.queue===WL.q)&&(!WL.page||r.creator===WL.page); });
+  if(!list.length){ el.innerHTML=h+'<div class="empty"><p>Nothing in this queue. Good.</p></div>'; return; }
+
+  h+=list.slice(0,WL.show).map(function(r){
+    var live=wlClaimLive(r), mine=live&&r.claimed_by===me, taken=live&&!mine;
+    var L=r.limits||{}, C=r.care||{};
+    var id="'"+r.creator.replace(/'/g,"\\'")+"','"+r.fan_id+"','"+r.queue+"'";
+    var out='<div class="wl-row'+(mine?' mine':taken?' taken':'')+'">'
+      +'<div class="wl-top"><span class="wl-q '+r.queue+'">'+WL_Q[r.queue]+'</span>'
+      +'<span class="wl-nm" onclick="wlOpen('+id+')">'+escapeHtml(r.fan_name||('fan '+r.fan_id))+'</span>'
+      +'<span class="wl-pg">'+escapeHtml(r.creator)+(r.tz_label?' · '+escapeHtml(r.tz_label):'')+'</span></div>'
+      +'<div class="wl-why">'+escapeHtml(r.reason||'')+'</div>';
+    if(C.level) out+='<div class="wl-why" style="color:var(--yellow);">'+escapeHtml(C.guidance||C.what||'')+'</div>';
+    if(r.summary) out+='<div class="wl-sum">'+escapeHtml(String(r.summary).slice(0,260))+'</div>';
+    if(L.ok!=null||L.too_much!=null){
+      out+='<div class="wl-chips">'+(L.ok!=null?'<span class="ok">fine with '+fsMoney(L.ok)+'</span>':'')
+        +(L.too_much!=null?'<span class="no">called '+fsMoney(L.too_much)+' too much</span>':'')+'</div>';
+    }
+    out+='<div class="wl-act">';
+    if(taken){ out+='<span class="who">'+escapeHtml(r.claimed_by)+' is on him</span>'; }
+    else if(mine){
+      out+='<span class="who">yours</span>'
+        +'<button class="btn btn-sm btn-primary" onclick="wlDone('+id+',\'messaged\')">Messaged</button>'
+        +'<button class="btn btn-sm btn-ghost" onclick="wlDone('+id+',\'sold\')">Sold</button>'
+        +'<button class="btn btn-sm btn-ghost" onclick="wlDone('+id+',\'not_now\')">Not now</button>'
+        +'<button class="btn btn-sm btn-ghost" onclick="wlClaim('+id+',false)">Release</button>';
+    } else {
+      out+='<button class="btn btn-sm btn-primary" onclick="wlClaim('+id+',true)">Claim</button>';
+    }
+    out+='<button class="btn btn-sm btn-ghost" onclick="wlOpen('+id+')">Open his card</button></div></div>';
+    return out;
+  }).join('');
+
+  if(list.length>WL.show) h+='<div class="wl-more"><button class="btn btn-sm btn-ghost" onclick="WL.show+=25;wlPaint()">Show 25 more ('+(list.length-WL.show)+' left)</button></div>';
+  el.innerHTML=h;
+}
+
+function wlOpen(creator, fanId){
+  FANS_TAB='fans'; renderFans();
+  setTimeout(function(){ fsOpen(creator, fanId); }, 0);
+}
+
+async function wlWrite(creator, fanId, queue, patch){
+  if(WL.busy) return; WL.busy=true;
+  var row=Object.assign({creator:creator, fan_id:fanId, queue:queue}, patch);
+  var res=await sb.from('fan_work').insert(row);
+  WL.busy=false;
+  if(res.error){ toast && toast('Not saved'); return false; }
+  var r=WL.rows.find(function(x){ return x.creator===creator && x.fan_id===fanId; });
+  if(r) Object.assign(r, {claimed_by:null,claimed_at:null,done_at:null,done_by:null,outcome:null}, patch);
+  return true;
+}
+
+async function wlClaim(creator, fanId, queue, take){
+  var ok=await wlWrite(creator, fanId, queue, take
+    ? {claimed_by:nqMe(), claimed_at:new Date().toISOString()}
+    : {claimed_by:null, claimed_at:null});
+  if(ok) wlPaint();
+}
+
+async function wlDone(creator, fanId, queue, outcome){
+  var ok=await wlWrite(creator, fanId, queue,
+    {claimed_by:nqMe(), claimed_at:new Date().toISOString(),
+     done_by:nqMe(), done_at:new Date().toISOString(), outcome:outcome});
+  if(!ok) return;
+  // he drops off the list for 5 days, same as the view
+  WL.rows=WL.rows.filter(function(x){ return !(x.creator===creator && x.fan_id===fanId); });
+  wlPaint();
+}
+
 function renderFans(){
   var el=document.getElementById('fans-tabs'); if(!el) return;
   el.innerHTML='<div class="tabs" style="margin-bottom:14px;">'
+    +'<div class="tab'+(FANS_TAB==='today'?' active':'')+'" onclick="FANS_TAB=\'today\';renderFans()">🎯 Today</div>'
     +'<div class="tab'+(FANS_TAB==='new'?' active':'')+'" onclick="FANS_TAB=\'new\';renderFans()">⏰ New subs</div>'
     +'<div class="tab'+(FANS_TAB==='fans'?' active':'')+'" onclick="FANS_TAB=\'fans\';renderFans()">🧑‍💼 Fan stats</div>'
     +'</div>';
-  var a=document.getElementById('new-subs-body'), b=document.getElementById('fan-stats-body');
-  if(FANS_TAB==='new'){ b.hidden=true; a.hidden=false; renderNewSubs(); }
-  else { a.hidden=true; b.hidden=false; renderFanStats(); }
+  var t=document.getElementById('today-body'), a=document.getElementById('new-subs-body'), b=document.getElementById('fan-stats-body');
+  t.hidden=FANS_TAB!=='today'; a.hidden=FANS_TAB!=='new'; b.hidden=FANS_TAB!=='fans';
+  if(FANS_TAB==='today') renderToday();
+  else if(FANS_TAB==='new') renderNewSubs();
+  else renderFanStats();
 }
 
 // ── Chat analyser ────────────────────────────────────────────
