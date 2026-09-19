@@ -95,6 +95,9 @@
   .two-col > .card, .two-col-wide > .card { margin-bottom: 0; }
   .page { display: none; }
   .page.active { display: block; }
+  .cf-l{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;} .cf-chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;} .cf-ok{background:rgba(74,222,128,.14);color:#4ade80;} .cf-warn{background:rgba(255,200,60,.16);color:#ffc83c;} .cf-bad{background:rgba(239,68,68,.16);color:#f87171;} .cf-shadow{background:rgba(249,115,22,.16);color:#fb923c;} .cf-none{background:var(--surface2);color:var(--text2);}
+  .cf-t{width:100%;border-collapse:collapse;} .cf-t th{text-align:left;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border-bottom:1px solid var(--border);font-weight:700;} .cf-t td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px;} .cf-t tr.cf-row:hover td{background:rgba(255,255,255,.02);} .cf-exp{display:none;} .cf-exp.open{display:table-row;} .cf-exp td{background:var(--surface2);padding:14px 16px;}
+  .cf-run{display:grid;grid-template-columns:80px 60px 1fr 58px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px;align-items:center;} .cf-sub{color:var(--text2);font-size:11.5px;} .cf-flag{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--border);} .cf-flag:last-child{border-bottom:0;} .cf-plan{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;} .cf-plan>div{background:var(--surface2);border-radius:8px;padding:8px 10px;font-size:12px;}
   .page-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.5px; color: #ffffff; }
   .page-sub { color: var(--text2); font-size: 10px; margin-bottom: 22px; letter-spacing: 2px; text-transform: uppercase; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-bottom: 14px; }
@@ -2029,6 +2032,65 @@
       <div id="sd-wrap"></div>
     </div>
 
+
+    <!-- Scanner Trainer -->
+    <div class="page" id="page-trainer">
+      <div class="page-title">🎓 Scanner Trainer</div>
+      <div class="page-sub">Feed it clips Meta actually took down. Each one becomes a <b>case</b> — a physical description of what was in it — that the Content Scanner reads before judging anything new. It is a library, not a model: every case is readable, switchable and deletable.</div>
+      <div id="tr-status" style="margin-bottom:14px;"></div>
+
+      <div class="two-col-wide">
+        <div class="card" style="max-width:560px;">
+          <div class="card-title">Add a takedown</div>
+          <div class="form-group full"><label>Why did Meta remove it?</label>
+            <textarea id="tr-reason" rows="3" placeholder="Paste Meta's exact wording if you have the notice. Otherwise your own read of it."></textarea></div>
+          <div class="form-group full"><label>Where did that reason come from?</label>
+            <select id="tr-reason-source">
+              <option value="notice">Meta's notice — I have the wording</option>
+              <option value="memory" selected>My memory of what happened</option>
+              <option value="guess">Honestly a guess</option>
+            </select></div>
+          <div class="two-col">
+            <div class="form-group"><label>Account</label><input id="tr-account" placeholder="liammliftss"></div>
+            <div class="form-group"><label>Account state before this post</label>
+              <select id="tr-strike">
+                <option value="unknown" selected>Don't know</option>
+                <option value="clean">Clean — no prior warnings</option>
+                <option value="warned">Had a warning</option>
+                <option value="striked">Already striked</option>
+              </select></div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6;margin:-4px 0 12px;">Account state matters more than it looks. If every removed clip came from an account that was already in trouble, the patterns the scanner finds may be tracking the <i>account</i>, not the content — which is how a scanner quietly becomes stricter instead of smarter.</div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="tr-add-btn" onclick="trAddClips()">Choose clips…</button>
+          </div>
+          <div id="tr-upload-status" style="margin-top:10px;font-size:13px;"></div>
+        </div>
+
+        <div class="card" style="max-width:520px;">
+          <div class="card-title">Does the library actually work?</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+            The useless test is "does it catch the clip I just added" — of course it does, the answer is sitting in front of it.
+            <br><br>
+            This runs <b>leave-one-out</b>: every case is re-scanned using a memory built from all the <i>other</i> cases. If the scanner still flags it, the library generalises to content it has never seen. If the score is near zero you have a lookup table, and adding more clips will not help.
+          </div>
+          <div id="tr-sweep-score" style="margin:16px 0;"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="tr-sweep-btn" onclick="trRunSweep()">Run full sweep</button>
+            <button class="btn btn-ghost" onclick="trTestClip()">Test a new clip…</button>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:10px;">One scan per case — 30 cases is a few minutes and real API spend. Run it after adding a batch, not after every clip.</div>
+          <div id="tr-sweep-body" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Case library <span id="tr-count" style="color:var(--text2);font-weight:400;"></span></div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Turn a case off when it starts causing flags you disagree with. The record stays; it just stops being shown to the scanner.</div>
+        <div id="tr-cases"></div>
+      </div>
+    </div>
+
     <!-- Proxy Checker -->
     <div class="page" id="page-proxy-checker">
       <div class="page-title">🛰️ Proxy Checker</div>
@@ -2494,6 +2556,44 @@
 
     <!-- Management -->
     <!-- Accounts vault -->
+    <!-- Cloud Farm -->
+    <div class="page" id="page-cloud-farm">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div><div class="page-title">☁️ Cloud Farm</div><div class="page-sub">Multilogin &amp; GeeLark phones, driven by the phone service on Railway. All times AEST.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span id="cf-pool" style="font-size:12px;color:var(--text2);"></span>
+          <button class="btn btn-sm btn-ghost" onclick="phSync('multilogin').then(loadCloudFarm)">⟳ Multilogin</button>
+          <button class="btn btn-sm btn-ghost" onclick="phSync('geelark').then(loadCloudFarm)">⟳ GeeLark</button>
+          <button class="btn btn-sm btn-ghost" onclick="cfToggleSched()">🗓 Schedule <span id="cf-sched-chip" class="acc-status st-disabled">off</span></button>
+        </div>
+      </div>
+      <span id="ph-sync-msg" style="font-size:12px;color:var(--text2);"></span>
+      <div id="cf-stats" class="stats-grid" style="margin:14px 0;"></div>
+      <div id="cf-flags"></div>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+          <div><label class="cf-l">Run</label><select id="cf-kind" onchange="cfEstimate()"><option value="warmup">Warm-up</option><option value="post_auto">Post — next unused clip</option><option value="post_pick">Post — pick a clip…</option><option value="health">Health check only</option></select></div>
+          <div><label class="cf-l">At once (max)</label><input type="number" id="cf-par" value="4" min="1" max="6" style="width:70px;" onchange="cfEstimate()"></div>
+          <div><label class="cf-l">Spread over</label><select id="cf-spread" onchange="cfEstimate()"><option value="45">45 min</option><option value="20">20 min</option><option value="90">90 min</option><option value="0">Now</option></select></div>
+          <div><label class="cf-l">Warm-up before post</label><select id="cf-prewarm"><option value="1">Yes</option><option value="0">No</option></select></div>
+          <div><label class="cf-l">Health check</label><select id="cf-health"><option value="daily">If not done today</option><option value="always">Always</option><option value="skip">Skip</option></select></div>
+          <div style="flex:1;"></div>
+          <div id="cf-est" style="font-size:12px;color:var(--text2);text-align:right;line-height:1.5;"></div>
+          <button class="btn btn-primary" onclick="cfRunBatch()">▶ Run batch</button>
+        </div>
+        <div id="cf-sched" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+        <select id="cf-f-model" onchange="renderCloudFarm()" style="width:auto;"><option value="">All models</option></select>
+        <select id="cf-f-backend" onchange="renderCloudFarm()" style="width:auto;"><option value="">Both vendors</option><option value="multilogin">Multilogin</option><option value="geelark">GeeLark</option></select>
+        <select id="cf-f-health" onchange="renderCloudFarm()" style="width:auto;"><option value="">Any health</option><option value="healthy">healthy</option><option value="cautious">cautious</option><option value="shadowbanned">shadowbanned</option><option value="banned">banned</option><option value="unchecked">unchecked</option></select>
+        <input id="cf-q" placeholder="search handle / name" style="width:200px;" oninput="renderCloudFarm()">
+        <span style="flex:1;"></span>
+        <span style="font-size:12px;color:var(--text2);">Select: <a href="#" onclick="cfSelect('on');return false;">all in use</a> · <a href="#" onclick="cfSelect('ok');return false;">healthy only</a> · <a href="#" onclick="cfSelect('none');return false;">none</a></span>
+      </div>
+      <div class="card" style="padding:0 6px;"><div id="cf-table"></div></div>
+      <div class="card" id="cf-plan" style="margin-top:12px;"></div>
+    </div>
     <div class="page" id="page-accounts">
       <div class="page-title">🔐 Accounts</div>
       <div class="page-sub">Every login, proxy, phone and handle — for the agency and each model — in one place. Tap a card field to copy it.</div>
@@ -2564,53 +2664,31 @@
       </div>
     </div>
 
+    <!-- Journal — replaces the old Drawing Board. Capture bar + four views (Today,
+         recurring Jobs, Ideas & goals, Brain dump). Built for someone who loses things
+         the moment they leave the screen: one capture box, a hard cap of three focus
+         items, nothing hidden in folders, and no red overdue shaming. -->
     <div class="page" id="page-management">
-      <div class="page-title">Drawing Board</div>
-      <div class="page-sub">Agency goals and KPI tracking</div>
-      <div class="two-col">
-        <div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-            <div class="stat-card accent">
-              <div class="stat-label">Revenue Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-revenue-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Model Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-model-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">models</span>
-              </div>
-            </div>
-            <div class="stat-card accent">
-              <div class="stat-label">Agency Net Target (weekly)</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <span style="font-weight:700;">$</span>
-                <input type="number" id="kpi-net-target" placeholder="0" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:110px;color:var(--text);" onchange="saveKPI()">
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Renewal Rate Target</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                <input type="number" id="kpi-renew-target" placeholder="80" style="font-size:20px;font-weight:800;background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;width:70px;color:var(--text);" onchange="saveKPI()">
-                <span style="font-size:13px;color:var(--text2);">%</span>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title">Agency Notes</div>
-            <textarea id="agency-notes" placeholder="Strategy notes, priorities, anything important for the team..." style="width:100%;min-height:180px;background:var(--surface2);" onchange="saveKPI()"></textarea>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">KPI vs Actuals — Latest Week</div>
-          <div id="kpi-comparison"></div>
-        </div>
-      </div>
+      <div class="page-title">Journal</div>
+      <div class="page-sub">Jobs, ideas, goals — everything out of your head</div>
+      <div id="jn-body"></div>
     </div>
 
+  </div>
+</div>
+
+<div class="modal-overlay" id="jn-job-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-title"><span id="jn-job-modal-title">New job</span><button class="modal-close" onclick="closeModal('jn-job-modal')">✕</button></div>
+    <div class="form-group"><label>Job</label><input id="jn-job-title" placeholder="e.g. Check the sub queue" onkeydown="if(event.key==='Enter')jnSaveJob()"></div>
+    <div class="form-group"><label>How often</label><select id="jn-job-cad">
+      <option value="daily">🔁 Every day</option><option value="weekly">🗓 Every week (resets Monday)</option><option value="monthly">📆 Every month (resets on the 1st)</option>
+    </select></div>
+    <div class="form-group"><label>Notes (optional)</label><input id="jn-job-notes" placeholder="Anything you'll forget"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="jnSaveJob()">💾 Save</button>
+      <button class="btn btn-danger" id="jn-job-delete" onclick="jnDeleteJob()">Delete</button>
+    </div>
   </div>
 </div>
 
@@ -2919,7 +2997,9 @@ var NAV = [
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
+  { id: 'cloud-farm',  icon: '☁️', label: 'Cloud Farm',         roles: ['admin','va'],                             section: 'Tools' },
   { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',   roles: ['admin','va'],                             section: 'Tools' },
+  { id: 'trainer',     icon: '🎓', label: 'Scanner Trainer',    roles: ['admin'],                                  section: 'Tools' },
   { id: 'content-factory', icon: '🏭', label: 'Content Factory',   roles: ['admin','va'],                             section: 'Tools' },
   { id: 'chat-analyser', icon: '🧪', label: 'Chat Analyser',       roles: ['admin','va'],                             section: 'Tools' },
   { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Tools' },
@@ -2939,7 +3019,7 @@ var NAV = [
   { id: 'models',     icon: '👤', label: 'Model Settings',      roles: ['admin','va'],                             section: 'Models' },
 
   { id: 'accounts',   icon: '🔐', label: 'Accounts',            roles: ['admin','va'],                             section: 'Management' },
-  { id: 'management', icon: '🎯', label: 'Drawing Board',       roles: ['admin','va'],                             section: 'Management' },
+  { id: 'management', icon: '📓', label: 'Journal',             secret: true, roles: [],                            section: 'Management' },
   { id: 'expenses',   icon: '💸', label: 'Expenses',            roles: ['admin','va'],                             section: 'Management' },
   { id: 'team',       icon: '🔑', label: 'Team Access',         roles: ['admin'],                                  section: 'Management' },
   { id: 'personal-dashboard', icon: '🔒', label: 'Dashboard',          secret: true, roles: [], section: 'My Accounts' },
@@ -3220,7 +3300,7 @@ function navigate(page) {
   if (page === 'chat-analyser') renderChatAnalyser();
   if (page === 'sops') { SOP_CATEGORY='chatting'; loadSOPs(); }
   if (page === 'traffic-sops') { SOP_CATEGORY='traffic'; loadSOPs(); }
-  if (page === 'management') loadManagement();
+  if (page === 'management') renderJournal();
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') renderSchedulePage();
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
@@ -3243,6 +3323,8 @@ function navigate(page) {
   if (page === 'traffic') loadTraffic();
   if (page === 'proxy-checker') renderProxyChecker();
   if (page === 'signup-desk') renderSignupDesk();
+  if (page === 'trainer') renderTrainer();
+  if (page === 'cloud-farm') loadCloudFarm();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -4388,6 +4470,267 @@ async function muUploadForOrder(orderId){
   if(btn){ btn.textContent=old; btn.disabled=false; }
   if(isModel) renderModelUpload().then(function(){ const s=document.getElementById('mu-status'); if(s&&r&&(r.item||r.error||r.skipped)) { s.style.display='block'; } });
   else if(typeof filterContentOrders==='function') filterContentOrders();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SCANNER TRAINER
+//
+// A library of clips Meta actually actioned, described physically, injected
+// into the scanner prompt as reference. Deliberately NOT a trained model:
+//
+//   * every case is human-readable, so a flag you disagree with is traceable
+//     to one specific stored case
+//   * cases toggle off individually, so a bad one costs one click, not a
+//     retrain
+//   * the scanner must CITE the case it matched and quote the shared feature.
+//     No citation is not a valid reason to flag.
+//
+// That citation rule is the whole safety property. A model given only bad
+// examples and no structure learns a mood — "this account posts risky stuff"
+// — and gets uniformly stricter, which is exactly the drift we are trying to
+// avoid. Forcing it to name a case keeps every flag falsifiable.
+// ══════════════════════════════════════════════════════════════════════════
+var TR_CASES=[], TR_SWEEP=null, TR_POLL=null;
+
+async function renderTrainer(){
+  if(TR_POLL){clearInterval(TR_POLL);TR_POLL=null;}
+  trHealth(); await trLoadCases(); trLoadLastSweep();
+}
+
+async function trHealth(){
+  var el=document.getElementById('tr-status'); if(!el) return;
+  try{
+    const{data}=await sb.functions.invoke('trainer-service',{body:{action:'health'}});
+    if(data&&!data.error) el.innerHTML='<div style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.4);border-radius:10px;padding:10px 14px;font-size:13px;color:#4ade80;">● Scan service online</div>';
+    else throw new Error((data&&data.error)||'no response');
+  }catch(e){
+    el.innerHTML='<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);">⚠️ Trainer service not reachable. Deploy the edge function with <code>supabase functions deploy trainer-service</code>, and redeploy the Railway box from <code>C:\\automation\\scan_service</code> so it has the trainer endpoints.</div>';
+  }
+}
+
+async function trLoadCases(){
+  const{data,error}=await sb.from('takedown_cases').select('*').order('created_at',{ascending:false});
+  if(error){ document.getElementById('tr-cases').innerHTML='<div style="color:var(--red);font-size:13px;">Could not load cases: '+escapeHtml(error.message)+'<br><span style="color:var(--text2);">The <code>takedown_cases</code> table may not exist yet — run <code>trainer_schema.sql</code> in the Supabase SQL editor.</span></div>'; return; }
+  TR_CASES=data||[]; trRenderCases();
+}
+
+function trRenderCases(){
+  var el=document.getElementById('tr-cases'); if(!el) return;
+  var cnt=document.getElementById('tr-count');
+  var act=TR_CASES.filter(function(c){return c.active&&c.case_json;}).length;
+  if(cnt) cnt.textContent='· '+act+' active of '+TR_CASES.length;
+  if(!TR_CASES.length){ el.innerHTML='<div class="empty" style="padding:30px 0;"><div class="empty-icon">🎓</div><p>No cases yet. Add the clips you know were taken down — 20 to 30 is enough to be useful.</p></div>'; return; }
+
+  el.innerHTML=TR_CASES.map(function(c){
+    var cj=c.case_json||{};
+    var feats=(cj.key_features||[]).map(function(f){return '<li style="margin:2px 0;">'+escapeHtml(String(f))+'</li>';}).join('');
+    var state=c.build_error
+      ? '<span class="cscan cscan-red" title="'+escapeHtml(c.build_error)+'">⚠ build failed</span>'
+      : (cj.summary? (c.active?'<span class="cscan cscan-green">● in use</span>':'<span class="cscan cscan-grey">○ off</span>')
+                   : '<span class="cscan cscan-grey">⏳ describing…</span>');
+    var src={notice:'📄 Meta notice',memory:'🧠 from memory',guess:'❓ guess'}[c.reason_source]||'';
+    var thumb=c.thumb_data?'<div class="ch-thumb" style="background-image:url(\''+String(c.thumb_data).replace(/'/g,"%27")+'\');flex:0 0 64px;height:64px;border-radius:8px;"></div>':'<div style="flex:0 0 64px;height:64px;border-radius:8px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">🎬</div>';
+    return '<div style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">'
+      +thumb
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">'
+          +'<b style="font-size:13px;">'+escapeHtml(c.file_name||'(clip)')+'</b>'+state
+          +(c.account?'<span style="font-size:12px;color:var(--text2);">@'+escapeHtml(c.account)+'</span>':'')
+          +(c.strike_state&&c.strike_state!=='unknown'?'<span class="cscan cscan-grey">'+escapeHtml(c.strike_state)+' before post</span>':'')
+        +'</div>'
+        +(cj.summary?'<div style="font-size:13px;margin-bottom:6px;">'+escapeHtml(cj.summary)+'</div>':'')
+        +(c.reason_given?'<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">'+escapeHtml(src)+': “'+escapeHtml(c.reason_given)+'”</div>':'')
+        +(feats?'<ul style="font-size:12px;color:var(--text2);margin:6px 0 0 16px;padding:0;">'+feats+'</ul>':'')
+      +'</div>'
+      +'<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">'
+        +'<button class="btn btn-sm btn-ghost" onclick="trToggle(\''+c.id+'\')">'+(c.active?'Turn off':'Turn on')+'</button>'
+        +(c.build_error||!cj.summary?'<button class="btn btn-sm btn-ghost" onclick="trRebuild(\''+c.id+'\')">Retry</button>':'')
+        +'<button class="btn btn-sm btn-ghost" style="color:var(--red);" onclick="trDelete(\''+c.id+'\')">Delete</button>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+async function trAddClips(){
+  var reason=(document.getElementById('tr-reason').value||'').trim();
+  if(!reason && !confirm('No reason entered. The reason is the most useful thing in a case — Meta\'s own wording most of all.\n\nAdd anyway?')) return;
+  var files=await libPickFiles('video/*,image/*',true);
+  if(!files.length) return;
+  var meta={reason_given:reason,
+            reason_source:document.getElementById('tr-reason-source').value,
+            account:(document.getElementById('tr-account').value||'').trim()||null,
+            strike_state:document.getElementById('tr-strike').value};
+  var st=document.getElementById('tr-upload-status');
+  var btn=document.getElementById('tr-add-btn'); btn.disabled=true;
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    st.textContent='Uploading '+(i+1)+' of '+files.length+': '+f.name;
+    try{
+      var probe=await libProbeFile(f);
+      var safe=(f.name||'clip').replace(/[^a-zA-Z0-9._-]/g,'_');
+      var key='takedowns/'+Date.now()+'_'+i+'_'+safe;
+      var url=await r2SignedUrl(key,'PUT');
+      await libPutWithProgress(url,f,function(){});
+      var row=Object.assign({file_name:f.name,storage_bucket:'bbm-content',
+                             storage_path:key,thumb_data:probe.thumb||null},meta);
+      const{data:ins,error}=await sb.from('takedown_cases').insert(row).select();
+      if(error) throw new Error(error.message);
+      st.textContent='Describing '+f.name+'…';
+      var signed=await r2SignedUrl(key,'GET');
+      await sb.functions.invoke('trainer-service',{body:{action:'case',case_id:ins[0].id,url:signed,frames:8}});
+    }catch(e){ st.innerHTML='<span style="color:var(--red);">'+escapeHtml(f.name)+': '+escapeHtml(String(e.message||e))+'</span>'; }
+  }
+  btn.disabled=false;
+  st.textContent=files.length+' clip(s) added. Descriptions land in 30–90s each.';
+  document.getElementById('tr-reason').value='';
+  await trLoadCases();
+  // descriptions are written asynchronously by the service — refresh a few times
+  [20000,50000,90000].forEach(function(t){ setTimeout(trLoadCases,t); });
+}
+
+async function trToggle(id){
+  var c=TR_CASES.find(function(x){return x.id===id;}); if(!c) return;
+  const{error}=await sb.from('takedown_cases').update({active:!c.active}).eq('id',id);
+  if(error){ alert('Could not update: '+error.message); return; }
+  c.active=!c.active; trRenderCases();
+}
+
+async function trDelete(id){
+  var c=TR_CASES.find(function(x){return x.id===id;});
+  if(!confirm('Delete this case permanently?\n\nIf you only want it out of the scanner, "Turn off" keeps the record.')) return;
+  const{error}=await sb.from('takedown_cases').delete().eq('id',id);
+  if(error){ alert('Could not delete: '+error.message); return; }
+  if(c&&c.storage_path){ try{ var u=await r2SignedUrl(c.storage_path,'DELETE'); fetch(u,{method:'DELETE'}); }catch(e){} }
+  await trLoadCases();
+}
+
+async function trRebuild(id){
+  var c=TR_CASES.find(function(x){return x.id===id;}); if(!c||!c.storage_path) return;
+  try{
+    var signed=await r2SignedUrl(c.storage_path,'GET');
+    await sb.functions.invoke('trainer-service',{body:{action:'case',case_id:id,url:signed,frames:8}});
+    [20000,50000].forEach(function(t){ setTimeout(trLoadCases,t); });
+  }catch(e){ alert('Retry failed: '+e); }
+}
+
+// ── leave-one-out ─────────────────────────────────────────────────────────
+async function trLoadLastSweep(){
+  const{data}=await sb.from('trainer_sweeps').select('*').order('started_at',{ascending:false}).limit(1);
+  if(data&&data.length){ TR_SWEEP=data[0]; trRenderSweep(); if(TR_SWEEP.status==='running') trPollSweep(TR_SWEEP.id); }
+}
+
+async function trRunSweep(){
+  var n=TR_CASES.filter(function(c){return c.active&&c.case_json;}).length;
+  if(n<3){ alert('Only '+n+' built cases. Leave-one-out needs at least 3 to mean anything.'); return; }
+  if(!confirm('This re-scans all '+n+' cases — about '+n+' vision calls and a few minutes.\n\nRun it?')) return;
+  var btn=document.getElementById('tr-sweep-btn'); btn.disabled=true; btn.textContent='Running…';
+  try{
+    const{data,error}=await sb.functions.invoke('trainer-service',{body:{action:'sweep',frames:8}});
+    if(error||!data||data.error||!data.sweep_id) throw new Error((data&&data.error)||(error&&error.message)||'unknown error');
+    trPollSweep(data.sweep_id);
+  }catch(e){ alert('Could not start: '+e); btn.disabled=false; btn.textContent='Run full sweep'; }
+}
+
+function trPollSweep(id){
+  if(TR_POLL){clearInterval(TR_POLL);}
+  TR_POLL=setInterval(async function(){
+    const{data}=await sb.from('trainer_sweeps').select('*').eq('id',id).single();
+    if(!data) return;
+    TR_SWEEP=data; trRenderSweep();
+    if(data.status!=='running'){
+      clearInterval(TR_POLL); TR_POLL=null;
+      var btn=document.getElementById('tr-sweep-btn'); if(btn){btn.disabled=false;btn.textContent='Run full sweep';}
+    }
+  },5000);
+}
+
+function trRenderSweep(){
+  var score=document.getElementById('tr-sweep-score');
+  var body=document.getElementById('tr-sweep-body');
+  if(!score||!TR_SWEEP) return;
+  var s=TR_SWEEP;
+
+  if(s.status==='running'){
+    score.innerHTML='<div style="font-size:13px;color:var(--text2);">⏳ Sweeping'+(s.n_cases?' '+s.n_cases+' cases':'')+'… this takes a few minutes.</div>';
+    if(body) body.innerHTML=''; return;
+  }
+  if(s.status==='error'){
+    score.innerHTML='<div style="color:var(--red);font-size:13px;">Sweep failed: '+escapeHtml(s.error||'')+'</div>';
+    if(body) body.innerHTML=''; return;
+  }
+
+  var n=s.n_cases||0, c=s.n_caught||0, pct=n?Math.round(c/n*100):0;
+  var col = pct>=70?'#4ade80' : pct>=40?'#e6b428' : 'var(--red)';
+  var read = pct>=70 ? 'The library transfers — cases it has never seen are being recognised from the others.'
+           : pct>=40 ? 'Partial transfer. Some patterns generalise, some cases are one-offs. More cases should help.'
+           : 'Little transfer. Right now this is closer to a lookup table than a pattern library — adding more of the same kind of clip probably will not fix it.';
+  score.innerHTML=
+    '<div style="display:flex;align-items:baseline;gap:10px;"><span style="font-size:34px;font-weight:700;color:'+col+';">'+c+'/'+n+'</span>'
+    +'<span style="font-size:13px;color:var(--text2);">caught without seeing themselves ('+pct+'%)</span></div>'
+    +'<div style="font-size:13px;color:var(--text2);margin-top:8px;line-height:1.6;">'+read+'</div>'
+    +(s.n_cited!=null?'<div style="font-size:12px;color:var(--text2);margin-top:6px;">'+s.n_cited+' of those named a specific case as the match — the rest were caught on the guidelines alone.</div>':'')
+    +'<div style="font-size:12px;color:var(--text2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border);line-height:1.6;"><b>Read this as agreement with your labels, not with Meta.</b> Clips that went for account-level reasons rather than content can never be caught from content, so the ceiling here is below 100% no matter how good the library gets.</div>';
+
+  if(!body) return;
+  var rows=(s.per_case||[]);
+  if(!rows.length){ body.innerHTML=''; return; }
+  body.innerHTML='<details><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);">Per-case detail</summary><div style="margin-top:10px;">'
+    +rows.map(function(r){
+      var ok=r.caught?'<span class="cscan cscan-green">caught</span>':'<span class="cscan cscan-grey">missed</span>';
+      if(r.error) ok='<span class="cscan cscan-red">'+escapeHtml(r.error)+'</span>';
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">'
+        +'<div style="flex:1;min-width:0;"><b>'+escapeHtml(r.file_name||'')+'</b>'
+        +(r.reason?'<div style="color:var(--text2);">'+escapeHtml(r.reason)+'</div>':'')
+        +(r.cited_case?'<div style="color:var(--text2);">cited case '+escapeHtml(String(r.cited_case))+(r.feature?' — '+escapeHtml(String(r.feature)):'')+'</div>':'')
+        +'</div><div style="flex:0 0 auto;">'+ok+'</div></div>';
+    }).join('')+'</div></details>';
+}
+
+// ── test a single new clip, memory on vs memory off ───────────────────────
+async function trTestClip(){
+  var files=await libPickFiles('video/*,image/*',false);
+  if(!files.length) return;
+  var f=files[0];
+  var body=document.getElementById('tr-sweep-body');
+  body.innerHTML='<div style="font-size:13px;color:var(--text2);">⏳ Scanning '+escapeHtml(f.name)+' twice — with the case library and without…</div>';
+  try{
+    var key='trainer-test/'+Date.now()+'_'+(f.name||'clip').replace(/[^a-zA-Z0-9._-]/g,'_');
+    var put=await r2SignedUrl(key,'PUT');
+    await libPutWithProgress(put,f,function(){});
+    var signed=await r2SignedUrl(key,'GET');
+    const{data,error}=await sb.functions.invoke('trainer-service',{body:{action:'test',url:signed,frames:8}});
+    if(error||!data||!data.job_id) throw new Error((data&&data.error)||'could not start');
+    var tries=0;
+    var poll=setInterval(async function(){
+      tries++;
+      const{data:j}=await sb.functions.invoke('trainer-service',{body:{action:'job',job_id:data.job_id}});
+      if(!j) return;
+      if(j.status==='running'){ if(tries>40){clearInterval(poll); body.innerHTML='<div style="color:var(--red);font-size:13px;">Timed out waiting for the scan.</div>';} return; }
+      clearInterval(poll);
+      try{ var d=await r2SignedUrl(key,'DELETE'); fetch(d,{method:'DELETE'}); }catch(e){}
+      if(j.status!=='done'){ body.innerHTML='<div style="color:var(--red);font-size:13px;">'+escapeHtml(j.error||'scan failed')+'</div>'; return; }
+      trRenderTest(f.name,j);
+    },4000);
+  }catch(e){ body.innerHTML='<div style="color:var(--red);font-size:13px;">'+escapeHtml(String(e.message||e))+'</div>'; }
+}
+
+function trRenderTest(name,j){
+  var body=document.getElementById('tr-sweep-body');
+  function side(title,v){
+    var m=COMPLIANCE_META[v&&v.instagram_outcome]||{cls:'cscan-grey',short:'—',icon:''};
+    var cm=(v&&v.case_match)||{};
+    return '<div style="flex:1;min-width:190px;border:1px solid var(--border);border-radius:12px;padding:14px;">'
+      +'<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'+title+'</div>'
+      +'<span class="cscan '+m.cls+'" style="font-size:13px;padding:6px 14px;">'+m.icon+' '+m.short+'</span>'
+      +(v&&v.primary_reason?'<div style="font-size:12px;color:var(--text2);margin-top:10px;line-height:1.5;">'+escapeHtml(v.primary_reason)+'</div>':'')
+      +(cm.matched&&cm.case_id?'<div style="font-size:12px;margin-top:8px;color:var(--accent2);">matched case '+escapeHtml(String(cm.case_id))+(cm.shared_feature?' — “'+escapeHtml(String(cm.shared_feature))+'”':'')+'</div>':'')
+      +'</div>';
+  }
+  var verdict = j.changed
+    ? '<div style="font-size:13px;margin-top:12px;padding:10px 14px;border-radius:10px;background:rgba(230,180,40,.1);border:1px solid rgba(230,180,40,.3);line-height:1.6;"><b>The library changed the verdict.</b> Check the cited case on the right — if you disagree with it, turn that case off and the change goes away.</div>'
+    : '<div style="font-size:13px;margin-top:12px;color:var(--text2);">Same verdict either way — the library did not affect this clip.</div>';
+  body.innerHTML='<div style="font-weight:700;font-size:13px;margin-bottom:10px;">'+escapeHtml(name)+' · tested against '+(j.n_cases||0)+' cases</div>'
+    +'<div style="display:flex;gap:12px;flex-wrap:wrap;">'+side('Without the library',j.without_memory)+side('With the library',j.with_memory)+'</div>'+verdict;
 }
 
 // ── Content Library compliance (scan R2 videos via presigned URL) ──────────
@@ -7089,6 +7432,268 @@ async function phEdit(id){
   await loadPhoneAccounts();
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// CLOUD FARM — the fleet page. phone_accounts rows are the phones; phone_runs
+// is what they did; phone_flags is what IG said about them; phone_settings
+// ('scheduler') is the fleet plan. Everything is shown in AEST.
+// ══════════════════════════════════════════════════════════════════════════
+var CF={sel:new Set(),open:new Set(),settings:{},flags:[],today:{},jobs:[],loaded:false};
+var CF_TZ='Australia/Sydney';
+function cfDay(d){ return new Intl.DateTimeFormat('en-AU',{timeZone:CF_TZ,day:'numeric',month:'short'}).format(d); }
+function cfTime(d){ return new Intl.DateTimeFormat('en-AU',{timeZone:CF_TZ,hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
+function cfAEST(ts){
+  if(!ts) return '—';
+  var d=new Date(ts), now=new Date(), day=cfDay(d);
+  var pre= day===cfDay(now)?'' : day===cfDay(new Date(now.getTime()-86400000))?'Yst ' : day+' ';
+  return pre+cfTime(d);
+}
+function cfMins(r){ if(!r||!r.started_at||!r.finished_at) return null; return Math.round((new Date(r.finished_at)-new Date(r.started_at))/6000)/10; }
+function cfHealthChip(a){
+  var h=a.health||'unchecked', cls={healthy:'cf-ok',cautious:'cf-warn',shadowbanned:'cf-shadow',banned:'cf-bad'}[h]||'cf-none';
+  var label=h==='shadowbanned'?'possible shadowban':h==='banned'?'BANNED':h;
+  var open=CF.flags.filter(function(f){return f.account_id===a.id;});
+  if(open.some(function(f){return f.kind==='post_removed';})&&h!=='banned') return '<span class="cf-chip cf-bad" title="'+escapeHtml(a.health_note||'')+'">post removed</span>';
+  return '<span class="cf-chip '+cls+'" title="'+escapeHtml(a.health_note||'')+'">'+label+'</span>';
+}
+async function loadCloudFarm(){
+  var el=document.getElementById('cf-table'); if(el&&!CF.loaded) el.innerHTML='<div class="cf-sub" style="padding:14px;">Loading…</div>';
+  var q=await Promise.all([
+    sb.from('phone_accounts').select('*').order('model',{ascending:true}).order('profile_name',{ascending:true}),
+    sb.from('phone_runs').select('id,account_id,ok,kind,started_at,finished_at,error,caption,clip_key,posted_at,rtt_ms,reels:stats->reels,likes:stats->likes,profiles:stats->profiles,skip:stats->skip,watch:stats->watch,rewatch:stats->rewatch,cooldown:stats->cooldown,health:stats->health').order('started_at',{ascending:false}).limit(800),
+    sb.from('phone_flags').select('*').is('dismissed_at',null).order('created_at',{ascending:false}),
+    sb.from('phone_settings').select('*').eq('key','scheduler').maybeSingle(),
+    sb.from('phone_runs_today').select('*'),
+    sb.from('phone_jobs').select('id,account_id,kind,status,not_before,payload,requested_by').in('status',['queued','running']).order('not_before',{ascending:true})
+  ]);
+  STATE.phoneAccounts=q[0].data||[]; STATE._phoneErr=q[0].error?q[0].error.message:null;
+  STATE.phoneRuns=q[1].data||[];
+  CF.flags=q[2].data||[]; CF.settings=(q[3].data&&q[3].data.value)||{};
+  CF.today={}; (q[4].data||[]).forEach(function(r){ CF.today[r.account_id]=r; });
+  CF.jobs=q[5].data||[];
+  if(!STATE.accounts||!STATE.accounts.length){ var r=await sb.from('accounts').select('id,handle,email,platform,model_id,status'); STATE.accounts=r.data||[]; }
+  if(!CF.loaded){ CF.loaded=true; STATE.phoneAccounts.forEach(function(a){ if(a.enabled) CF.sel.add(a.id); }); }
+  var fm=document.getElementById('cf-f-model');
+  if(fm&&fm.options.length<=1){ var ms={}; STATE.phoneAccounts.forEach(function(a){ if(a.model) ms[a.model]=1; }); Object.keys(ms).sort().forEach(function(m){ var o=document.createElement('option'); o.value=m; o.textContent=m; fm.appendChild(o); }); }
+  renderCloudFarm(); cfPool();
+}
+function cfPhones(){
+  var fm=(document.getElementById('cf-f-model')||{}).value||'', fb=(document.getElementById('cf-f-backend')||{}).value||'', fh=(document.getElementById('cf-f-health')||{}).value||'', q=((document.getElementById('cf-q')||{}).value||'').toLowerCase().trim();
+  return (STATE.phoneAccounts||[]).filter(function(a){
+    if(fm&&(a.model||'')!==fm) return false; if(fb&&(a.backend||'multilogin')!==fb) return false; if(fh&&(a.health||'unchecked')!==fh) return false;
+    if(q&&![a.profile_name,a.handle,a.model,a.notes].some(function(v){return String(v||'').toLowerCase().includes(q);})) return false;
+    return true; });
+}
+function cfRunsFor(id){ return (STATE.phoneRuns||[]).filter(function(r){return r.account_id===id;}); }
+function cfNextJob(id){ return CF.jobs.find(function(j){return j.account_id===id;}); }
+function renderCloudFarm(){
+  var wrap=document.getElementById('cf-table'); if(!wrap) return;
+  var P=cfPhones(), all=STATE.phoneAccounts||[];
+  var runsToday=0, postsToday=0, minsToday=0; Object.keys(CF.today).forEach(function(k){ runsToday+=CF.today[k].runs||0; postsToday+=CF.today[k].posts||0; minsToday+=parseFloat(CF.today[k].minutes||0); });
+  var st=document.getElementById('cf-stats');
+  if(st) st.innerHTML=statCard('Phones',all.length)+statCard('In use',all.filter(function(a){return a.enabled;}).length,'accent')+statCard('Runs today',runsToday)+statCard('Posts today',postsToday)+statCard('Phone min today',Math.round(minsToday))+statCard('Flags',CF.flags.length,CF.flags.length?'warn':'',CF.flags.length?'red':'');
+  var chip=document.getElementById('cf-sched-chip'); if(chip){ chip.textContent=CF.settings.enabled?'on':'off'; chip.className='acc-status '+(CF.settings.enabled?'st-active':'st-disabled'); }
+  // flags
+  var fl=document.getElementById('cf-flags');
+  if(fl){
+    if(!CF.flags.length) fl.innerHTML='';
+    else fl.innerHTML='<div class="card" style="border-color:rgba(255,200,60,.45);margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>🚩 Flags ('+CF.flags.length+')</b><span class="cf-sub">from Account Status checks and run outcomes</span></div>'
+      +CF.flags.map(function(f){ var a=all.find(function(x){return x.id===f.account_id;})||{}; var d=f.detail||{};
+        var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn'}[f.kind]||'cf-none';
+        return '<div class="cf-flag"><span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace('_',' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div>';
+  }
+  if(STATE._phoneErr){ wrap.innerHTML='<div style="color:var(--red);padding:12px;">'+escapeHtml(STATE._phoneErr)+'</div>'; return; }
+  if(!P.length){ wrap.innerHTML='<div class="cf-sub" style="padding:14px;">No phones match. Sync from Multilogin or GeeLark to pull them in.</div>'; cfEstimate(); return; }
+  var h='<table class="cf-t"><tr><th style="width:30px;"></th><th>Phone</th><th>Model</th><th>Health</th><th>Last run</th><th>Runs today</th><th>Posts today</th><th>Next</th><th style="width:34px;"></th></tr>';
+  P.forEach(function(a){
+    var runs=cfRunsFor(a.id), lr=runs[0], t=CF.today[a.id]||{}, nj=cfNextJob(a.id);
+    var busy=nj&&nj.status==='running';
+    var last= busy ? '<span style="color:var(--accent2);">● running</span> '+escapeHtml(nj.kind) : lr ? cfAEST(lr.started_at)+' · '+escapeHtml(lr.kind)+(cfMins(lr)!=null?' · '+cfMins(lr)+' min':'')+' · '+(lr.ok?'<span style="color:#4ade80;font-weight:700;">ok</span>':'<span style="color:#f87171;font-weight:700;" title="'+escapeHtml(lr.error||'')+'">failed</span>') : '<span class="cf-sub">never</span>';
+    var next= nj&&!busy ? cfAEST(nj.not_before)+' '+escapeHtml(nj.kind) : a.enabled ? (CF.settings.enabled?'scheduled':'—') : 'off';
+    if(a.posting_paused) next+=' <span class="cf-sub">· posts paused</span>';
+    var dis=a.health==='banned'||!a.enabled;
+    h+='<tr class="cf-row"><td><input type="checkbox" '+(CF.sel.has(a.id)?'checked':'')+' '+(a.health==='banned'?'disabled':'')+' onchange="cfTick(\''+a.id+'\',this.checked)"></td>'
+      +'<td><b>'+escapeHtml(a.handle||a.profile_name||a.profile_id)+'</b><div class="cf-sub">'+escapeHtml(a.profile_name||'')+' · '+escapeHtml(a.backend||'multilogin')+(a.enabled?'':' · <span style="color:var(--text3);">off</span>')+'</div></td>'
+      +'<td>'+escapeHtml(a.model||'—')+'</td><td>'+cfHealthChip(a)+'</td><td>'+last+'</td><td>'+(t.runs||0)+'</td><td>'+(t.posts||0)+'</td><td class="cf-sub">'+next+'</td>'
+      +'<td><button class="btn btn-sm btn-ghost" style="padding:2px 8px;" onclick="cfToggle(\''+a.id+'\')">'+(CF.open.has(a.id)?'▾':'▸')+'</button></td></tr>';
+    h+='<tr class="cf-exp '+(CF.open.has(a.id)?'open':'')+'"><td colspan="9">'+(CF.open.has(a.id)?cfExpandHtml(a,runs):'')+'</td></tr>';
+  });
+  wrap.innerHTML=h+'</table>';
+  cfEstimate(); cfRenderPlan(); cfRenderSched();
+}
+function cfExpandHtml(a,runs){
+  var d=a.health_detail||{}, acct=(STATE.accounts||[]).find(function(x){return x.id===a.account_id;});
+  var runsHtml=runs.slice(0,10).map(function(r){
+    var what= r.kind==='post' ? (r.ok?'reel posted':'post failed')+(r.caption?' · "'+escapeHtml(String(r.caption).slice(0,60))+'"':'')+(r.reels!=null?' · then '+r.reels+' reels, '+(r.likes||0)+' likes':'')
+            : r.kind==='health' ? escapeHtml((r.health&&r.health.summary)||(r.ok?'checked':'check failed'))
+            : (r.reels!=null?r.reels+' reels ('+(r.skip||0)+' skip / '+(r.watch||0)+' watch / '+(r.rewatch||0)+' rewatch) · '+(r.likes||0)+' likes'+(r.profiles?' · '+r.profiles+' profile':''):'');
+    if(!r.ok&&r.error) what=escapeHtml(String(r.error).slice(0,110))+' · <a href="#" onclick="cfShot(\''+r.id+'\');return false;">screenshot</a>';
+    return '<div class="cf-run"><span>'+cfAEST(r.started_at)+'</span><span>'+escapeHtml(r.kind)+'</span><span>'+what+(cfMins(r)!=null?' <span class="cf-sub">· '+cfMins(r)+' min</span>':'')+'</span><span style="font-weight:700;color:'+(r.ok?'#4ade80':'#f87171')+';">'+(r.ok?'ok':'failed')+'</span></div>';
+  }).join('')||'<div class="cf-sub">No runs yet.</div>';
+  var tick=function(ok){return '<span style="color:'+(ok?'#4ade80':'#f87171')+';">'+(ok?'✓':'✗')+'</span> ';};
+  var status= a.health_checked_at ? '<div style="display:grid;gap:4px;font-size:12.5px;">'
+      +'<div>'+tick(!(d.removed&&d.removed.length))+'Removed content: '+((d.removed&&d.removed.length)?'<b style="color:#f87171;">'+d.removed.length+'</b> — '+escapeHtml(d.removed.map(function(x){return x.text||x;}).join('; ').slice(0,140)):'none')+'</div>'
+      +'<div>'+tick(!(d.features&&d.features.length))+'Features you can\'t use: '+((d.features&&d.features.length)?escapeHtml(d.features.join(', ')):'none')+'</div>'
+      +'<div>'+tick(d.recommended!==false)+'Recommended to non-followers: '+(d.recommended===false?'<b style="color:#fb923c;">no</b>':d.recommended===true?'<b style="color:#4ade80;">yes</b>':'unknown')+'</div>'
+      +(d.views&&d.views.length?'<div>📈 Recent reels '+d.views.slice(0,5).join(' / ')+' views'+(d.baseline?' · baseline '+d.baseline:'')+'</div>':'')
+      +(a.account_created_on?'<div>🗓 Account day '+Math.max(1,Math.round((Date.now()-new Date(a.account_created_on))/86400000))+(a.posting_paused?' · <span style="color:#ffc83c;">posting paused</span>':'')+'</div>':'')
+      +'</div>' : '<div class="cf-sub">Not checked yet — run a health check.</div>';
+  var actions='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'
+    +'<button class="btn btn-sm btn-ghost" onclick="cfQueueOne(\''+a.id+'\',\'warmup\')">▶ Warm up now</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="cfPostOne(\''+a.id+'\')">📤 Post…</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="cfQueueOne(\''+a.id+'\',\'health\')">🩺 Health check</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="cfEditPhone(\''+a.id+'\')">✏️ Persona &amp; plan</button>'
+    +(a.posting_paused?'<button class="btn btn-sm btn-ghost" onclick="cfSetPhone(\''+a.id+'\',{posting_paused:false})">Resume posting</button>':'')
+    +'<button class="btn btn-sm btn-ghost" onclick="cfSetPhone(\''+a.id+'\',{enabled:'+(!a.enabled)+'})">'+(a.enabled?'Turn off':'Turn on')+'</button></div>';
+  return '<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;"><div><div class="cf-sub" style="margin-bottom:4px;">LAST 10 RUNS</div>'+runsHtml+'</div>'
+    +'<div><div class="cf-sub" style="margin-bottom:4px;">ACCOUNT STATUS'+(a.health_checked_at?' · checked '+cfAEST(a.health_checked_at):'')+'</div>'+status
+    +(acct?'<div class="cf-sub" style="margin-top:6px;">Linked to Accounts: '+escapeHtml(acct.handle||acct.email||'')+'</div>':'<div class="cf-sub" style="margin-top:6px;">Not linked to an Accounts row.</div>')
+    +(a.notes?'<div class="cf-sub" style="margin-top:4px;">'+escapeHtml(a.notes)+'</div>':'')+actions+'</div></div>';
+}
+function cfToggle(id){ if(CF.open.has(id)) CF.open.delete(id); else CF.open.add(id); renderCloudFarm(); }
+function cfTick(id,on){ if(on) CF.sel.add(id); else CF.sel.delete(id); cfEstimate(); }
+function cfSelect(mode){ CF.sel.clear(); if(mode!=='none') cfPhones().forEach(function(a){ if(a.health==='banned') return; if(mode==='on'&&a.enabled) CF.sel.add(a.id); if(mode==='ok'&&a.enabled&&a.health==='healthy') CF.sel.add(a.id); }); renderCloudFarm(); }
+function cfEstimate(){
+  var el=document.getElementById('cf-est'); if(!el) return;
+  var n=CF.sel.size, kind=(document.getElementById('cf-kind')||{}).value||'warmup', sp=parseInt((document.getElementById('cf-spread')||{}).value||'0',10);
+  var per= kind.indexOf('post')===0 ? ((document.getElementById('cf-prewarm')||{}).value==='0'?7:13) : kind==='health' ? 3 : 8;
+  el.innerHTML='<b style="color:var(--text);">'+n+' selected</b> · ~'+(n*per)+' phone-min'+(n?' · '+(sp?'spread over '+sp+' min, ≥4 min apart':'starting now, ≥4 min apart'):'');
+}
+async function cfPool(){
+  var el=document.getElementById('cf-pool'); if(!el) return;
+  try{ const{data}=await sb.functions.invoke('phone-service',{body:{action:'status'}});
+    if(data&&data.workers!=null){ var b=data.busy||{}, names=Object.keys(b).map(function(k){return (b[k].handle||b[k].kind)+' ('+b[k].kind+', '+Math.round(b[k].for_s/60)+'m)';}); el.innerHTML='<span style="color:#4ade80;">●</span> online · '+Object.keys(b).length+'/'+data.workers+' busy'+(names.length?' · '+escapeHtml(names.join(', ')):''); }
+    else el.innerHTML='<span style="color:var(--red);">●</span> phone service unreachable';
+  }catch(e){ el.innerHTML='<span style="color:var(--red);">●</span> phone service unreachable'; }
+}
+async function cfQueue(rows){
+  // rows: [{account_id, kind, payload, not_before}] — one request each through the edge function
+  var ok=0, errs=[];
+  for(var i=0;i<rows.length;i++){
+    try{ const{data,error}=await sb.functions.invoke('phone-service',{body:Object.assign({action:'queue',requested_by:(STATE.profile&&STATE.profile.email)||'app'},rows[i])});
+      if(error||!data||data.error||!data.id) throw new Error((data&&data.error)||(error&&error.message)||'failed'); ok++;
+    }catch(e){ errs.push(String(e.message||e)); }
+  }
+  return {ok:ok,errs:errs};
+}
+function cfDrawStarts(n,spreadMin,minGapMin){
+  // n start offsets (minutes from now) inside [0,spread], no two closer than minGap; falls back to a fixed ladder if the window is too tight
+  var gap=minGapMin||4, out=[];
+  if(spreadMin<=0||spreadMin<gap*(n-1)){ for(var i=0;i<n;i++) out.push(i*gap+Math.random()*1.5); return out; }
+  var tries=0;
+  while(out.length<n&&tries<5000){ tries++; var t=Math.random()*spreadMin; if(out.every(function(o){return Math.abs(o-t)>=gap;})) out.push(t); }
+  while(out.length<n) out.push((out.length?Math.max.apply(null,out):0)+gap);
+  return out.sort(function(a,b){return a-b;});
+}
+async function cfRunBatch(){
+  var ids=Array.from(CF.sel).filter(function(id){ var a=(STATE.phoneAccounts||[]).find(function(x){return x.id===id;}); return a&&a.health!=='banned'; });
+  if(!ids.length){ alert('Select at least one phone.'); return; }
+  var kind=document.getElementById('cf-kind').value, spread=parseInt(document.getElementById('cf-spread').value,10), par=Math.max(1,Math.min(6,parseInt(document.getElementById('cf-par').value,10)||4));
+  var prewarm=document.getElementById('cf-prewarm').value==='1', health=document.getElementById('cf-health').value;
+  var clipKey=null;
+  if(kind==='post_pick'){ clipKey=await cfPickClip(); if(!clipKey) return; }
+  var paused=ids.filter(function(id){ var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); return kind.indexOf('post')===0&&a.posting_paused; });
+  if(paused.length&&!confirm(paused.length+' selected phone(s) have posting paused by a health flag. Post on them anyway?')) return;
+  var offs=cfDrawStarts(ids.length,spread,CF.settings.min_gap_min||4), now=Date.now();
+  var rows=ids.map(function(id,i){
+    var p={}; var k=kind;
+    if(kind==='post_auto'){ k='post'; p={r2_key:'auto',warmup:prewarm}; }
+    else if(kind==='post_pick'){ k='post'; p={r2_key:clipKey,warmup:prewarm}; }
+    if(k!=='health'&&health!=='skip') p.health_check=health;
+    return {account_id:id,kind:k,payload:p,not_before:new Date(now+offs[i]*60000).toISOString(),priority:5};
+  });
+  var first=cfAEST(rows[0].not_before), last=cfAEST(rows[rows.length-1].not_before);
+  if(!confirm('Queue '+rows.length+' × '+kind.replace('_',' ')+'?\n\nStarts '+first+' → '+last+' AEST, at most '+par+' phones at once, ≥'+(CF.settings.min_gap_min||4)+' min between starts.')) return;
+  var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Queuing…';
+  var r=await cfQueue(rows);
+  if(msg) msg.innerHTML=r.ok+' queued'+(r.errs.length?' · <span style="color:var(--red);">'+r.errs.length+' failed: '+escapeHtml(r.errs[0])+'</span>':'')+'. Phones start on their drawn times; this page refreshes itself.';
+  loadCloudFarm(); [60000,180000,420000,900000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
+}
+async function cfQueueOne(id,kind){
+  var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
+  if(!confirm((kind==='health'?'Run an Account Status check on ':'Queue a warm-up on ')+(a.handle||a.profile_name)+' now?')) return;
+  var r=await cfQueue([{account_id:id,kind:kind,payload:{}}]); var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent=r.ok?'Queued — a worker picks it up within ~10 s.':'Could not queue: '+(r.errs[0]||'');
+  [45000,180000,420000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
+}
+async function cfPostOne(id){
+  var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
+  var key=await cfPickClip(a.model); if(!key) return;
+  var warm=confirm('Warm up for a few minutes before posting? (OK = yes, Cancel = post straight away)');
+  var r=await cfQueue([{account_id:id,kind:'post',payload:{r2_key:key,warmup:warm}}]); var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent=r.ok?'Post queued on '+(a.handle||a.profile_name)+'.':'Could not queue: '+(r.errs[0]||'');
+  [60000,240000,600000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
+}
+function cfPickClip(model){
+  // small chooser over the Content Library's videos; resolves to an r2_key or null ('auto' = next unused for that phone's model)
+  return new Promise(async function(resolve){
+    if(!STATE.library||!STATE.library.length){ try{ await loadContentLibrary(); }catch(e){} }
+    var mid=null; if(model){ var m=(STATE.models||[]).find(function(x){return (x.name||'').toLowerCase()===model;}); mid=m&&m.id; }
+    var vids=(STATE.library||[]).filter(function(it){ return libIsVideo(it)&&(!mid||it.model_id===mid)&&(it.review_status||'')!=='rejected'; }).slice(0,80);
+    var ov=document.createElement('div'); ov.className='modal-overlay open'; ov.style.display='flex';
+    ov.innerHTML='<div class="modal"><div class="modal-title"><span>Pick a clip'+(model?' · '+escapeHtml(model):'')+'</span><button class="modal-close" id="cfpc-x">✕</button></div>'
+      +'<div style="max-height:50vh;overflow:auto;display:grid;gap:6px;">'
+      +'<label style="display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;"><input type="radio" name="cfpc" value="auto" checked> <b>Next unused clip</b> <span class="cf-sub">— the newest library clip this phone has not posted yet</span></label>'
+      +vids.map(function(it){ return '<label style="display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;"><input type="radio" name="cfpc" value="'+accEscapeAttr(it.r2_key)+'">'+(it.thumb_data?'<img src="'+it.thumb_data+'" style="width:34px;height:60px;object-fit:cover;border-radius:4px;">':'')+'<span>'+escapeHtml(it.title||it.r2_key)+'<div class="cf-sub">'+(it.duration_sec?Math.round(it.duration_sec)+'s · ':'')+escapeHtml(it.category||it.folder||'')+' · '+cfAEST(it.created_at)+'</div></span></label>'; }).join('')
+      +(vids.length?'':'<div class="cf-sub">No videos in the library'+(model?' for '+escapeHtml(model):'')+'.</div>')
+      +'</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;"><button class="btn btn-ghost" id="cfpc-c">Cancel</button><button class="btn btn-primary" id="cfpc-ok">Use this clip</button></div></div>';
+    document.body.appendChild(ov);
+    var done=function(v){ ov.remove(); resolve(v); };
+    ov.querySelector('#cfpc-x').onclick=function(){done(null);}; ov.querySelector('#cfpc-c').onclick=function(){done(null);};
+    ov.querySelector('#cfpc-ok').onclick=function(){ var r=ov.querySelector('input[name=cfpc]:checked'); done(r?r.value:null); };
+  });
+}
+async function cfShot(runId){
+  const{data}=await sb.from('phone_runs').select('shot:stats->>fail_shot,text:stats->fail_screen_text,error,log').eq('id',runId).maybeSingle();
+  if(!data){ alert('Run not found'); return; }
+  var ov=document.createElement('div'); ov.className='modal-overlay open'; ov.style.display='flex';
+  ov.innerHTML='<div class="modal" style="width:760px;"><div class="modal-title"><span>Failure capture</span><button class="modal-close">✕</button></div><div style="display:flex;gap:16px;align-items:flex-start;">'
+    +(data.shot?'<img src="'+data.shot+'" style="width:240px;border-radius:8px;border:1px solid var(--border);">':'<div class="cf-sub">No screenshot captured.</div>')
+    +'<div style="flex:1;min-width:0;"><div style="color:var(--red);font-size:13px;margin-bottom:8px;">'+escapeHtml(data.error||'')+'</div>'
+    +(data.text?'<div class="cf-sub" style="margin-bottom:4px;">SCREEN TEXT</div><div style="font-size:12px;white-space:pre-wrap;max-height:160px;overflow:auto;background:var(--surface2);padding:8px;border-radius:6px;">'+escapeHtml((data.text||[]).join(' | '))+'</div>':'')
+    +'<div class="cf-sub" style="margin:8px 0 4px;">LOG</div><pre style="font-size:11px;white-space:pre-wrap;max-height:220px;overflow:auto;background:var(--surface2);padding:8px;border-radius:6px;margin:0;">'+escapeHtml((data.log||'').split('\n').slice(-25).join('\n'))+'</pre></div></div></div>';
+  document.body.appendChild(ov); ov.querySelector('.modal-close').onclick=function(){ov.remove();}; ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+}
+async function cfDismiss(id){ await sb.from('phone_flags').update({dismissed_at:new Date().toISOString(),dismissed_by:(STATE.profile&&STATE.profile.email)||''}).eq('id',id); loadCloudFarm(); }
+async function cfSetPhone(id,patch){ const{error}=await sb.from('phone_accounts').update(patch).eq('id',id); if(error){ alert('Could not save: '+error.message); return; } loadCloudFarm(); }
+async function cfEditPhone(id){
+  var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
+  var p=a.persona||{}, plan=a.plan||{};
+  var handle=prompt('Instagram handle (no @):',a.handle||''); if(handle===null) return;
+  var model=prompt('Model (liam / chase / checo / raul / alex / emmily):',a.model||''); if(model===null) return;
+  var created=prompt('IG account created on (YYYY-MM-DD, for the age gate):',a.account_created_on||''); if(created===null) return;
+  var tz=prompt('Persona timezone (e.g. America/New_York):',a.tz||'America/New_York'); if(tz===null) return;
+  var wpd=prompt('Warm-ups per day (blank = fleet default '+(CF.settings.warmups_per_day||2)+'):',plan.warmups_per_day!=null?plan.warmups_per_day:''); if(wpd===null) return;
+  var ppd=prompt('Posts per day once mature (blank = fleet default '+(CF.settings.posts_per_day||1)+'):',plan.posts_per_day!=null?plan.posts_per_day:''); if(ppd===null) return;
+  var np={}; if(wpd!=='') np.warmups_per_day=parseInt(wpd,10); if(ppd!=='') np.posts_per_day=parseInt(ppd,10);
+  await cfSetPhone(id,{handle:handle.replace(/^@/,'')||null,model:(model||'').toLowerCase()||null,account_created_on:created||null,tz:tz||null,plan:np});
+}
+function cfToggleSched(){ var el=document.getElementById('cf-sched'); if(!el) return; el.style.display=el.style.display==='none'?'block':'none'; cfRenderSched(); }
+function cfRenderSched(){
+  var el=document.getElementById('cf-sched'); if(!el||el.style.display==='none') return;
+  var s=CF.settings||{}; var f=function(k,label,html){ return '<div><label class="cf-l">'+label+'</label>'+html+'</div>'; };
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;">'
+    +f('enabled','Master switch','<select id="cfs-enabled"><option value="1" '+(s.enabled?'selected':'')+'>On</option><option value="0" '+(!s.enabled?'selected':'')+'>Paused</option></select>')
+    +f('w','Warm-ups per day','<input type="number" id="cfs-wpd" value="'+(s.warmups_per_day!=null?s.warmups_per_day:2)+'" min="0" max="4">')
+    +f('p','Posts per day (mature)','<input type="number" id="cfs-ppd" value="'+(s.posts_per_day!=null?s.posts_per_day:1)+'" min="0" max="3">')
+    +f('d','Posting starts on account day','<input type="number" id="cfs-pfd" value="'+(s.posting_from_day!=null?s.posting_from_day:5)+'" min="1" max="60">')
+    +f('pw','Post window (EST)','<div style="display:flex;gap:6px;"><input id="cfs-pw0" value="'+escapeHtml((s.post_window_est||['18:30','21:30'])[0])+'" style="width:80px;"><input id="cfs-pw1" value="'+escapeHtml((s.post_window_est||['18:30','21:30'])[1])+'" style="width:80px;"></div>')
+    +f('mc','Max phones at once','<input type="number" id="cfs-mc" value="'+(s.max_concurrent||6)+'" min="1" max="6">')
+    +f('mg','Min gap between starts (min)','<input type="number" id="cfs-mg" value="'+(s.min_gap_min||4)+'" min="1" max="30">')
+    +f('hd','Account Status check','<select id="cfs-hd"><option value="1" '+(s.health_daily!==false?'selected':'')+'>Daily, first session</option><option value="0" '+(s.health_daily===false?'selected':'')+'>Off</option></select>')
+    +'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;"><span class="cf-sub">Tomorrow\'s plan is drawn nightly at '+(s.draw_hour_aest||23)+':00 AEST from these settings plus each phone\'s overrides (Persona &amp; plan). Cautious/shadowbanned phones keep warm-ups but skip posts; banned phones are removed.</span><button class="btn btn-sm btn-primary" onclick="cfSaveSched()">Save schedule</button></div>';
+}
+async function cfSaveSched(){
+  var g=function(id){ return document.getElementById(id); };
+  var v=Object.assign({},CF.settings,{enabled:g('cfs-enabled').value==='1',warmups_per_day:parseInt(g('cfs-wpd').value,10)||0,posts_per_day:parseInt(g('cfs-ppd').value,10)||0,posting_from_day:parseInt(g('cfs-pfd').value,10)||5,post_window_est:[g('cfs-pw0').value||'18:30',g('cfs-pw1').value||'21:30'],max_concurrent:parseInt(g('cfs-mc').value,10)||6,min_gap_min:parseInt(g('cfs-mg').value,10)||4,health_daily:g('cfs-hd').value==='1'});
+  const{error}=await sb.from('phone_settings').upsert({key:'scheduler',value:v,updated_at:new Date().toISOString()}); if(error){ alert('Could not save: '+error.message); return; }
+  CF.settings=v; var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Schedule saved'+(v.enabled?' — the service draws the next plan at '+(v.draw_hour_aest||23)+':00 AEST.':' (paused).'); renderCloudFarm();
+}
+function cfRenderPlan(){
+  var el=document.getElementById('cf-plan'); if(!el) return;
+  var q=CF.jobs.filter(function(j){return j.status==='queued';});
+  if(!q.length){ el.innerHTML='<div style="display:flex;justify-content:space-between;"><b>Upcoming</b><span class="cf-sub">'+(CF.settings.enabled?'nothing queued yet — the scheduler draws the next plan at '+(CF.settings.draw_hour_aest||23)+':00 AEST':'nothing queued · schedule is off')+'</span></div>'; return; }
+  el.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>Upcoming ('+q.length+')</b><span class="cf-sub">queued jobs in start order · AEST</span></div><div class="cf-plan">'
+    +q.slice(0,40).map(function(j){ var a=(STATE.phoneAccounts||[]).find(function(x){return x.id===j.account_id;})||{}; var p=j.payload||{}; return '<div>'+cfAEST(j.not_before)+' <b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b><br><span class="cf-sub">'+escapeHtml(j.kind)+(j.kind==='post'&&p.warmup===false?' (no warm-up)':'')+(p.health_check?' + health':'')+' · '+escapeHtml(j.requested_by||'')+'</span></div>'; }).join('')+(q.length>40?'<div class="cf-sub">… '+(q.length-40)+' more</div>':'')+'</div>';
+}
+
 function accCountFor(ent){
   var A=STATE.accounts||[];
   if(ent==='emails') return A.filter(function(a){return a.platform==='email';}).length;
@@ -7124,7 +7729,7 @@ function renderAccEntities(){
   const el=document.getElementById('acc-entities'); if(!el)return;
   var html='<div class="acc-ent '+(STATE._accEntity==='agency'?'active':'')+'" onclick="selectAccEntity(\'agency\')">🏢 Agency <span class="cnt">'+accCountFor('agency')+'</span></div>';
   html+='<div class="acc-ent '+(STATE._accEntity==='emails'?'active':'')+'" onclick="selectAccEntity(\'emails\')">✉️ Emails <span class="cnt">'+accCountFor('emails')+'</span></div>';
-  html+='<div class="acc-ent '+(STATE._accEntity==='phones'?'active':'')+'" onclick="selectAccEntity(\'phones\')">☁️ Cloud Phones <span class="cnt">'+((STATE.phoneAccounts||[]).length)+'</span></div>';
+  html+='<div class="acc-ent" onclick="navigate(\'cloud-farm\')" title="Phones live in Cloud Farm now">☁️ Cloud Farm ↗</div>';
   (STATE.models||[]).forEach(function(m){ html+='<div class="acc-ent '+(STATE._accEntity===m.id?'active':'')+'" onclick="selectAccEntity(\''+m.id+'\')">'+escapeHtml(m.name||'—')+' <span class="cnt">'+accCountFor(m.id)+'</span></div>'; });
   el.innerHTML=html;
 }
@@ -12364,74 +12969,471 @@ async function saveContentPerfRows(){
   }
 }
 
-// ── Management / KPIs ─────────────────────────────────────────
-async function loadManagement(){
-  const{data}=await sb.from('agency_settings').select('*').eq('key','kpis').single();
-  if(data){
-    const kpis=data.value||{};
-    document.getElementById('kpi-revenue-target').value=kpis.revenue||'';
-    document.getElementById('kpi-model-target').value=kpis.models||'';
-    document.getElementById('kpi-net-target').value=kpis.net||'';
-    document.getElementById('kpi-renew-target').value=kpis.renew||'';
-    document.getElementById('agency-notes').value=kpis.notes||'';
-  }
-  // Load latest week actuals for comparison
-  const{data:reports}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
-  if(reports&&reports.length){
-    const weeks=[...new Set(reports.map(r=>r.week_of))];
-    const latest=weeks[0];
-    const week=reports.filter(r=>r.week_of===latest);
-    const totalE=week.reduce((s,r)=>s+parseFloat(r.total_earnings||0),0);
-    const totalN=week.reduce((s,r)=>s+parseFloat(r.agency_net||0),0);
-    const avgRenew=week.length?week.reduce((s,r)=>s+parseFloat(r.renew_pct||0),0)/week.length:0;
-    const kpis=data?.value||{};
+// ── Journal ──────────────────────────────────────────────────────────────────
+// Replaces the old Drawing Board. Three jobs to do, in priority order:
+//   1. Recurring jobs (daily / weekly / monthly) you tick off and can un-tick.
+//   2. Somewhere to put a thought in under two seconds so it leaves your head.
+//   3. Somewhere to think — ideas, goals, brain dump.
+//
+// Design notes (deliberate, don't "tidy" these away):
+//   - A tick is a row in journal_job_done keyed to the PERIOD it belongs to, so a new
+//     day/week/month shows everything unticked with no reset job running anywhere, and
+//     un-ticking is just a delete. History is a free side-effect.
+//   - Today shows a hard maximum of three focus items. A list of forty is a list of none.
+//   - Nothing is red. Overdue reads "3 days ago" in amber at worst — guilt causes
+//     avoidance, avoidance kills the tool.
+//   - All dates are LOCAL. toISOString() would shift the day backwards for UTC+10 and
+//     silently tick the wrong period (this bug has bitten this codebase before).
 
-    // Chatter-side actuals for the same latest week -- same source/definitions as the
-    // Chatter Performance summary tab, just rolled into one number each rather than per-chatter.
-    const{data:cpData}=await sb.from('chatter_performance').select('*').eq('week_of',latest);
-    const cpRows=cpData||[];
-    let cvrSum=0,cvrCount=0,goldenSum=0,goldenCount=0,unlockSum=0,unlockCount=0,dmsTotal=0,salesTotal=0,hoursTotal=0;
-    cpRows.forEach(r=>{
-      const cvrNum=parseFloat(String(r.fan_cvr||'').replace(/[$,%]/g,'').trim()); if(!isNaN(cvrNum)){cvrSum+=cvrNum;cvrCount++;}
-      const goldenNum=parseFloat(String(r.golden_ratio||'').replace(/[$,%]/g,'').trim()); if(!isNaN(goldenNum)){goldenSum+=goldenNum;goldenCount++;}
-      const unlockNum=parseFloat(String(r.unlock_rate||'').replace(/[$,%]/g,'').trim()); if(!isNaN(unlockNum)){unlockSum+=unlockNum;unlockCount++;}
-      const dmsNum=parseInt(String(r.dms_sent||'').replace(/[^0-9.-]/g,''),10); if(!isNaN(dmsNum)) dmsTotal+=dmsNum;
-      const hoursNum=parseFloat(String(r.scheduled_hours||'').replace(/[$,%]/g,'').trim()); if(!isNaN(hoursNum)) hoursTotal+=hoursNum;
-      salesTotal+=parseFloat(r.sales||0);
-    });
-    const salesPerHr=hoursTotal>0?salesTotal/hoursTotal:null;
+var JN = { tab:'today', jobCad:'daily', items:[], jobs:[], done:[], editing:null, timer:null, collapsed:{} };
+try{ JN.collapsed=JSON.parse(localStorage.getItem('jn_collapsed')||'{}'); }catch(e){ JN.collapsed={}; }
+function jnSaveCollapsed(){ try{ localStorage.setItem('jn_collapsed',JSON.stringify(JN.collapsed)); }catch(e){} }
+function jnToggleCol(k){ JN.collapsed[k]=!JN.collapsed[k]; jnSaveCollapsed(); jnPaint(); }
+function jnAllCols(){ return (JN.tab==='today'?['t3','due','daily','donetoday']:JN.tab==='jobs'?['daily','weekly','monthly']:JN.tab==='ideas'?['goals','inbox','week','someday']:[]); }
+function jnSetAll(v){ jnAllCols().forEach(function(k){ JN.collapsed[k]=v; }); jnSaveCollapsed(); jnPaint(); }
+// A column: header stays visible when collapsed so nothing disappears from view.
+function jnCol(key,icon,title,count,body,accent){
+  var open=!JN.collapsed[key];
+  return '<div class="card" style="margin:0;display:flex;flex-direction:column;'+(accent?'border-top:2px solid '+accent+';':'')+'">'
+    +'<div onclick="jnToggleCol(\''+key+'\')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:'+(open?'10px':'0')+';">'
+    +'<span style="font-size:11px;color:var(--text2);width:10px;">'+(open?'▾':'▸')+'</span>'
+    +'<span style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text2);flex:1;">'+icon+' '+title+'</span>'
+    +(count!==null&&count!==undefined?'<span style="font-size:11px;font-weight:700;color:var(--text2);">'+count+'</span>':'')
+    +'</div>'
+    +(open?'<div style="flex:1;">'+body+'</div>':'')+'</div>';
+}
+function jnGrid(cols,min){ return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax('+(min||300)+'px,1fr));gap:14px;align-items:start;">'+cols.join('')+'</div>'; }
+function jnEmpty(msg){ return '<div style="font-size:12.5px;color:var(--text2);padding:4px 2px;line-height:1.5;">'+msg+'</div>'; }
 
-    document.getElementById('kpi-comparison').innerHTML=`
-      <div class="stats-grid" style="margin-top:0;">
-        ${kpiCard('Revenue',totalE,parseFloat(kpis.revenue||0),'$')}
-        ${kpiCard('Agency Net',totalN,parseFloat(kpis.net||0),'$')}
-        ${kpiCard('Active Models',week.length,parseFloat(kpis.models||0),'')}
-        ${kpiCard('Avg Renew %',avgRenew*100,parseFloat(kpis.renew||0),'%',true)}
-        ${statCard('Avg Golden Ratio',goldenCount?(goldenSum/goldenCount).toFixed(2)+'%':'—','','green')}
-        ${statCard('Avg Unlock Ratio',unlockCount?(unlockSum/unlockCount).toFixed(2)+'%':'—','','blue')}
-        ${statCard('Avg Fan CVR',cvrCount?(cvrSum/cvrCount).toFixed(2)+'%':'—','','')}
-        ${statCard('DMs Sent',dmsTotal||'—','','')}
-        ${statCard('Sales/Hr',salesPerHr!==null?'$'+fmt(salesPerHr):'—','','purple')}
-        ${statCard('Total Sales','$'+fmt(salesTotal),'','purple')}
-      </div>`;
+function jnLocalISO(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function jnMonday(d){ d=new Date(d||new Date()); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d; }
+function jnIsoWeek(d){
+  // ISO-8601 week number, Monday-based. Kept explicit rather than clever.
+  var t=new Date(d||new Date()); t.setHours(0,0,0,0);
+  t.setDate(t.getDate()+3-((t.getDay()+6)%7));               // nearest Thursday
+  var week1=new Date(t.getFullYear(),0,4);
+  var n=1+Math.round(((t-week1)/86400000-3+((week1.getDay()+6)%7))/7);
+  return t.getFullYear()+'-W'+String(n).padStart(2,'0');
+}
+// The period a tick belongs to, for each cadence.
+function jnPeriodKey(cad,d){
+  d=d||new Date();
+  if(cad==='daily')  return jnLocalISO(d);
+  if(cad==='weekly') return jnIsoWeek(d);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function jnPeriodLabel(cad){
+  var d=new Date();
+  if(cad==='daily')  return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  if(cad==='weekly'){ var m=jnMonday(d), s=new Date(m); s.setDate(s.getDate()+6);
+    return 'Week of '+m.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+s.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+  return d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+}
+// Relative time. "in 2 days" / "3 days ago" lands; "17/09" does not.
+function jnWhen(dateStr){
+  if(!dateStr) return '';
+  var due=new Date(dateStr+'T00:00:00'), today=new Date(); today.setHours(0,0,0,0);
+  var n=Math.round((due-today)/86400000);
+  if(n===0) return 'today'; if(n===1) return 'tomorrow'; if(n===-1) return 'yesterday';
+  if(n>1&&n<7) return 'in '+n+' days'; if(n<-1&&n>-14) return Math.abs(n)+' days ago';
+  return due.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+function jnAge(ts){
+  if(!ts) return '';
+  var n=Math.floor((Date.now()-new Date(ts))/86400000);
+  return n<1?'today':n===1?'1 day':n+' days';
+}
+function jnMe(){ return (STATE.profile&&STATE.profile.email)||''; }
+function jnShortName(email){ return (email||'').split('@')[0]; }
+
+// ── Data ────────────────────────────────────────────────────────────────────
+async function jnLoad(){
+  // Brain dump lives in journal_notes (owner-only), not agency_settings.
+  if(JN.dumpText===undefined){
+    var d=await sb.from('journal_notes').select('text').eq('key','dump').maybeSingle();
+    JN.dumpText=(d.data&&d.data.text)||'';
   }
+  var r = await Promise.all([
+    sb.from('journal_jobs').select('*').eq('active',true).order('cadence').order('sort_order'),
+    sb.from('journal_items').select('*').order('created_at',{ascending:false}),
+    sb.from('journal_job_done').select('*').in('period_key',[jnPeriodKey('daily'),jnPeriodKey('weekly'),jnPeriodKey('monthly')])
+  ]);
+  JN.jobs=r[0].data||[]; JN.items=r[1].data||[]; JN.done=r[2].data||[];
+}
+function jnDoneRow(job){ return JN.done.find(function(d){ return d.job_id===job.id && d.period_key===jnPeriodKey(job.cadence); }); }
+
+async function jnToggleJob(id){
+  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
+  var key=jnPeriodKey(job.cadence), row=jnDoneRow(job);
+  if(row){
+    var r=await sb.from('journal_job_done').delete().eq('id',row.id).select();
+    if(r.error||!r.data||!r.data.length){ alert('Could not un-tick — '+(r.error?r.error.message:'no permission')); return; }
+    JN.done=JN.done.filter(function(d){return d.id!==row.id;});
+  } else {
+    var ins=await sb.from('journal_job_done').insert({job_id:id,period_key:key,done_by:jnMe()}).select();
+    if(ins.error||!ins.data||!ins.data.length){ alert('Could not tick — '+(ins.error?ins.error.message:'no permission')); return; }
+    JN.done.push(ins.data[0]);
+    jnCelebrate();
+  }
+  jnPaint();
+}
+async function jnSaveJob(){
+  var title=(document.getElementById('jn-job-title').value||'').trim(); if(!title) return;
+  var cad=document.getElementById('jn-job-cad').value;
+  var notes=(document.getElementById('jn-job-notes').value||'').trim()||null;
+  var res;
+  if(JN.editing){ res=await sb.from('journal_jobs').update({title:title,cadence:cad,notes:notes}).eq('id',JN.editing).select(); }
+  else { var max=Math.max(0,...JN.jobs.filter(function(j){return j.cadence===cad;}).map(function(j){return j.sort_order||0;}));
+         res=await sb.from('journal_jobs').insert({title:title,cadence:cad,notes:notes,sort_order:max+1,created_by:jnMe()}).select(); }
+  if(res.error||!res.data||!res.data.length){ alert('Could not save — '+(res.error?res.error.message:'no permission')); return; }
+  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
+}
+function jnOpenJob(id){
+  JN.editing=id||null;
+  var j=id?JN.jobs.find(function(x){return x.id===id;}):null;
+  document.getElementById('jn-job-modal-title').textContent=j?'Edit job':'New job';
+  document.getElementById('jn-job-title').value=j?j.title:'';
+  document.getElementById('jn-job-cad').value=j?j.cadence:JN.jobCad;
+  document.getElementById('jn-job-notes').value=(j&&j.notes)||'';
+  document.getElementById('jn-job-delete').style.display=j?'':'none';
+  openModal('jn-job-modal');
+  setTimeout(function(){ var el=document.getElementById('jn-job-title'); if(el) el.focus(); },50);
+}
+async function jnDeleteJob(){
+  if(!JN.editing) return;
+  if(!confirm('Delete this job? Its tick history goes too.')) return;
+  var r=await sb.from('journal_jobs').delete().eq('id',JN.editing).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
+}
+async function jnMoveJob(id,dir){
+  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
+  var list=JN.jobs.filter(function(j){return j.cadence===job.cadence;});
+  var i=list.findIndex(function(j){return j.id===id;}), k=i+dir;
+  if(k<0||k>=list.length) return;
+  var a=list[i], b=list[k];
+  await Promise.all([
+    sb.from('journal_jobs').update({sort_order:b.sort_order||k}).eq('id',a.id),
+    sb.from('journal_jobs').update({sort_order:a.sort_order||i}).eq('id',b.id)
+  ]);
+  await jnLoad(); jnPaint();
 }
 
-function kpiCard(label,actual,target,prefix,isPct=false){
-  const fmt2=v=>isPct?v.toFixed(1):fmt(v);
-  const hit=target>0&&actual>=target;
-  const pct=target>0?Math.min(100,(actual/target)*100):0;
-  return`<div class="stat-card">
-    <div class="stat-label">${label}</div>
-    <div style="font-size:20px;font-weight:800;color:${hit?'var(--green)':'var(--text)'};">${prefix}${fmt2(actual)}</div>
-    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Target: ${prefix}${fmt2(target)}</div>
-    <div style="background:var(--border);border-radius:4px;height:4px;margin-top:8px;"><div style="background:${hit?'var(--green)':'var(--accent)'};width:${pct}%;height:4px;border-radius:4px;"></div></div>
-  </div>`;
+// ── Capture ─────────────────────────────────────────────────────────────────
+// Under two seconds or it never gets captured. Type, Enter, gone. The prefixes are
+// optional sugar, not a syntax anyone has to learn.
+function jnParse(raw){
+  var t=raw.trim(), out={kind:'task',text:t,urgent:false,due_at:null,tags:null,status:'inbox'};
+  if(/^!!/.test(t)){ out.urgent=true; t=t.replace(/^!!\s*/,''); }
+  else if(/^!/.test(t)){ out.urgent=true; t=t.replace(/^!\s*/,''); }
+  if(/^\?/.test(t)){ out.kind='idea'; t=t.replace(/^\?\s*/,''); }
+  if(/^\*/.test(t)){ out.kind='goal'; t=t.replace(/^\*\s*/,''); }
+  var tags=t.match(/#[\w-]+/g);
+  if(tags){ out.tags=tags.map(function(s){return s.slice(1);}).join(','); t=t.replace(/#[\w-]+/g,'').trim(); }
+  var d=new Date(), hit=null;
+  if(/\btoday\b/i.test(t)){ hit=new Date(d); t=t.replace(/\btoday\b/i,''); }
+  else if(/\btomorrow\b/i.test(t)){ hit=new Date(d); hit.setDate(hit.getDate()+1); t=t.replace(/\btomorrow\b/i,''); }
+  else {
+    var days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    for(var i=0;i<7;i++){
+      var re=new RegExp('\\b(next\\s+)?'+days[i]+'\\b','i'), m=t.match(re);
+      if(m){ hit=new Date(d); var delta=(i-hit.getDay()+7)%7; if(delta===0||m[1]) delta=delta||7; hit.setDate(hit.getDate()+delta); t=t.replace(re,''); break; }
+    }
+  }
+  if(hit){ out.due_at=jnLocalISO(hit); out.status='today'; }
+  out.text=t.replace(/\s{2,}/g,' ').trim()||raw.trim();
+  return out;
+}
+async function jnCapture(ev){
+  if(ev && ev.key!=='Enter') return;
+  var el=document.getElementById('jn-capture'); var raw=(el.value||'').trim(); if(!raw) return;
+  el.value='';
+  var row=jnParse(raw); row.created_by=jnMe();
+  var r=await sb.from('journal_items').insert(row).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not save — '+(r.error?r.error.message:'no permission')); el.value=raw; return; }
+  JN.items.unshift(r.data[0]);
+  jnFlash('Captured ✓');
+  jnPaint();
+}
+function jnFlash(msg){
+  var b=document.getElementById('jn-flash'); if(!b) return;
+  b.textContent=msg; b.style.opacity='1';
+  clearTimeout(JN._flash); JN._flash=setTimeout(function(){ b.style.opacity='0'; },1400);
+}
+function jnCelebrate(){ jnFlash('Nice ✓'); }
+
+async function jnUpdate(id,patch){
+  patch.updated_at=new Date().toISOString();
+  var r=await sb.from('journal_items').update(patch).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  var i=JN.items.findIndex(function(x){return x.id===id;}); if(i>=0) JN.items[i]=r.data[0];
+  jnPaint();
+}
+async function jnComplete(id){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  if(it.status==='done'){ await jnUpdate(id,{status:'inbox',done_at:null,slot:null}); return; }
+  await jnUpdate(id,{status:'done',done_at:new Date().toISOString(),slot:null});
+  jnCelebrate();
+}
+async function jnDeleteItem(id){
+  var r=await sb.from('journal_items').delete().eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  JN.items=JN.items.filter(function(x){return x.id!==id;}); jnPaint();
+}
+// Click the text, type, Enter. Saves in place and never repaints the view, so your
+// scroll position and the rest of the page stay exactly where they were.
+function jnEditItem(id){ var el=document.getElementById('jn-txt-'+id); if(el) jnInline(el,id); }
+function jnInline(el,id){
+  if(el.dataset.editing==='1') return;
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it||it.status==='done') return;
+  el.dataset.editing='1';
+  var before=el.innerHTML, inp=document.createElement('input');
+  inp.value=it.text;
+  inp.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--accent);border-radius:7px;color:var(--text);padding:6px 9px;font-size:14px;font-family:inherit;';
+  el.innerHTML=''; el.appendChild(inp); inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);
+  var closed=false;
+  function done(save){
+    if(closed) return; closed=true;
+    var v=inp.value.trim();
+    el.dataset.editing='';
+    if(save && v && v!==it.text){
+      it.text=v;                                   // optimistic: update in place
+      el.innerHTML=jnTextHtml(it);
+      sb.from('journal_items').update({text:v,updated_at:new Date().toISOString()}).eq('id',id).select()
+        .then(function(r){ if(r.error||!r.data||!r.data.length){ jnFlash('Not saved'); } else { jnFlash('Saved ✓'); } });
+    } else { el.innerHTML=before; }
+  }
+  inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); done(true); } else if(e.key==='Escape'){ done(false); } };
+  inp.onblur=function(){ done(true); };
+}
+// Due date still needs a picker; changing it does repaint because it can move the item.
+function jnEditDue(id){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  var d=prompt('Due date (YYYY-MM-DD, blank to clear):',it.due_at||''); if(d===null) return;
+  jnUpdate(id,{due_at:(d||'').trim()||null});
+}
+function jnTextHtml(it){
+  var done=it.status==='done', kindIcon={task:'',idea:'💡',goal:'🎯',note:'📝'}[it.kind]||'';
+  return (it.urgent&&!done?'<span style="color:#ffc83c;font-weight:900;">! </span>':'')+(kindIcon?kindIcon+' ':'')+escapeHtml(it.text);
+}
+// Today holds three. Asking for a fourth tells you to finish or bump one.
+async function jnToSlot(id){
+  var used=JN.items.filter(function(x){return x.status==='today'&&x.slot;});
+  var free=[1,2,3].find(function(n){ return !used.some(function(x){return x.slot===n;}); });
+  if(!free){ jnFlash('Today is full — finish or bump one first'); return; }
+  await jnUpdate(id,{status:'today',slot:free});
 }
 
-async function saveKPI(){
-  const kpis={revenue:document.getElementById('kpi-revenue-target').value,models:document.getElementById('kpi-model-target').value,net:document.getElementById('kpi-net-target').value,renew:document.getElementById('kpi-renew-target').value,notes:document.getElementById('agency-notes').value};
-  await sb.from('agency_settings').upsert({key:'kpis',value:kpis},{onConflict:'key'});
+// ── Focus timer ─────────────────────────────────────────────────────────────
+// Starting is the hard part, not finishing. A countdown gives it a ritual.
+function jnFocus(id,mins){
+  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
+  if(JN.timer){ clearInterval(JN.timer.h); JN.timer=null; }
+  JN.timer={id:id, left:(mins||25)*60, total:(mins||25)*60};
+  JN.timer.h=setInterval(function(){
+    JN.timer.left--;
+    if(JN.timer.left<=0){
+      clearInterval(JN.timer.h);
+      sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+JN.timer.total}).eq('id',id).then(function(){});
+      JN.timer=null; jnFlash('Time — take a break'); jnLoad().then(jnPaint); return;
+    }
+    jnPaintTimer();
+  },1000);
+  jnPaint();
+}
+function jnStopFocus(save){
+  if(!JN.timer) return;
+  var spent=JN.timer.total-JN.timer.left, id=JN.timer.id;
+  clearInterval(JN.timer.h);
+  var it=JN.items.find(function(x){return x.id===id;});
+  if(save&&spent>30&&it) sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+spent}).eq('id',id).then(function(){ jnLoad().then(jnPaint); });
+  JN.timer=null; jnPaint();
+}
+function jnPaintTimer(){
+  var el=document.getElementById('jn-timer-clock'); if(!el||!JN.timer) return;
+  var m=Math.floor(JN.timer.left/60), s=JN.timer.left%60;
+  el.textContent=m+':'+String(s).padStart(2,'0');
+  var bar=document.getElementById('jn-timer-bar');
+  if(bar) bar.style.width=(100-(JN.timer.left/JN.timer.total*100))+'%';
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function jnTab(t){ JN.tab=t; jnPaint(); try{ localStorage.setItem('jn_tab',t); }catch(e){} }
+function jnCadTab(c){ JN.jobCad=c; jnPaint(); }
+
+async function renderJournal(){
+  var el=document.getElementById('jn-body'); if(!el) return;
+  el.innerHTML='<div style="color:var(--text2);padding:14px;">Loading…</div>';
+  try{ JN.tab=localStorage.getItem('jn_tab')||'today'; }catch(e){}
+  await jnLoad(); jnPaint();
+}
+
+function jnPaint(){
+  var el=document.getElementById('jn-body'); if(!el) return;
+  var tabs=[['today','☀️','Today'],['jobs','🔁','Jobs'],['ideas','💡','Ideas & goals'],['dump','🧠','Brain dump']];
+  var head='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">'
+    +'<input id="jn-capture" placeholder="Capture anything — type it and hit Enter" onkeydown="jnCapture(event)" '
+    +'style="flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:15px;color:var(--text);">'
+    +'<span id="jn-flash" style="font-size:12px;font-weight:700;color:#4ade80;opacity:0;transition:opacity .3s;min-width:70px;"></span></div>'
+    +'<div style="font-size:11px;color:var(--text3,var(--text2));margin-bottom:16px;">'
+    +'<b>tomorrow</b> / <b>friday</b> sets a date · <b>!</b> urgent · <b>?</b> idea · <b>*</b> goal · <b>#alex</b> tags a model</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">'
+    +tabs.map(function(t){ var on=JN.tab===t[0];
+      return '<button onclick="jnTab(\''+t[0]+'\')" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:10px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;">'+t[1]+' '+t[2]+'</button>';
+    }).join('')
+    +(jnAllCols().length?'<span style="margin-left:auto;display:flex;gap:6px;">'
+      +'<button onclick="jnSetAll(true)" title="Collapse every column" style="border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">⌃ Collapse all</button>'
+      +'<button onclick="jnSetAll(false)" title="Expand every column" style="border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">⌄ Expand all</button></span>':'')
+    +'</div>';
+  var sc=window.scrollY;                        // keep the page where it was
+  el.innerHTML=head+(JN.tab==='today'?jnToday():JN.tab==='jobs'?jnJobs():JN.tab==='ideas'?jnIdeas():jnDump())+jnTimerBar();
+  window.scrollTo(0,sc);
+  if(JN.timer) jnPaintTimer();
+  var c=document.getElementById('jn-capture'); if(c&&JN.tab!=='dump') c.focus();
+}
+
+function jnTimerBar(){
+  if(!JN.timer) return '';
+  var it=JN.items.find(function(x){return x.id===JN.timer.id;});
+  return '<div style="position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--surface);border-top:1px solid var(--accent);padding:12px 20px;display:flex;align-items:center;gap:16px;">'
+    +'<div id="jn-timer-clock" style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent2);min-width:82px;">--:--</div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(it?it.text:'')+'</div>'
+    +'<div style="background:var(--border);height:4px;border-radius:3px;margin-top:6px;"><div id="jn-timer-bar" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 1s linear;"></div></div></div>'
+    +'<button class="btn btn-sm btn-green" onclick="jnComplete(\''+(it?it.id:'')+'\');jnStopFocus(true)">✓ Done</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="jnStopFocus(true)">Stop</button></div>';
+}
+
+function jnItemRow(it,opts){
+  opts=opts||{};
+  var done=it.status==='done';
+  var due=it.due_at?jnWhen(it.due_at):'';
+  var overdue=it.due_at && new Date(it.due_at+'T00:00:00')<new Date(new Date().toDateString());
+  var tags=(it.tags||'').split(',').filter(Boolean).map(function(t){return '<span class="cscan cscan-grey">#'+escapeHtml(t)+'</span>';}).join(' ');
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--border);">'
+    +'<div onclick="jnComplete(\''+it.id+'\')" title="'+(done?'Put it back':'Done')+'" style="width:20px;height:20px;flex-shrink:0;margin-top:2px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
+    +'<div style="flex:1;min-width:0;">'
+    +'<div id="jn-txt-'+it.id+'" '+(done?'':'onclick="jnInline(this,\''+it.id+'\')" title="Click to edit"')+' style="font-size:13.5px;line-height:1.45;word-break:break-word;'+(done?'opacity:.5;text-decoration:line-through;':'cursor:text;')+'">'+jnTextHtml(it)+'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--text2);">'
+    +(due?'<span onclick="jnEditDue(\''+it.id+'\')" style="cursor:pointer;color:'+(overdue&&!done?'#ffc83c':'var(--text2)')+';">'+(overdue&&!done?'⏳ ':'📅 ')+due+'</span>':(done?'':'<span onclick="jnEditDue(\''+it.id+'\')" style="cursor:pointer;opacity:.5;">+ date</span>'))
+    +(it.focus_seconds?'<span>⏱ '+Math.round(it.focus_seconds/60)+'m</span>':'')
+    +(!done&&!due?'<span>· sat '+jnAge(it.created_at)+'</span>':'')
+    +tags+'</div></div>'
+    +'<div style="display:flex;gap:2px;flex-shrink:0;">'
+    +(!done&&opts.focus?'<button class="btn btn-sm btn-ghost" title="Focus 25 min" onclick="jnFocus(\''+it.id+'\',25)">⏱</button>':'')
+    +(!done&&opts.promote?'<button class="btn btn-sm btn-ghost" title="Move to Today" onclick="jnToSlot(\''+it.id+'\')">☀️</button>':'')
+    +(!done&&opts.bump?'<button class="btn btn-sm btn-ghost" title="Back to inbox" onclick="jnUpdate(\''+it.id+'\',{status:\'inbox\',slot:null})">↩</button>':'')
+    +(!done&&opts.later?'<button class="btn btn-sm btn-ghost" title="Someday" onclick="jnUpdate(\''+it.id+'\',{status:\'someday\',slot:null})">💤</button>':'')
+    +'<button class="btn btn-sm btn-danger" title="Delete" onclick="jnDeleteItem(\''+it.id+'\')">✕</button>'
+    +'</div></div>';
+}
+
+function jnToday(){
+  var slots=JN.items.filter(function(x){return x.status==='today'&&x.slot;}).sort(function(a,b){return a.slot-b.slot;});
+  var dueNow=JN.items.filter(function(x){return x.status!=='done'&&x.status!=='archived'&&!x.slot&&x.due_at&&x.due_at<=jnLocalISO();});
+  var daily=JN.jobs.filter(function(j){return j.cadence==='daily';});
+  var doneToday=JN.items.filter(function(x){return x.done_at&&x.done_at.slice(0,10)===jnLocalISO();});
+
+  var three='';
+  for(var n=1;n<=3;n++){
+    var it=slots.find(function(x){return x.slot===n;});
+    three += it ? jnItemRow(it,{focus:true,bump:true})
+      : '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px dashed var(--border);color:var(--text2);font-size:12.5px;opacity:.7;">'
+        +'<div style="width:20px;height:20px;border-radius:7px;border:2px dashed var(--border);flex-shrink:0;"></div>Empty — pull one from Ideas</div>';
+  }
+  var dailyDone=daily.filter(function(j){return jnDoneRow(j);}).length;
+  return jnGrid([
+    jnCol('t3','☀️',"Today's three",null,'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Three. Not thirty.</div>'+three,'var(--accent)'),
+    jnCol('due','📅','Due',dueNow.length, dueNow.length?dueNow.map(function(x){return jnItemRow(x,{focus:true,promote:true,later:true});}).join(''):jnEmpty('Nothing due.')),
+    jnCol('daily','🔁','Daily jobs',daily.length?dailyDone+'/'+daily.length:null,
+      daily.length?daily.map(jnJobRow).join('')+(dailyDone===daily.length?'<div style="text-align:center;padding:10px;color:#4ade80;font-size:12.5px;font-weight:700;">All done ✓</div>':'')
+        :jnEmpty('None yet — add them in <b>Jobs</b>.'), dailyDone&&dailyDone===daily.length?'#4ade80':null),
+    jnCol('donetoday','✅','Done today',doneToday.length,
+      doneToday.length?doneToday.map(function(x){return jnItemRow(x,{});}).join(''):jnEmpty('Nothing yet. Tick one thing.'))
+  ],290);
+}
+
+function jnJobRow(j){
+  var row=jnDoneRow(j), done=!!row;
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--border);">'
+    +'<div onclick="jnToggleJob(\''+j.id+'\')" title="'+(done?'Un-tick (not done properly)':'Tick off')+'" style="width:20px;height:20px;flex-shrink:0;margin-top:2px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13.5px;line-height:1.45;word-break:break-word;'+(done?'opacity:.5;text-decoration:line-through;':'')+'">'+escapeHtml(j.title)+'</div>'
+    +(j.notes?'<div style="font-size:11.5px;color:var(--text2);margin-top:2px;">'+escapeHtml(j.notes)+'</div>':'')
+    +(done&&row.done_at?'<div style="font-size:11px;color:#4ade80;margin-top:2px;">ticked '+new Date(row.done_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div>':'')+'</div>'
+    +'<div style="display:flex;gap:2px;flex-shrink:0;">'
+    +'<button class="btn btn-sm btn-ghost" title="Move up" onclick="jnMoveJob(\''+j.id+'\',-1)">↑</button>'
+    +'<button class="btn btn-sm btn-ghost" title="Move down" onclick="jnMoveJob(\''+j.id+'\',1)">↓</button>'
+    +'<button class="btn btn-sm btn-ghost" title="Edit" onclick="jnOpenJob(\''+j.id+'\')">✏</button>'
+    +'</div></div>';
+}
+
+function jnJobs(){
+  var cads=[['daily','🔁','Daily','day'],['weekly','🗓','Weekly','week'],['monthly','📆','Monthly','month']];
+  var cols=cads.map(function(c){
+    var list=JN.jobs.filter(function(j){return j.cadence===c[0];});
+    var d=list.filter(function(j){return jnDoneRow(j);}).length;
+    var pct=list.length?Math.round(d/list.length*100):0;
+    var body='<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">'+jnPeriodLabel(c[0])+'</div>'
+      +'<div style="background:var(--border);height:5px;border-radius:3px;margin-bottom:10px;"><div style="height:100%;width:'+pct+'%;background:'+(pct===100&&list.length?'#4ade80':'var(--accent)')+';border-radius:3px;transition:width .3s;"></div></div>'
+      +(list.length?list.map(jnJobRow).join(''):jnEmpty('Nothing yet. Add what you do every '+c[3]+' and stop holding it in your head.'))
+      +'<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:10px;" onclick="jnOpenJobFor(\''+c[0]+'\')">+ Add '+c[2].toLowerCase()+' job</button>';
+    return jnCol(c[0],c[1],c[2],list.length?d+'/'+list.length:'0', body, list.length&&d===list.length?'#4ade80':null);
+  });
+  return jnGrid(cols,290)
+    +'<div style="font-size:12px;color:var(--text2);padding:12px 4px 0;">Ticks reset on their own — daily at midnight, weekly on Monday, monthly on the 1st. Un-tick anything that wasn\'t done properly.</div>';
+}
+function jnOpenJobFor(cad){ JN.jobCad=cad; jnOpenJob(); }
+
+function jnIdeas(){
+  var inbox=JN.items.filter(function(x){return x.status==='inbox';});
+  var week=JN.items.filter(function(x){return x.status==='week';});
+  var someday=JN.items.filter(function(x){return x.status==='someday';});
+  var goals=JN.items.filter(function(x){return x.kind==='goal'&&x.status!=='done';});
+  var stale=inbox.filter(function(x){ return (Date.now()-new Date(x.created_at))/86400000>14; });
+
+  var h='';
+  if(stale.length>=3) h+='<div class="card" style="border:1px solid rgba(230,180,40,.35);background:rgba(230,180,40,.06);margin-bottom:14px;">'
+    +'<div style="font-size:13px;color:#e6b428;font-weight:700;margin-bottom:3px;">'+stale.length+' things have sat here over two weeks</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:9px;">No judgement — they were worth writing down. Clear them out or pick one.</div>'
+    +'<button class="btn btn-sm btn-ghost" onclick="jnArchiveStale()">💤 Move them all to Someday</button></div>';
+
+  return h+jnGrid([
+    jnCol('goals','🎯','Goals',goals.length, goals.length?goals.map(function(x){return jnItemRow(x,{promote:true});}).join(''):jnEmpty('None set. Capture one with <b>*</b> in front.')),
+    jnCol('inbox','📥','Inbox',inbox.length, inbox.length?inbox.map(function(x){return jnItemRow(x,{promote:true,later:true,focus:true});}).join(''):jnEmpty('Empty. Capture anything up top — sort it later.'),'var(--accent)'),
+    jnCol('week','🗓','This week',week.length, week.length?week.map(function(x){return jnItemRow(x,{promote:true,later:true});}).join(''):jnEmpty('Nothing queued for this week.')),
+    jnCol('someday','💤','Someday',someday.length, someday.length?someday.map(function(x){return jnItemRow(x,{promote:true});}).join(''):jnEmpty('Nothing parked.'))
+  ],290);
+}
+async function jnArchiveStale(){
+  var stale=JN.items.filter(function(x){return x.status==='inbox'&&(Date.now()-new Date(x.created_at))/86400000>14;});
+  await Promise.all(stale.map(function(x){ return sb.from('journal_items').update({status:'someday'}).eq('id',x.id); }));
+  await jnLoad(); jnPaint(); jnFlash('Parked '+stale.length);
+}
+
+function jnDump(){
+  return '<div class="card"><div class="card-title">🧠 Brain dump</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">No structure, no rules. Get it out of your head first — turn it into tasks after.</div>'
+    +'<textarea id="jn-dump" placeholder="Everything that\'s rattling around…" style="width:100%;min-height:340px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:14px;font-size:14px;line-height:1.7;resize:vertical;">'+escapeHtml(JN.dumpText||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary" onclick="jnSaveDump()">💾 Save</button>'
+    +'<button class="btn btn-ghost" onclick="jnExtract()">✨ Turn each line into a task</button>'
+    +'<span id="jn-dump-note" style="font-size:12px;color:var(--text2);align-self:center;"></span></div></div>';
+}
+async function jnSaveDump(){
+  var t=(document.getElementById('jn-dump')||{}).value||'';
+  JN.dumpText=t;
+  var r=await sb.from('journal_notes').upsert({key:'dump',text:t,updated_at:new Date().toISOString()},{onConflict:'key'});
+  if(r.error){ alert('Could not save — '+r.error.message); return; }
+  var n=document.getElementById('jn-dump-note'); if(n){ n.textContent='Saved ✓'; setTimeout(function(){ n.textContent=''; },1600); }
+}
+async function jnExtract(){
+  var t=(document.getElementById('jn-dump')||{}).value||'';
+  var lines=t.split('\n').map(function(s){return s.replace(/^[-*•\s]+/,'').trim();}).filter(function(s){return s.length>2;});
+  if(!lines.length){ jnFlash('Nothing to pull out'); return; }
+  if(!confirm('Create '+lines.length+' item'+(lines.length===1?'':'s')+' in your Inbox?\n\nThe dump text stays as it is.')) return;
+  var rows=lines.map(function(l){ var p=jnParse(l); p.created_by=jnMe(); p.status='inbox'; p.slot=null; return p; });
+  var r=await sb.from('journal_items').insert(rows).select();
+  if(r.error){ alert('Could not create — '+r.error.message); return; }
+  await jnLoad(); JN.tab='ideas'; jnPaint(); jnFlash('Added '+lines.length);
 }
 
 // ── Utils ────────────────────────────────────────────────────
