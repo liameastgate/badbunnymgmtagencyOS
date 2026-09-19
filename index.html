@@ -7549,6 +7549,7 @@ function cfExpandHtml(a,runs){
       +'<div>'+tick(!(d.features&&d.features.length))+'Features you can\'t use: '+((d.features&&d.features.length)?escapeHtml(d.features.join(', ')):'none')+'</div>'
       +'<div>'+tick(d.recommended!==false)+'Recommended to non-followers: '+(d.recommended===false?'<b style="color:#fb923c;">no</b>':d.recommended===true?'<b style="color:#4ade80;">yes</b>':'unknown')+'</div>'
       +(d.views&&d.views.length?'<div>📈 Recent reels '+d.views.slice(0,5).join(' / ')+' views'+(d.baseline?' · baseline '+d.baseline:'')+'</div>':'')
+      +(d.profile&&(d.profile.followers!=null||d.profile.views_30d!=null)?'<div>👤 '+(d.profile.followers!=null?d.profile.followers+' followers · ':'')+(d.profile.posts!=null?d.profile.posts+' posts · ':'')+(d.profile.views_30d!=null?d.profile.views_30d.toLocaleString()+' views / 30d':'')+(d.profile.professional?' · pro account':'')+'</div>':'')
       +(a.account_created_on?'<div>🗓 Account day '+Math.max(1,Math.round((Date.now()-new Date(a.account_created_on))/86400000))+(a.posting_paused?' · <span style="color:#ffc83c;">posting paused</span>':'')+'</div>':'')
       +'</div>' : '<div class="cf-sub">Not checked yet — run a health check.</div>';
   var actions='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'
@@ -10316,9 +10317,9 @@ var FANS_TAB = 'today';
 // ── Today: the worklist ──────────────────────────────────────────────────────
 // One ordered list of who to message next, built server-side in fan_worklist so
 // every chatter on shift sees the same order and nobody works the same man twice.
-var WL={rows:[],q:'',page:'',loaded:false,busy:false,show:25};
-var WL_Q={care:'Care',vip:'VIP gone cold',untapped:'Untapped',unopened:'Unopened PPV',winback:'Win-back',talks:'Talks, never bought',cold:'Never messaged'};
-var WL_ORDER=['care','vip','untapped','unopened','winback','talks','cold'];
+var WL={rows:[],q:'',page:'',tier:'field',loaded:false,busy:false,show:25};
+var WL_Q={care:'Care',cold_vip:'Gone quiet',warm_vip:'In touch',untapped:'Untapped',unopened:'Unopened PPV',winback:'Win-back',talks:'Talks, never bought',cold:'Never messaged'};
+var WL_ORDER={field:['care','untapped','unopened','winback','talks','cold'],vip:['care','cold_vip','warm_vip']};
 var WL_CLAIM_HOURS=4;
 
 function wlCss(){
@@ -10338,7 +10339,8 @@ function wlCss(){
     +'.wl-pg{font-size:12px;color:var(--text2);}'
     +'.wl-q{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;background:var(--surface);color:var(--text2);}'
     +'.wl-q.care{background:rgba(239,68,68,.16);color:var(--red);}'
-    +'.wl-q.vip{background:rgba(234,179,8,.16);color:var(--yellow);}'
+    +'.wl-q.cold_vip{background:rgba(234,179,8,.16);color:var(--yellow);}'
+    +'.wl-q.warm_vip{background:rgba(74,158,255,.14);color:var(--accent);}'
     +'.wl-q.untapped{background:rgba(34,197,94,.16);color:var(--green);}'
     +'.wl-q.unopened{background:rgba(249,115,22,.16);color:#fb923c;}'
     +'.wl-why{font-size:13px;margin:5px 0 0;}'
@@ -10370,14 +10372,17 @@ async function renderToday(){
 function wlPaint(){
   var el=document.getElementById('today-body'); if(!el) return;
   var me=nqMe();
-  var pages=[]; WL.rows.forEach(function(r){ if(pages.indexOf(r.creator)<0) pages.push(r.creator); }); pages.sort();
-  var byQ={}; WL.rows.forEach(function(r){ if(WL.page&&r.creator!==WL.page) return; (byQ[r.queue]=byQ[r.queue]||[]).push(r); });
+  var pages=[]; WL.rows.forEach(function(r){ if(r.tier===WL.tier&&pages.indexOf(r.creator)<0) pages.push(r.creator); }); pages.sort();
+  var mine=WL.rows.filter(function(r){ return r.tier===WL.tier; });
+  var byQ={}; mine.forEach(function(r){ if(WL.page&&r.creator!==WL.page) return; (byQ[r.queue]=byQ[r.queue]||[]).push(r); });
 
-  var h='<div class="fs-sub" style="margin-bottom:10px;">Worked top to bottom. The order is the same for everyone on shift — claim a man before you open him so two of you don\'t land in the same inbox.</div>';
+  var h='<div class="fs-sub" style="margin-bottom:10px;">'+(WL.tier==='vip'
+    ? 'The men who already spend with us. They are not on the Today list on purpose — this is a relationship to keep, not a queue to farm. Read his card before you type.'
+    : 'Worked top to bottom. The order is the same for everyone on shift — claim a man before you open him so two of you don\'t land in the same inbox.')+'</div>';
 
   h+='<div class="wl-kpis">';
-  h+='<div class="wl-kpi'+(WL.q===''?' on':'')+'" onclick="WL.q=\'\';WL.show=25;wlPaint()"><div class="v">'+WL.rows.filter(function(r){return !WL.page||r.creator===WL.page;}).length+'</div><div class="k">everyone</div></div>';
-  WL_ORDER.forEach(function(q){
+  h+='<div class="wl-kpi'+(WL.q===''?' on':'')+'" onclick="WL.q=\'\';WL.show=25;wlPaint()"><div class="v">'+mine.filter(function(r){return !WL.page||r.creator===WL.page;}).length+'</div><div class="k">everyone</div></div>';
+  (WL_ORDER[WL.tier]||[]).forEach(function(q){
     var rows=byQ[q]||[]; if(!rows.length) return;
     var net=rows.reduce(function(a,r){return a+Number(r.total_net||0);},0);
     h+='<div class="wl-kpi'+(WL.q===q?' on':'')+'" onclick="WL.q=\''+q+'\';WL.show=25;wlPaint()">'
@@ -10391,7 +10396,7 @@ function wlPaint(){
       +pages.map(function(p){ return '<div class="wl-kpi'+(WL.page===p?' on':'')+'" style="min-width:0;padding:6px 12px;" onclick="WL.page=\''+p.replace(/'/g,"\\'")+'\';WL.show=25;wlPaint()"><div class="k">'+escapeHtml(p)+'</div></div>'; }).join('')+'</div>';
   }
 
-  var list=WL.rows.filter(function(r){ return (!WL.q||r.queue===WL.q)&&(!WL.page||r.creator===WL.page); });
+  var list=mine.filter(function(r){ return (!WL.q||r.queue===WL.q)&&(!WL.page||r.creator===WL.page); });
   if(!list.length){ el.innerHTML=h+'<div class="empty"><p>Nothing in this queue. Good.</p></div>'; return; }
 
   h+=list.slice(0,WL.show).map(function(r){
@@ -10429,7 +10434,7 @@ function wlPaint(){
 }
 
 function wlOpen(creator, fanId){
-  FANS_TAB='fans'; renderFans();
+  WL.back=FANS_TAB; FANS_TAB='fans'; renderFans();
   setTimeout(function(){ fsOpen(creator, fanId); }, 0);
 }
 
@@ -10464,13 +10469,14 @@ async function wlDone(creator, fanId, queue, outcome){
 function renderFans(){
   var el=document.getElementById('fans-tabs'); if(!el) return;
   el.innerHTML='<div class="tabs" style="margin-bottom:14px;">'
-    +'<div class="tab'+(FANS_TAB==='today'?' active':'')+'" onclick="FANS_TAB=\'today\';renderFans()">🎯 Today</div>'
+    +'<div class="tab'+(FANS_TAB==='today'?' active':'')+'" onclick="FANS_TAB=\'today\';WL.tier=\'field\';WL.q=\'\';WL.show=25;renderFans()">🎯 Today</div>'
+    +'<div class="tab'+(FANS_TAB==='vips'?' active':'')+'" onclick="FANS_TAB=\'vips\';WL.tier=\'vip\';WL.q=\'\';WL.show=25;renderFans()">💎 VIPs</div>'
     +'<div class="tab'+(FANS_TAB==='new'?' active':'')+'" onclick="FANS_TAB=\'new\';renderFans()">⏰ New subs</div>'
     +'<div class="tab'+(FANS_TAB==='fans'?' active':'')+'" onclick="FANS_TAB=\'fans\';renderFans()">🧑‍💼 Fan stats</div>'
     +'</div>';
   var t=document.getElementById('today-body'), a=document.getElementById('new-subs-body'), b=document.getElementById('fan-stats-body');
-  t.hidden=FANS_TAB!=='today'; a.hidden=FANS_TAB!=='new'; b.hidden=FANS_TAB!=='fans';
-  if(FANS_TAB==='today') renderToday();
+  t.hidden=(FANS_TAB!=='today'&&FANS_TAB!=='vips'); a.hidden=FANS_TAB!=='new'; b.hidden=FANS_TAB!=='fans';
+  if(FANS_TAB==='today'||FANS_TAB==='vips') renderToday();
   else if(FANS_TAB==='new') renderNewSubs();
   else renderFanStats();
 }
