@@ -4092,6 +4092,20 @@ function libFiltered(){
   return items;
 }
 
+// "Show them" on the held-for-review banner. The banner counts every held item
+// for this model, but the list underneath is also filtered by category, scan
+// outcome and the search box — so setting the state alone landed you on
+// "Nothing here with these filters" whenever the held clips sat in a category
+// you weren't looking at. Clear everything that could hide them; the model
+// stays, because that's the folder you're standing in.
+function libShowNeedsReview(){
+  LIB_F.state='needs_review'; LIB_F.category=''; LIB_F.outcome=''; LIB_F.q='';
+  var s=document.getElementById('cl-search'); if(s) s.value='';
+  renderLibraryList();
+  var w=document.getElementById('cl-list');
+  if(w&&w.scrollIntoView) try{ w.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
+}
+
 function renderLibraryList(){
   var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
   if(!wrap) return;
@@ -4185,7 +4199,7 @@ function renderLibraryList(){
     +statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
     +((p.needs_review||0)?'<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 13px;font-size:12.5px;color:var(--red);margin:-4px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
       +'<b>🛑 '+p.needs_review+' held for review</b><span style="color:var(--text2);">— the scanner says Instagram would remove them. They can\'t be posted until you clear or re-file them.</span>'
-      +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="LIB_F.state=\'needs_review\';renderLibraryList()">Show them</button></div>':'')
+      +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libShowNeedsReview()">Show them</button></div>':'')
     +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+'</div>':'');
 
   var items=libFiltered();
