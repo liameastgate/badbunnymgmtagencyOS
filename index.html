@@ -871,7 +871,7 @@
 <!-- CONTENT FACTORY -->
     <div class="page" id="page-content-factory">
       <div class="page-title">Content Factory <button class="btn btn-sm btn-ghost" style="margin-left:10px;vertical-align:middle;" onclick="navigate('content-upload')" title="Every upload, with its lifecycle state">📁 Content Library ↗</button></div>
-      <div class="page-sub">Upload photos, get posting-ready reels back. The rendering runs on a server, so nothing needs to be open on anyone's computer.</div>
+      <div class="page-sub">Photos and sounds come from the model's Content Library; finished reels go back into it, ready for the phones. Rendering runs on a server — nothing needs to be open on anyone's computer.</div>
 
       <div class="card">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
@@ -891,11 +891,11 @@
           </div>
           <div class="form-group" style="margin:0;">
             <label>Add photos</label>
-            <input type="file" id="cf-up-raw" multiple accept="image/*" onchange="cfUpload('content-raw', this)">
+            <input type="file" id="cf-up-raw" multiple accept="image/*" onchange="cfUploadLib('photos', this)">
           </div>
           <div class="form-group" style="margin:0;">
             <label>Add sounds</label>
-            <input type="file" id="cf-up-audio" multiple accept="audio/*" onchange="cfUpload('content-audio', this)">
+            <input type="file" id="cf-up-audio" multiple accept="audio/*" onchange="cfUploadLib('sounds', this)">
           </div>
         </div>
         <div id="cf-alert" class="alert"></div>
@@ -3167,16 +3167,38 @@ async function cfCount(bucket, prefix){
   }catch(e){ return 0; }
 }
 
+// The Library is the one door now: photos and sounds are Library rows for the
+// model; clips the worker made are render_assets; finished reels are Library
+// rows the worker wrote (render_job_id set), which the phones can post.
 async function cfLoadCounts(){
   const id=cfModelId(); const box=document.getElementById('cf-counts');
   if(!id||!box) return;
-  const [photos,clips,sounds,staged,ready]=await Promise.all([
-    cfCount(CF_RAW,id), cfCount(CF_SOURCE,id), cfCount(CF_AUDIO,id),
-    cfCount(CF_OUT,id+'/staged'), cfCount(CF_OUT,id+'/ready')
+  const [lib,assets]=await Promise.all([
+    sb.from('content_library').select('id,category,content_type,r2_key,render_job_id,review_status').eq('model_id',id),
+    sb.from('render_assets').select('kind').eq('model_id',id)
   ]);
-  const tile=(n,l)=>`<div class="stat-card"><div class="stat-value">${n}</div><div class="stat-label">${l}</div></div>`;
-  box.innerHTML=tile(photos,'Photos')+tile(clips,'Source clips')+tile(sounds,'Sounds')
-               +tile(staged,'Made')+tile(ready,'Ready to post');
+  const L=lib.data||[], A=assets.data||[];
+  const isImg=function(x){ return /^image\//.test(x.content_type||'')||/\.(jpe?g|png|webp)$/i.test(x.r2_key||''); };
+  const photos=L.filter(function(x){ return isImg(x)&&['photos','social'].includes(x.category)&&x.review_status!=='rejected'; }).length;
+  const sounds=L.filter(function(x){ return x.category==='sounds'; }).length;
+  const clips=A.filter(function(x){ return x.kind==='source'; }).length;
+  const staged=A.filter(function(x){ return x.kind==='staged'; }).length;
+  const ready=L.filter(function(x){ return !!x.render_job_id; }).length;
+  const tile=(n,l,sub)=>`<div class="stat-card"><div class="stat-value">${n}</div><div class="stat-label">${l}</div>${sub?'<div class="stat-label" style="font-size:10.5px;opacity:.7;">'+sub+'</div>':''}</div>`;
+  box.innerHTML=tile(photos,'Photos','from the Library')+tile(clips,'Source clips')+tile(sounds,'Sounds','Library · Sounds')
+               +tile(staged,'Made')+tile(ready,'Ready to post','in the Library');
+}
+
+async function cfUploadLib(category, input){
+  const id=cfModelId();
+  if(!id){ cfAlert('Pick a model first.','error'); input.value=''; return; }
+  const files=[...(input.files||[])]; if(!files.length) return;
+  cfAlert(`Uploading ${files.length} file(s) to the Library (${category})…`);
+  const res=await libUploadFiles(files,{modelId:id,ownerType:'model',category:category,onStatus:function(label,msg){ cfAlert(label+' · '+msg); }});
+  input.value='';
+  const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
+  cfAlert(bad.length?`${ok} uploaded, ${bad.length} skipped — ${bad[0].error||bad[0].skipped}`:`${ok} file(s) in the Library.`, bad.length?'error':'success');
+  cfLoadCounts();
 }
 
 async function cfUpload(bucket, input){
@@ -3257,23 +3279,21 @@ function cfShowLog(jobId){
 async function cfLoadReady(){
   const id=cfModelId(); const box=document.getElementById('cf-ready');
   if(!id||!box) return;
-  const {data,error}=await sb.storage.from(CF_OUT).list(id+'/ready',
-    {limit:200, sortBy:{column:'created_at',order:'desc'}});
-  const files=(data||[]).filter(f=>f.id);
+  const {data,error}=await sb.from('content_library').select('id,title,r2_key,created_at,state,derived_from')
+    .eq('model_id',id).not('render_job_id','is',null).order('created_at',{ascending:false}).limit(100);
+  const files=data||[];
   document.getElementById('cf-ready-empty').style.display=files.length?'none':'block';
   if(error||!files.length){ box.innerHTML=''; return; }
   box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.18);">
-      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</div>
-      <button class="btn btn-sm btn-ghost" onclick="cfDownload('${id}/ready/${f.name}')">Download</button>
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.title||f.r2_key)} <span class="stat-label" style="font-size:11px;">· ${escapeHtml(f.state||'')}</span></div>
+      <button class="btn btn-sm btn-ghost" onclick="cfDownload('${accEscapeAttr(f.r2_key)}')">Download</button>
     </div>`).join('');
 }
-
 async function cfDownload(path){
   // Signed URL rather than a public bucket: the link works for a minute and
   // then stops, so a forwarded link is not a permanent hole.
-  const {data,error}=await sb.storage.from(CF_OUT).createSignedUrl(path,60,{download:true});
-  if(error||!data){ cfAlert('Could not get that file: '+(error?.message||'unknown'),'error'); return; }
-  window.open(data.signedUrl,'_blank');
+  try{ const url=await r2SignedUrl(path,'GET'); window.open(url,'_blank'); }
+  catch(e){ cfAlert('Could not get that file: '+(e.message||e),'error'); }
 }
 
 function navigate(page) {
@@ -3781,6 +3801,10 @@ async function loadContentLibrary(){
   const{data,error}=await sb.from('content_library').select('*').order('created_at',{ascending:false});
   if(error){ console.error('loadContentLibrary',error); STATE.library=[]; return; }
   STATE.library=data||[];
+  try{ const pr=await sb.from('phone_runs').select('clip_key,account_id,kind,started_at').eq('ok',true).in('kind',['post','story']).not('clip_key','is',null).limit(2000);
+    const pa=await sb.from('phone_accounts').select('id,handle,profile_name'); const hn={}; (pa.data||[]).forEach(function(a){ hn[a.id]=a.handle||a.profile_name||'?'; });
+    STATE.libPhoneUse={}; (pr.data||[]).forEach(function(r){ (STATE.libPhoneUse[r.clip_key]=STATE.libPhoneUse[r.clip_key]||[]).push({handle:hn[r.account_id]||'?',kind:r.kind,at:r.started_at}); });
+  }catch(e){ STATE.libPhoneUse={}; }
   if(['admin','va'].includes(STATE.profile?.role)){
     const r=await sb.from('content_postings').select('*').order('posted_at',{ascending:false});
     STATE.postings=r.data||[];
@@ -3791,6 +3815,7 @@ var LIB_CATEGORIES={
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
   stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Photos the phones post as link-sticker stories — one per account per day, never repeated within 30 days'},
+  sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
   // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
   // slips through into a social category and can't actually be posted there.
   nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'🔥', accept:'video/*,image/*', hint:'Too explicit to promote anywhere — paid page only'}
@@ -4302,6 +4327,14 @@ function renderLibraryList(){
 function libOpenModel(key){ LIB_F.model=key; LIB_F.category=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
 function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
 
+function libPhoneUseFor(i){
+  // this item plus everything cut from it (derived_from chain), across all phones
+  var use=STATE.libPhoneUse||{}, L=STATE.library||[], out=[];
+  var kids=function(id){ return L.filter(function(x){return x.derived_from===id;}); };
+  var stack=[i], seen={};
+  while(stack.length){ var x=stack.pop(); if(!x||seen[x.id]) continue; seen[x.id]=1; (use[x.r2_key]||[]).forEach(function(u){out.push(u);}); kids(x.id).forEach(function(k){stack.push(k);}); }
+  return out;
+}
 function libCardHtml(i){
   var mdl=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
   var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
@@ -4309,6 +4342,7 @@ function libCardHtml(i){
   var meta=[dims,libFmtDur(i.duration_sec),libFmtSize(i.size_bytes),fmtDate(i.created_at)].filter(Boolean).join(' · ');
   var ps=libPostingsFor(i.id);
   var postedChip=ps.length?'<span class="cscan cscan-grey" style="cursor:pointer;" onclick="libShowPostings(\''+i.id+'\')">📌 ×'+ps.length+'</span>':'';
+  var pu=libPhoneUseFor(i); var phoneChip=pu.length?'<span class="cscan" style="background:rgba(107,143,255,.16);color:var(--accent2);" title="'+accEscapeAttr(pu.map(function(u){return u.handle+' · '+u.kind+' · '+fmtDate(u.at);}).join('\n'))+'">📱 '+pu.length+' on phones</span>':'';
   var orderChip=o?'<span class="cscan cscan-grey" title="Uploaded for this content order">🎯 #'+String(o.order_number||'').padStart(3,'0')+'</span>':'';
   var hdWarn=(i.width&&i.height&&Math.max(i.width,i.height)<LIB_MIN_LONG_SIDE)?'<span class="cscan cscan-red" title="Longest edge is under 1080px">⚠ not HD</span>':'';
   var st=i.state||'fresh';
@@ -4327,7 +4361,7 @@ function libCardHtml(i){
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+phoneChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
     +'<div style="display:flex;gap:3px;flex-wrap:wrap;">'
     +(st!=='retired'?'<button class="btn btn-sm btn-primary" onclick="libOpenPost(\''+i.id+'\')" title="Record that this went out on an account">📌</button>':'')
     +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll">📲</button>'
@@ -9352,13 +9386,12 @@ async function popoutModelSheet(modelId){
 function defaultSheetTemplate(){
   return [
 '## Stage Info','Name: ','Age: ','Birthday (DD/MM/YYYY): ','Ethnicity: ','Home (Country, City): ','Living (Country, City): ','Personality: ','Niche / Branding: ','',
-'## Personal Details','Favorite Emojis: ','Keywords: ','Favorite Color/s: ','Timezone: ','Tone & Language: ','Marketing Notes: ','',
+'## Personal Details','Favorite Emojis: ','Keywords: ','Favorite Color/s: ','Timezone: ','Tone & Language: ','',
 '## Dimensions','Height: ','Weight: ','Boob Size: ','Shoe Size: ','Natural Hair Color: ','Natural Eye Color: ','Tattoos / Piercings: ','',
 '## Sexual Preferences','Romantic Person?: ','Ideal Date: ','Celebrity Crush: ','Sex With Men?: ','Sex With Women?: ','Anal Sex?: ','Dominant Or Submissive: ','',
 '## Personal Life','Family Status: ','Relationship Status: ','Pets: ','Dreams / Aspirations: ','Hobbies / Interests: ','Sport / Active: ','Travel History: ','Education: ','Profession / Job: ','Astrological Sign: ','',
 '## Sex Toys Owned / More Prefs','Sex Toys Owned: ','Turn Ons: ','Turn Offs: ','Fetishes / Kinks: ','Favorite Sex Position: ','Hairy Or Shaved: ','Crazy Sex Stories: ','Group Sex Stories: ','Crazy Location Sex: ','Best Sex You Had: ','',
-'## Custom Type — Will Do','Show Pussy: ','Show Ass: ','Use Dildo (Pussy): ','Use Dildo (Ass): ','Dirty Talking: ','Sell Items (Socks/Underwear): ','Dick Rates: ','Video Calls: ','Refuse: ','',
-'## Content Offered','Fully Nude: ','Dick Rating: ','Solo: ','Worship: ','Feet: ','',
+'## Will Do / Won’t Do','Answer each line: Yes  /  Yes – <condition>  /  Not yet  /  No.   A blank line means No.','Delete any line that does not apply to this model.','','### Visual','Clothed / teasing: ','Lingerie or swimwear: ','Underwear / jockstrap: ','Sheer or implied nude: ','Topless: ','Fully nude, non-explicit: ','Explicit solo — no toys: ','Explicit solo — with toys: ','Ass: ','Feet: ','Chest / breasts: ','Bulge / genitals: ','Muscle / flexing: ','Shower or bath: ','Outdoor or semi-public: ','','### Voice','Silent content only: ','Moaning: ','Dirty talk — scripted: ','Dirty talk — uses his name: ','Voice notes: ','Spoken roleplay: ','','### Tone','GFE / warmth: ','Dominant: ','Submissive: ','Brat / teasing: ','JOI: ','Degradation aimed at him: ','Degradation aimed at the model: ','Findom: ','','### Requests','Custom video — general: ','Custom video — says his name: ','Name written on paper or body: ','Fan-scripted scenario (model keeps the veto): ','Dick / cock rating: ','Sell worn items: ','Live stream: ','Video call — faceless: ','Video call — face shown: ','','### Off the table','Never, whatever is offered (list them): ','Any answer here can change at any time — the model tells their manager and this gets updated.','',
 '## Pricing — Premade Solo Content','2 - 3 Photos — Standard: | Whale: ','4 - 5 Photos — Standard: | Whale: ','12 - 15 Photos — Standard: | Whale: ','2 - 3 Min Solo Video — Standard: | Whale: ','4 - 5 Min Solo Video — Standard: | Whale: ','5 - 10 Min Solo Video — Standard: | Whale: ','10 - 15 Min Solo Video — Standard: | Whale: ','15+ Min Solo Video — Standard: | Whale: ','Short Sexting Scene (1 min) — Standard: | Whale: ','Long Sexting Scene (2 min) — Standard: | Whale: ','',
 '## Pricing — Premade Collab Content','1 - 2 Min Teaser (not posted) — Standard: | Whale: ','4 - 5 Min Sextapes — Standard: | Whale: ','5 - 10 Min Sextapes — Standard: | Whale: ','10 - 15 Min Sextapes — Standard: | Whale: ','15+ Min Sextapes — Standard: | Whale: ','',
 '## Pricing — Custom Content','Cock Rating Audio (per min) — Standard: | Fetish: ','Cock Rating Video (per min) — Standard: | Fetish: ','Custom Photos (per photo) — Standard: | Fetish: ','Custom Voice Notes (per min) — Standard: | Fetish: ','Reusable Custom Video (per min) — Standard: | Fetish: ','Personal Custom Video: ','Video Call: ','Underwear (Not Used): ','Underwear (Used): ','',
@@ -14920,8 +14953,8 @@ var CP_SPEC = [
      h:'Be honest rather than optimistic. We’d rather build around four real hours than eight imaginary ones.'},
     {k:'assets', l:'What you’ve got that we can film', t:'area', ph:'Vehicle, tools, kit, animals, a workplace. Skills you already have. Anywhere you can get into that most people can’t.',
      h:'Half the options later come down to something you either have or don’t — a truck, a garage, a dog, a job behind a bar.'},
-    {k:'lines', l:'Your hard limits', t:'area', ph:'Face shown or not. Anyone in your life who can’t see this. Places you can’t be filmed. Anything you’ve already decided is a no.',
-     h:'We’d rather know now than in week six. Most plans that fall apart do it because nobody asked whether you could film at work, or who follows you.'}
+    {k:'lines', l:'Filming limits', t:'area', ph:'Face shown or not. Anyone in your life who can’t see this. Places you can’t be filmed. Identifying marks that stay out of frame.',
+     h:'Filming and identity only — what gets <b>made and sold</b> lives in the Chatting Script under Will Do / Won’t Do, one list not two. We’d rather know now than in week six. Most plans that fall apart do it because nobody asked whether you could film at work, or who follows you.'}
  ]},
 
  { id:'concept', tag:'Concept', title:'Two things get called a niche',
@@ -15047,13 +15080,12 @@ CP_SPEC.push(
     ['We’ve agreed up front what result ends it','']
    ],
    fields:[
-    {k:'vps', l:'Views per paid sub today', t:'text', ph:'—'},
     {k:'us', l:'US share today', t:'text', ph:'—%'},
     {k:'start', l:'Test starts', t:'text'},
     {k:'owner', l:'Weekly check owned by', t:'text'},
     {k:'kill', l:'What ends it', t:'area', ph:'The specific result that stops this test. Agreed by both of us, today.',
      h:'Agreed before launch it’s a decision we both made. Agreed afterwards it’s an argument, and the loudest person wins instead of the right one.'},
-    {k:'sign', l:'Signed off by / date / review on', t:'text'}
+    {k:'owner2', l:'Agreed with', t:'text', ph:'Who signed off on the kill condition'}
    ],
    call:true }
 );
