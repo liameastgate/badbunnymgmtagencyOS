@@ -2572,7 +2572,7 @@
       <div id="cf-flags"></div>
       <div class="card" style="margin-bottom:12px;">
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-          <div><label class="cf-l">Run</label><select id="cf-kind" onchange="cfEstimate()"><option value="warmup">Warm-up</option><option value="post_auto">Post — next unused clip</option><option value="post_pick">Post — pick a clip…</option><option value="health">Health check only</option></select></div>
+          <div><label class="cf-l">Run</label><select id="cf-kind" onchange="cfEstimate()"><option value="warmup">Warm-up</option><option value="post_auto">Post — next unused clip</option><option value="post_pick">Post — pick a clip…</option><option value="story">Story CTA (link sticker)</option><option value="health">Health check only</option></select></div>
           <div><label class="cf-l">At once (max)</label><input type="number" id="cf-par" value="4" min="1" max="6" style="width:70px;" onchange="cfEstimate()"></div>
           <div><label class="cf-l">Spread over</label><select id="cf-spread" onchange="cfEstimate()"><option value="45">45 min</option><option value="20">20 min</option><option value="90">90 min</option><option value="0">Now</option></select></div>
           <div><label class="cf-l">Warm-up before post</label><select id="cf-prewarm"><option value="1">Yes</option><option value="0">No</option></select></div>
@@ -3790,6 +3790,7 @@ var LIB_CATEGORIES={
   social:  {label:'IG / TikTok / Snap', short:'Social',  icon:'📱', accept:'video/*,image/*', hint:'Reels, stories, snaps — anything for the phone accounts'},
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
+  stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Photos the phones post as link-sticker stories — one per account per day, never repeated within 30 days'},
   // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
   // slips through into a social category and can't actually be posted there.
   nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'🔥', accept:'video/*,image/*', hint:'Too explicit to promote anywhere — paid page only'}
@@ -7477,7 +7478,7 @@ async function loadCloudFarm(){
     sb.from('phone_flags').select('*').is('dismissed_at',null).order('created_at',{ascending:false}),
     sb.from('phone_settings').select('*').eq('key','scheduler').maybeSingle(),
     sb.from('phone_runs_today').select('*'),
-    sb.from('phone_jobs').select('id,account_id,kind,status,not_before,payload,requested_by').in('status',['queued','running']).order('not_before',{ascending:true})
+    sb.from('phone_jobs').select('id,account_id,kind,status,not_before,payload,requested_by,progress,progress_at').in('status',['queued','running']).order('not_before',{ascending:true})
   ]);
   STATE.phoneAccounts=q[0].data||[]; STATE._phoneErr=q[0].error?q[0].error.message:null;
   STATE.phoneRuns=q[1].data||[];
@@ -7517,22 +7518,23 @@ function renderCloudFarm(){
   }
   if(STATE._phoneErr){ wrap.innerHTML='<div style="color:var(--red);padding:12px;">'+escapeHtml(STATE._phoneErr)+'</div>'; return; }
   if(!P.length){ wrap.innerHTML='<div class="cf-sub" style="padding:14px;">No phones match. Sync from Multilogin or GeeLark to pull them in.</div>'; cfEstimate(); return; }
-  var h='<table class="cf-t"><tr><th style="width:30px;"></th><th>Phone</th><th>Model</th><th>Health</th><th>Last run</th><th>Runs today</th><th>Posts today</th><th>Next</th><th style="width:34px;"></th></tr>';
+  var h='<table class="cf-t"><tr><th style="width:30px;"></th><th>Phone</th><th>Model</th><th>Health</th><th>Last run</th><th>Runs today</th><th>Posts today</th><th>Stories today</th><th>Next</th><th style="width:34px;"></th></tr>';
   P.forEach(function(a){
     var runs=cfRunsFor(a.id), lr=runs[0], t=CF.today[a.id]||{}, nj=cfNextJob(a.id);
     var busy=nj&&nj.status==='running';
-    var last= busy ? '<span style="color:var(--accent2);">● running</span> '+escapeHtml(nj.kind) : lr ? cfAEST(lr.started_at)+' · '+escapeHtml(lr.kind)+(cfMins(lr)!=null?' · '+cfMins(lr)+' min':'')+' · '+(lr.ok?'<span style="color:#4ade80;font-weight:700;">ok</span>':'<span style="color:#f87171;font-weight:700;" title="'+escapeHtml(lr.error||'')+'">failed</span>') : '<span class="cf-sub">never</span>';
+    var last= busy ? '<span style="color:var(--accent2);">● running</span> '+escapeHtml(nj.kind)+(nj.progress?'<div class="cf-sub" style="max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+accEscapeAttr(nj.progress)+'">'+escapeHtml(nj.progress.split('\n').pop())+'</div>':'') : lr ? cfAEST(lr.started_at)+' · '+escapeHtml(lr.kind)+(cfMins(lr)!=null?' · '+cfMins(lr)+' min':'')+' · '+(lr.ok?'<span style="color:#4ade80;font-weight:700;">ok</span>':'<span style="color:#f87171;font-weight:700;" title="'+escapeHtml(lr.error||'')+'">failed</span>') : '<span class="cf-sub">never</span>';
     var next= nj&&!busy ? cfAEST(nj.not_before)+' '+escapeHtml(nj.kind) : a.enabled ? (CF.settings.enabled?'scheduled':'—') : 'off';
     if(a.posting_paused) next+=' <span class="cf-sub">· posts paused</span>';
     var dis=a.health==='banned'||!a.enabled;
     h+='<tr class="cf-row"><td><input type="checkbox" '+(CF.sel.has(a.id)?'checked':'')+' '+(a.health==='banned'?'disabled':'')+' onchange="cfTick(\''+a.id+'\',this.checked)"></td>'
       +'<td><b>'+escapeHtml(a.handle||a.profile_name||a.profile_id)+'</b><div class="cf-sub">'+escapeHtml(a.profile_name||'')+' · '+escapeHtml(a.backend||'multilogin')+(a.enabled?'':' · <span style="color:var(--text3);">off</span>')+'</div></td>'
-      +'<td>'+escapeHtml(a.model||'—')+'</td><td>'+cfHealthChip(a)+'</td><td>'+last+'</td><td>'+(t.runs||0)+'</td><td>'+(t.posts||0)+'</td><td class="cf-sub">'+next+'</td>'
+      +'<td>'+escapeHtml(a.model||'—')+'</td><td>'+cfHealthChip(a)+'</td><td>'+last+'</td><td>'+(t.runs||0)+'</td><td>'+(t.posts||0)+'</td><td>'+(t.stories||0)+'</td><td class="cf-sub">'+next+'</td>'
       +'<td><button class="btn btn-sm btn-ghost" style="padding:2px 8px;" onclick="cfToggle(\''+a.id+'\')">'+(CF.open.has(a.id)?'▾':'▸')+'</button></td></tr>';
-    h+='<tr class="cf-exp '+(CF.open.has(a.id)?'open':'')+'"><td colspan="9">'+(CF.open.has(a.id)?cfExpandHtml(a,runs):'')+'</td></tr>';
+    h+='<tr class="cf-exp '+(CF.open.has(a.id)?'open':'')+'"><td colspan="10">'+(CF.open.has(a.id)?cfExpandHtml(a,runs):'')+'</td></tr>';
   });
   wrap.innerHTML=h+'</table>';
   cfEstimate(); cfRenderPlan(); cfRenderSched();
+  clearTimeout(CF._tick); if(CF.jobs.some(function(j){return j.status==='running';})&&document.getElementById('page-cloud-farm').classList.contains('active')) CF._tick=setTimeout(loadCloudFarm,20000);
 }
 function cfExpandHtml(a,runs){
   var d=a.health_detail||{}, acct=(STATE.accounts||[]).find(function(x){return x.id===a.account_id;});
@@ -7555,12 +7557,15 @@ function cfExpandHtml(a,runs){
   var actions='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'
     +'<button class="btn btn-sm btn-ghost" onclick="cfQueueOne(\''+a.id+'\',\'warmup\')">▶ Warm up now</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="cfPostOne(\''+a.id+'\')">📤 Post…</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="cfStoryOne(\''+a.id+'\')">📖 Story CTA</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="cfQueueOne(\''+a.id+'\',\'health\')">🩺 Health check</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="cfEditPhone(\''+a.id+'\')">✏️ Persona &amp; plan</button>'
     +(a.posting_paused?'<button class="btn btn-sm btn-ghost" onclick="cfSetPhone(\''+a.id+'\',{posting_paused:false})">Resume posting</button>':'')
     +'<button class="btn btn-sm btn-ghost" onclick="cfSetPhone(\''+a.id+'\',{enabled:'+(!a.enabled)+'})">'+(a.enabled?'Turn off':'Turn on')+'</button></div>';
-  return '<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;"><div><div class="cf-sub" style="margin-bottom:4px;">LAST 10 RUNS</div>'+runsHtml+'</div>'
+  var nj=cfNextJob(a.id), live= nj&&nj.status==='running'&&nj.progress ? '<div class="cf-sub" style="margin-bottom:4px;">LIVE · '+escapeHtml(nj.kind)+' · updated '+cfAEST(nj.progress_at)+'</div><pre style="font-size:11px;white-space:pre-wrap;background:var(--surface);padding:8px;border-radius:6px;margin:0 0 10px;border:1px solid var(--border);">'+escapeHtml(nj.progress)+'</pre>' : '';
+  return '<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;"><div>'+live+'<div class="cf-sub" style="margin-bottom:4px;">LAST 10 RUNS</div>'+runsHtml+'</div>'
     +'<div><div class="cf-sub" style="margin-bottom:4px;">ACCOUNT STATUS'+(a.health_checked_at?' · checked '+cfAEST(a.health_checked_at):'')+'</div>'+status
+    +'<div class="cf-sub" style="margin-top:6px;">Story link: '+(a.story_link?escapeHtml(a.story_link):'<span style="color:#ffc83c;">not set</span>')+'</div>'
     +(acct?'<div class="cf-sub" style="margin-top:6px;">Linked to Accounts: '+escapeHtml(acct.handle||acct.email||'')+'</div>':'<div class="cf-sub" style="margin-top:6px;">Not linked to an Accounts row.</div>')
     +(a.notes?'<div class="cf-sub" style="margin-top:4px;">'+escapeHtml(a.notes)+'</div>':'')+actions+'</div></div>';
 }
@@ -7570,7 +7575,7 @@ function cfSelect(mode){ CF.sel.clear(); if(mode!=='none') cfPhones().forEach(fu
 function cfEstimate(){
   var el=document.getElementById('cf-est'); if(!el) return;
   var n=CF.sel.size, kind=(document.getElementById('cf-kind')||{}).value||'warmup', sp=parseInt((document.getElementById('cf-spread')||{}).value||'0',10);
-  var per= kind.indexOf('post')===0 ? ((document.getElementById('cf-prewarm')||{}).value==='0'?7:13) : kind==='health' ? 3 : 8;
+  var per= kind.indexOf('post')===0 ? ((document.getElementById('cf-prewarm')||{}).value==='0'?7:13) : kind==='health' ? 3 : kind==='story' ? 5 : 8;
   el.innerHTML='<b style="color:var(--text);">'+n+' selected</b> · ~'+(n*per)+' phone-min'+(n?' · '+(sp?'spread over '+sp+' min, ≥4 min apart':'starting now, ≥4 min apart'):'');
 }
 async function cfPool(){
@@ -7606,18 +7611,22 @@ async function cfRunBatch(){
   var prewarm=document.getElementById('cf-prewarm').value==='1', health=document.getElementById('cf-health').value;
   var clipKey=null;
   if(kind==='post_pick'){ clipKey=await cfPickClip(); if(!clipKey) return; }
-  var paused=ids.filter(function(id){ var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); return kind.indexOf('post')===0&&a.posting_paused; });
+  if(kind==='story'){ var nolink=ids.filter(function(id){ var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); return !a.story_link; }); if(nolink.length){ alert(nolink.length+' selected phone(s) have no story link set. Expand the row → Persona & plan → story link.'); return; } }
+  var paused=ids.filter(function(id){ var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); return (kind.indexOf('post')===0||kind==='story')&&a.posting_paused; });
   if(paused.length&&!confirm(paused.length+' selected phone(s) have posting paused by a health flag. Post on them anyway?')) return;
-  var offs=cfDrawStarts(ids.length,spread,CF.settings.min_gap_min||4), now=Date.now();
+  // 'at once' -> minimum spacing: ~10-min sessions, so at most `par` overlap
+  var gap=Math.max(CF.settings.min_gap_min||4, Math.ceil(10/par));
+  var offs=cfDrawStarts(ids.length,spread,gap), now=Date.now();
   var rows=ids.map(function(id,i){
     var p={}; var k=kind;
     if(kind==='post_auto'){ k='post'; p={r2_key:'auto',warmup:prewarm}; }
+    else if(kind==='story'){ k='story'; p={r2_key:'auto',warmup:false}; }
     else if(kind==='post_pick'){ k='post'; p={r2_key:clipKey,warmup:prewarm}; }
     if(k!=='health'&&health!=='skip') p.health_check=health;
     return {account_id:id,kind:k,payload:p,not_before:new Date(now+offs[i]*60000).toISOString(),priority:5};
   });
   var first=cfAEST(rows[0].not_before), last=cfAEST(rows[rows.length-1].not_before);
-  if(!confirm('Queue '+rows.length+' × '+kind.replace('_',' ')+'?\n\nStarts '+first+' → '+last+' AEST, at most '+par+' phones at once, ≥'+(CF.settings.min_gap_min||4)+' min between starts.')) return;
+  if(!confirm('Queue '+rows.length+' × '+kind.replace('_',' ')+'?\n\nStarts '+first+' → '+last+' AEST, about '+par+' phones at once (≥'+gap+' min between starts).')) return;
   var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Queuing…';
   var r=await cfQueue(rows);
   if(msg) msg.innerHTML=r.ok+' queued'+(r.errs.length?' · <span style="color:var(--red);">'+r.errs.length+' failed: '+escapeHtml(r.errs[0])+'</span>':'')+'. Phones start on their drawn times; this page refreshes itself.';
@@ -7628,6 +7637,13 @@ async function cfQueueOne(id,kind){
   if(!confirm((kind==='health'?'Run an Account Status check on ':'Queue a warm-up on ')+(a.handle||a.profile_name)+' now?')) return;
   var r=await cfQueue([{account_id:id,kind:kind,payload:{}}]); var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent=r.ok?'Queued — a worker picks it up within ~10 s.':'Could not queue: '+(r.errs[0]||'');
   [45000,180000,420000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
+}
+async function cfStoryOne(id){
+  var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
+  if(!a.story_link){ alert('Set a story link first (Persona & plan).'); return; }
+  if(!confirm('Post a link-sticker story on '+(a.handle||a.profile_name)+' now?\n\nPhoto: next unused from the Story CTA bank · link: '+a.story_link)) return;
+  var r=await cfQueue([{account_id:id,kind:'story',payload:{r2_key:'auto'}}]); var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent=r.ok?'Story queued on '+(a.handle||a.profile_name)+'.':'Could not queue: '+(r.errs[0]||'');
+  [60000,240000,480000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
 }
 async function cfPostOne(id){
   var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
@@ -7675,10 +7691,11 @@ async function cfEditPhone(id){
   var model=prompt('Model (liam / chase / checo / raul / alex / emmily):',a.model||''); if(model===null) return;
   var created=prompt('IG account created on (YYYY-MM-DD, for the age gate):',a.account_created_on||''); if(created===null) return;
   var tz=prompt('Persona timezone (e.g. America/New_York):',a.tz||'America/New_York'); if(tz===null) return;
+  var slink=prompt('Story link (the URL for the link sticker — your link page / redirect):',a.story_link||''); if(slink===null) return;
   var wpd=prompt('Warm-ups per day (blank = fleet default '+(CF.settings.warmups_per_day||2)+'):',plan.warmups_per_day!=null?plan.warmups_per_day:''); if(wpd===null) return;
   var ppd=prompt('Posts per day once mature (blank = fleet default '+(CF.settings.posts_per_day||1)+'):',plan.posts_per_day!=null?plan.posts_per_day:''); if(ppd===null) return;
   var np={}; if(wpd!=='') np.warmups_per_day=parseInt(wpd,10); if(ppd!=='') np.posts_per_day=parseInt(ppd,10);
-  await cfSetPhone(id,{handle:handle.replace(/^@/,'')||null,model:(model||'').toLowerCase()||null,account_created_on:created||null,tz:tz||null,plan:np});
+  await cfSetPhone(id,{handle:handle.replace(/^@/,'')||null,model:(model||'').toLowerCase()||null,account_created_on:created||null,tz:tz||null,story_link:(slink||'').trim()||null,plan:np});
 }
 function cfToggleSched(){ var el=document.getElementById('cf-sched'); if(!el) return; el.style.display=el.style.display==='none'?'block':'none'; cfRenderSched(); }
 function cfRenderSched(){
@@ -7692,12 +7709,14 @@ function cfRenderSched(){
     +f('pw','Post window (EST)','<div style="display:flex;gap:6px;"><input id="cfs-pw0" value="'+escapeHtml((s.post_window_est||['18:30','21:30'])[0])+'" style="width:80px;"><input id="cfs-pw1" value="'+escapeHtml((s.post_window_est||['18:30','21:30'])[1])+'" style="width:80px;"></div>')
     +f('mc','Max phones at once','<input type="number" id="cfs-mc" value="'+(s.max_concurrent||6)+'" min="1" max="6">')
     +f('mg','Min gap between starts (min)','<input type="number" id="cfs-mg" value="'+(s.min_gap_min||4)+'" min="1" max="30">')
+    +f('sp','Stories per day','<input type="number" id="cfs-spd" value="'+(s.story_per_day!=null?s.story_per_day:0)+'" min="0" max="2">')
+    +f('sf','Stories start on account day','<input type="number" id="cfs-sfd" value="'+(s.story_from_day!=null?s.story_from_day:8)+'" min="1" max="60">')
     +f('hd','Account Status check','<select id="cfs-hd"><option value="1" '+(s.health_daily!==false?'selected':'')+'>Daily, first session</option><option value="0" '+(s.health_daily===false?'selected':'')+'>Off</option></select>')
     +'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;"><span class="cf-sub">Tomorrow\'s plan is drawn nightly at '+(s.draw_hour_aest||23)+':00 AEST from these settings plus each phone\'s overrides (Persona &amp; plan). Cautious/shadowbanned phones keep warm-ups but skip posts; banned phones are removed.</span><button class="btn btn-sm btn-primary" onclick="cfSaveSched()">Save schedule</button></div>';
 }
 async function cfSaveSched(){
   var g=function(id){ return document.getElementById(id); };
-  var v=Object.assign({},CF.settings,{enabled:g('cfs-enabled').value==='1',warmups_per_day:parseInt(g('cfs-wpd').value,10)||0,posts_per_day:parseInt(g('cfs-ppd').value,10)||0,posting_from_day:parseInt(g('cfs-pfd').value,10)||5,post_window_est:[g('cfs-pw0').value||'18:30',g('cfs-pw1').value||'21:30'],max_concurrent:parseInt(g('cfs-mc').value,10)||6,min_gap_min:parseInt(g('cfs-mg').value,10)||4,health_daily:g('cfs-hd').value==='1'});
+  var v=Object.assign({},CF.settings,{enabled:g('cfs-enabled').value==='1',warmups_per_day:parseInt(g('cfs-wpd').value,10)||0,posts_per_day:parseInt(g('cfs-ppd').value,10)||0,posting_from_day:parseInt(g('cfs-pfd').value,10)||5,post_window_est:[g('cfs-pw0').value||'18:30',g('cfs-pw1').value||'21:30'],max_concurrent:parseInt(g('cfs-mc').value,10)||6,story_per_day:parseInt(g('cfs-spd').value,10)||0,story_from_day:parseInt(g('cfs-sfd').value,10)||8,min_gap_min:parseInt(g('cfs-mg').value,10)||4,health_daily:g('cfs-hd').value==='1'});
   const{error}=await sb.from('phone_settings').upsert({key:'scheduler',value:v,updated_at:new Date().toISOString()}); if(error){ alert('Could not save: '+error.message); return; }
   CF.settings=v; var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Schedule saved'+(v.enabled?' — the service draws the next plan at '+(v.draw_hour_aest||23)+':00 AEST.':' (paused).'); renderCloudFarm();
 }
