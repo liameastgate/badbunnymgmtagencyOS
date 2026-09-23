@@ -2730,6 +2730,7 @@
       <div class="form-group"><label>Status</label><select id="model-platform"><option>Active</option><option>Onboarding</option><option>Paused</option><option>Offboarded</option></select></div>
       <div class="form-group"><label>Management Type</label><select id="model-mgmt-type"><option value="full_scale">Full Scale</option><option value="chatting">Chatting</option></select></div>
       <div class="form-group"><label>Agency Split % <span style="font-weight:400;color:var(--text2);">(agency's cut — model keeps the rest)</span></label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
+      <div class="form-group"><label>Gender <span style="font-weight:400;color:var(--text2);">(decides which Guides they see)</span></label><select id="model-gender"><option value="">Not set</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
       <div class="form-group"><label>Niche</label><input type="text" id="model-niche" placeholder="e.g. Fitness, Cosplay, Gaming" list="niche-suggestions"></div>
       <datalist id="niche-suggestions"></datalist>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
@@ -3022,6 +3023,7 @@ var NAV = [
   { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Tools' },
   { id: 'signup-desk', icon: '🪪', label: 'Signup Desk',        roles: ['admin','va','traffic'],                   section: 'Tools' },
 
+  { id: 'model-guides', icon: '📕', label: 'Guides',            roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-upload', icon: '📤', label: 'Upload',             roles: ['model'],                                  section: 'Models' },
   { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va'],                             section: 'Models' },
@@ -3320,7 +3322,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   // 'traffic-sops' reuses the same SOP page DOM as 'sops' -- one implementation, two
   // categories -- so map it back to page-sops while keeping its own nav-item highlighted.
-  const pageDomId = (page === 'traffic-sops') ? 'sops' : page;
+  const pageDomId = (page === 'traffic-sops' || page === 'model-guides') ? 'sops' : page;
   const el = document.getElementById('page-' + pageDomId); if (el) el.classList.add('active');
   const nav = document.getElementById('nav-' + page); if (nav) nav.classList.add('active');
   try{ localStorage.setItem('agencyos_page', page); }catch(e){}
@@ -3337,6 +3339,7 @@ function navigate(page) {
   if (page === 'chat-analyser') renderChatAnalyser();
   if (page === 'sops') { SOP_CATEGORY='chatting'; loadSOPs(); }
   if (page === 'traffic-sops') { SOP_CATEGORY='traffic'; loadSOPs(); }
+  if (page === 'model-guides') { SOP_CATEGORY='model'; loadSOPs(); }
   if (page === 'management') renderJournal();
   if (page === 'expenses') loadExpenses();
   if (page === 'chatters') renderSchedulePage();
@@ -8234,6 +8237,7 @@ function editModel(id){
   document.getElementById('model-mgmt-type').value=m.mgmt_type||'full_scale';
   document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
   document.getElementById('model-niche').value=m.niche||'';
+  document.getElementById('model-gender').value=m.gender||'';
   document.getElementById('model-email').value=m.email||'';
   document.getElementById('model-drive').value=m.drive_link||''; document.getElementById('model-ig-handles').value=(m.instagram_handles||[]).join(', '); openModal('model-modal');
 }
@@ -8262,6 +8266,7 @@ async function saveModel(){
     email:document.getElementById('model-email').value.trim(),
     drive_link:document.getElementById('model-drive').value.trim()||null,
     niche:document.getElementById('model-niche').value.trim()||null,
+    gender:document.getElementById('model-gender').value||null,
     instagram_handles:document.getElementById('model-ig-handles').value.split(',').map(s=>s.trim().replace(/^@/,'').toLowerCase()).filter(Boolean)
   };
   if(!p.name)return showAlert('model-alert','Name required.','error');
@@ -11429,7 +11434,7 @@ async function loadSOPs(){
   const isAdmin=['admin','va'].includes(STATE.profile.role);
   if(isAdmin) document.getElementById('sops-add-btn').style.display='block';
   const label=document.getElementById('sops-sidebar-label');
-  if(label) label.textContent=SOP_CATEGORY==='traffic'?'Traffic SOPs':'Chatting SOPs';
+  if(label) label.textContent=SOP_CATEGORY==='traffic'?'Traffic SOPs':SOP_CATEGORY==='model'?'Guides':'Chatting SOPs';
   // Category switch (e.g. Chatting -> Traffic) must not keep a now-hidden SOP open.
   CURRENT_SOP_ID=null;
   const{data}=await sb.from('sops').select('*').eq('category',SOP_CATEGORY).order('created_at');
@@ -11442,7 +11447,8 @@ async function loadSOPs(){
     openSOP(stillExists?CURRENT_SOP_ID:SOPS_DATA[0].id);
   } else {
     CURRENT_SOP_ID=null;
-    document.getElementById('sops-content-area').innerHTML='<div class="empty" style="margin-top:80px;"><div class="empty-icon">📖</div><p>No SOPs yet — click + Add to create one</p></div>';
+    const noun=SOP_CATEGORY==='model'?'guides':'SOPs';
+    document.getElementById('sops-content-area').innerHTML='<div class="empty" style="margin-top:80px;"><div class="empty-icon">📖</div><p>No '+noun+' yet'+(isAdmin?' — click + Add to create one':'')+'</p></div>';
   }
 }
 
@@ -11460,6 +11466,51 @@ function renderSOPNav(isAdmin){
   });
 }
 
+// Wrap plain guide text onto A4 pages. jsPDF has no text flow of its own: splitTextToSize
+// breaks lines to a width, but paging is manual, so track the cursor and add a page before
+// overrunning rather than letting it print off the bottom edge.
+function sopTextToPdf(title, body){
+  const{jsPDF}=window.jspdf||{};
+  if(!jsPDF) return null;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const M=48, W=doc.internal.pageSize.getWidth()-M*2, H=doc.internal.pageSize.getHeight()-M;
+  let y=M;
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.splitTextToSize(String(title||'Guide'),W).forEach(l=>{ doc.text(l,M,y); y+=20; });
+  y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  String(body||'').split('\n').forEach(para=>{
+    if(!para.trim()){ y+=8; return; }
+    doc.splitTextToSize(para,W).forEach(line=>{
+      if(y>H-20){ doc.addPage(); y=M; }
+      doc.text(line,M,y); y+=15;
+    });
+  });
+  return doc;
+}
+
+async function saveSopAudience(id,val){
+  const{error}=await sb.from('sops').update({audience:val}).eq('id',id).select();
+  if(error) return alert('Could not change the audience: '+error.message);
+  const sop=(SOPS_DATA||[]).find(s=>s.id===id); if(sop) sop.audience=val;
+}
+
+function downloadSopPdf(id){
+  const sop=(SOPS_DATA||[]).find(s=>s.id===id);
+  if(!sop) return;
+  const safe=String(sop.title||'guide').replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-').slice(0,60)||'guide';
+  // An uploaded PDF is the real document -- prefer it over a generated approximation.
+  if(sop.pdf_url){
+    const a=document.createElement('a');
+    a.href=sop.pdf_url; a.download=safe+'.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
+  const doc=sopTextToPdf(sop.title,sop.content);
+  if(!doc) return alert('PDF export is unavailable — the PDF library did not load. Try refreshing.');
+  doc.save(safe+'.pdf');
+}
+
 var _sopPdfDataUrl=null;
 function openSOP(id){
   CURRENT_SOP_ID=id;
@@ -11471,12 +11522,14 @@ function openSOP(id){
   const navEl=document.getElementById('sop-nav-'+id);
   if(navEl){navEl.style.background='var(--surface2)';navEl.style.color='var(--text)';}
   const area=document.getElementById('sops-content-area');
+  const dlBtn=`<button class="btn btn-ghost btn-sm" onclick="downloadSopPdf('${sop.id}')" title="${sop.pdf_url?'Download the attached PDF':'Download this guide as a PDF'}">⬇️ Download PDF</button>`;
   area.innerHTML=`<div style="max-width:720px;">
     ${isAdmin
       ?`<input id="sop-title-input" value="${sop.title.replace(/"/g,'&quot;')}"
           style="font-size:26px;font-weight:800;background:none;border:none;border-bottom:2px solid transparent;color:var(--text);width:100%;margin-bottom:20px;outline:none;padding:4px 0;"
           onfocus="this.style.borderBottomColor='var(--accent)'" onblur="this.style.borderBottomColor='transparent'">`
       :`<div style="font-size:26px;font-weight:800;margin-bottom:20px;">${sop.title}</div>`}
+    <div class="btn-row" style="margin-bottom:16px;">${dlBtn}</div>
     ${isAdmin
       ?`<div class="card" style="margin-bottom:16px;">
           <div class="card-title">Attached PDF (optional)</div>
@@ -11484,6 +11537,15 @@ function openSOP(id){
             <label>Upload PDF File</label>
             <input type="file" id="sop-pdf-file" accept=".pdf,application/pdf" onchange="handleSopPdfFile(this.files[0])">
             <div id="sop-pdf-filename" style="font-size:11px;color:var(--text2);margin-top:4px;">${sop.pdf_url?'A PDF is attached — choose a new file to replace it.':''}</div>
+          </div>
+          <div class="form-group">
+            <label>Who can see this</label>
+            <select id="sop-audience-input" onchange="saveSopAudience('${sop.id}',this.value)">
+              <option value="all"${sop.audience==='all'||!sop.audience?' selected':''}>Everyone</option>
+              <option value="female"${sop.audience==='female'?' selected':''}>Female models only</option>
+              <option value="male"${sop.audience==='male'?' selected':''}>Male models only</option>
+            </select>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Enforced in the database, not just here — a model cannot read a guide outside their audience even via the API.</div>
           </div>
           ${sop.pdf_url?`<div style="display:flex;gap:8px;"><button onclick="togglePdfPreview('sop-pdf-preview',decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm">📄 Preview PDF</button><button onclick="openPdfLink(decodeURIComponent('${pdfUrlEscape(sop.pdf_url)}'))" class="btn btn-ghost btn-sm" title="Open in a new tab">↗️</button><button class="btn btn-ghost btn-sm" onclick="clearSopPdf('${sop.id}')">🗑️ Remove PDF</button></div>`:''}
         </div>`
