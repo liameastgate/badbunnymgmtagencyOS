@@ -1097,6 +1097,7 @@
       <div class="page-sub">Upload Infloww CSV to calculate earnings, splits and agency profit</div>
       <div class="tabs">
         <div class="tab active" onclick="switchReportTab('overview')">Overview</div>
+        <div class="tab" onclick="switchReportTab('bulk')">⬆️ Bulk Import</div>
         <div class="tab" onclick="switchReportTab('upload')">Creator Stats</div>
         <div class="tab" onclick="switchReportTab('chatters')">Chatter Performance</div>
         <div class="tab" onclick="switchReportTab('sales')">Sales Records</div>
@@ -1143,6 +1144,21 @@
       </div>
 
       <!-- Creator Stats Upload -->
+      <div id="report-tab-bulk" style="display:none;">
+        <div class="card">
+          <div class="card-title">⬆️ Drop this week's Infloww exports</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Drop all of them at once — each file is identified by its own column headers, so the order you drop them in doesn't matter. Nothing is saved until you press Import.</div>
+          <div id="bulk-drop" class="dropzone" ondrop="handleBulkDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('bulk-file').click()" style="padding:28px;text-align:center;cursor:pointer;">
+            <div style="font-size:30px;">📥</div>
+            <div style="margin-top:6px;font-size:13px;">Drop files here, or click to choose</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Creator Stats · Sales Record · Employee Performance</div>
+          </div>
+          <input type="file" id="bulk-file" multiple accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleBulkFiles(this.files)">
+          <div id="bulk-alert" class="alert" style="margin-top:12px;"></div>
+          <div id="bulk-list" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
       <div id="report-tab-upload" style="display:none;">
         <div class="card">
           <div class="card-title">📊 Summary</div>
@@ -5619,9 +5635,10 @@ function renderLeaderboard(){
 
 // ── Reports ──────────────────────────────────────────────────
 function switchReportTab(tab) {
-  const order=['overview','upload','chatters','sales','reconcile','history'];
+  const order=['overview','bulk','upload','chatters','sales','reconcile','history'];
   document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('report-tab-overview').style.display=tab==='overview'?'block':'none';
+  document.getElementById('report-tab-bulk').style.display=tab==='bulk'?'block':'none';
   document.getElementById('report-tab-upload').style.display=tab==='upload'?'block':'none';
   document.getElementById('report-tab-chatters').style.display=tab==='chatters'?'block':'none';
   document.getElementById('report-tab-sales').style.display=tab==='sales'?'block':'none';
@@ -6226,6 +6243,107 @@ async function loadReportsOverview(){
 
 // ── Creator Stats handlers ────────────────────────────────────
 var _parsedRows=null;
+// ── Bulk Infloww import ──────────────────────────────────────────────────────
+// One drop zone for the whole week's exports. Each file is identified by its own column
+// headers rather than by filename or drop order, because Infloww's filenames are not
+// stable and a mis-routed file would silently import into the wrong table.
+//
+// Nothing here re-implements parsing: each file is handed to the same preview/save pair
+// its own tab already uses, so there is one parser per export, not two.
+var _bulkQueue=[];
+
+// Pure, so the header matching can be tested without files or the DOM.
+function classifyInflowwRows(headers){
+  const h=(headers||[]).map(x=>String(x||'').trim().toLowerCase());
+  const has=n=>h.includes(String(n).toLowerCase());
+  const any=(...n)=>n.some(has);
+  // Creator Statistics is checked first: it is the only export with per-creator fan
+  // metrics. Sales Record also carries an Employee column, so testing for that first
+  // would swallow it.
+  if(any('creator','account') && any('total earnings net','renew on %','active fans','profile visitors')) return 'creator';
+  if(any('fan','fan id') && any('earnings','gross revenue','net revenue')) return 'sales';
+  if(any('employees','employee') && any('golden ratio','fan cvr','sales/hr','creators','dms sent')) return 'employee';
+  return 'unknown';
+}
+
+const BULK_LABELS={creator:'Creator Stats', sales:'Sales Record', employee:'Employee Performance', unknown:'Not recognised'};
+
+function handleBulkDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  if(e.dataTransfer.files&&e.dataTransfer.files.length) handleBulkFiles(e.dataTransfer.files);
+}
+
+function handleBulkFiles(files){
+  _bulkQueue=[];
+  const list=[...(files||[])];
+  if(!list.length) return;
+  let done=0;
+  list.forEach(file=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'binary'});
+        const summaryName=wb.SheetNames[0];
+        const detailName=wb.SheetNames.find(n=>/detail/i.test(n));
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[summaryName],{defval:''});
+        const detailRows=detailName?XLSX.utils.sheet_to_json(wb.Sheets[detailName],{defval:''}):[];
+        const headers=rows.length?Object.keys(rows[0]):[];
+        _bulkQueue.push({name:file.name, kind:rows.length?classifyInflowwRows(headers):'unknown', rows:rows, detailRows:detailRows});
+      }catch(err){
+        _bulkQueue.push({name:file.name, kind:'unknown', rows:[], detailRows:[], error:err.message});
+      }
+      if(++done===list.length) renderBulkQueue();
+    };
+    r.readAsBinaryString(file);
+  });
+}
+
+function renderBulkQueue(){
+  const el=document.getElementById('bulk-list');
+  if(!el) return;
+  if(!_bulkQueue.length){ el.innerHTML=''; return; }
+  const usable=_bulkQueue.filter(f=>f.kind!=='unknown');
+  const dupes=new Set();
+  const seen=new Set();
+  usable.forEach(f=>{ if(seen.has(f.kind)) dupes.add(f.kind); seen.add(f.kind); });
+  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>File</th><th>Detected as</th><th>Rows</th></tr></thead><tbody>'+
+    _bulkQueue.map(f=>'<tr'+(f.kind==='unknown'?' style="background:rgba(255,92,92,0.06);"':'')+'>'+
+      '<td style="font-size:12px;">'+escapeHtml(f.name)+'</td>'+
+      '<td style="'+(f.kind==='unknown'?'color:var(--danger,#ff5c5c);font-weight:700;':'color:var(--accent2);')+'">'+BULK_LABELS[f.kind]+
+        (f.error?' <span style="color:var(--text2);font-size:11px;">('+escapeHtml(f.error)+')</span>':'')+'</td>'+
+      '<td>'+(f.rows.length||'—')+'</td></tr>').join('')+
+    '</tbody></table></div>'+
+    (dupes.size?'<div style="margin-top:10px;font-size:12px;color:var(--danger,#ff5c5c);">Two files look like the same export ('+[...dupes].map(k=>BULK_LABELS[k]).join(', ')+'). Remove one — importing both would overwrite the first.</div>':'')+
+    '<div class="btn-row" style="margin-top:12px;">'+
+      (usable.length&&!dupes.size?'<button class="btn btn-primary" onclick="runBulkImport()">Import '+usable.length+' file'+(usable.length!==1?'s':'')+'</button>':'')+
+      '<button class="btn btn-ghost" onclick="_bulkQueue=[];renderBulkQueue();document.getElementById(\'bulk-alert\').style.display=\'none\';">Clear</button>'+
+    '</div>';
+}
+
+// Creator Stats is deliberately imported LAST: saving it is what generates that week's
+// model invoices, so the other data should already be in place when it runs.
+async function runBulkImport(){
+  const ORDER=['sales','employee','creator'];
+  const done=[];
+  for(const kind of ORDER){
+    const f=_bulkQueue.find(x=>x.kind===kind);
+    if(!f) continue;
+    try{
+      if(kind==='sales'){        previewSales(f.rows);                 await saveSalesRecords(); }
+      else if(kind==='employee'){previewChatterReport(f.rows);         await saveChatterPerformance(); }
+      else {                     previewReport(f.rows,f.detailRows);   await saveReportRows(); }
+      done.push(BULK_LABELS[kind]);
+    }catch(err){
+      showAlert('bulk-alert','Stopped on '+BULK_LABELS[kind]+': '+err.message+(done.length?' — '+done.join(', ')+' already imported.':''),'error');
+      return;
+    }
+  }
+  showAlert('bulk-alert', done.length?('Imported: '+done.join(', ')+'.'):'Nothing to import.', done.length?'success':'error');
+  _bulkQueue=[]; renderBulkQueue();
+  renderImportCoverage();
+}
+
 function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
 function handleCsvFile(file){
   const r=new FileReader();
@@ -11064,7 +11182,7 @@ function caSetTab(t){ CA.tab=t; caRender(); }
 // Admin only, and gated in the database as well as here — chatter_flags returns
 // nothing to anyone whose profile role is not admin, so a chatter poking the API
 // cannot read another chatter's mistakes.
-var CF={rows:[],loaded:false,kind:'',who:'',show:40};
+var CFL={rows:[],loaded:false,kind:'',who:'',show:40};
 var CF_KIND={
   opener_to_known:['Opened a man he already knows','Sent the cold-open line into a thread with real history. The clearest sign the conversation was never read.'],
   repeat_question:['Asked the same thing twice','Same question to the same man on separate days.'],
@@ -11076,18 +11194,18 @@ var CF_ORDER=['opener_to_known','repeat_question','asked_again','banned_phrase',
 
 function cfIsAdmin(){ return (STATE.profile&&STATE.profile.role)==='admin'; }
 
-async function cfLoad(){
+async function cflLoad(){
   var r=await sb.from('chatter_flags').select('*').limit(1200);
-  CF.rows=r.data||[]; CF.loaded=true;
+  CFL.rows=r.data||[]; CFL.loaded=true;
 }
 
 function cfRender(){
   if(!cfIsAdmin()) return '<div class="ca-card"><div class="ca-mini">Admins only.</div></div>';
-  if(!CF.loaded){ cfLoad().then(caRender); return '<div class="ca-card"><div class="ca-mini">Reading the last 45 days…</div></div>'; }
-  if(!CF.rows.length) return '<div class="ca-card"><div class="ca-mini">Nothing flagged in the last 45 days. Either they are on it, or the exports have not been pushed lately.</div></div>';
+  if(!CFL.loaded){ cflLoad().then(caRender); return '<div class="ca-card"><div class="ca-mini">Reading the last 45 days…</div></div>'; }
+  if(!CFL.rows.length) return '<div class="ca-card"><div class="ca-mini">Nothing flagged in the last 45 days. Either they are on it, or the exports have not been pushed lately.</div></div>';
 
   var by={}, who={};
-  CF.rows.forEach(function(r){
+  CFL.rows.forEach(function(r){
     (by[r.kind]=by[r.kind]||[]).push(r);
     who[r.sender]=who[r.sender]||{};
     who[r.sender][r.kind]=(who[r.sender][r.kind]||0)+1;
@@ -11115,19 +11233,19 @@ function cfRender(){
 
   // filters
   h+='<div class="ca-card"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
-    +'<button class="btn btn-sm '+(CF.kind===''?'btn-primary':'btn-ghost')+'" onclick="CF.kind=\'\';CF.show=40;caRender()">Everything ('+CF.rows.length+')</button>'
+    +'<button class="btn btn-sm '+(CFL.kind===''?'btn-primary':'btn-ghost')+'" onclick="CFL.kind=\'\';CFL.show=40;caRender()">Everything ('+CFL.rows.length+')</button>'
     +CF_ORDER.filter(function(k){ return (by[k]||[]).length; }).map(function(k){
-        return '<button class="btn btn-sm '+(CF.kind===k?'btn-primary':'btn-ghost')+'" onclick="CF.kind=\''+k+'\';CF.show=40;caRender()">'+CF_KIND[k][0]+' ('+by[k].length+')</button>'; }).join('')
+        return '<button class="btn btn-sm '+(CFL.kind===k?'btn-primary':'btn-ghost')+'" onclick="CFL.kind=\''+k+'\';CFL.show=40;caRender()">'+CF_KIND[k][0]+' ('+by[k].length+')</button>'; }).join('')
     +'</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'
-    +'<button class="btn btn-sm '+(CF.who===''?'btn-primary':'btn-ghost')+'" onclick="CF.who=\'\';CF.show=40;caRender()">All chatters</button>'
-    +names.map(function(n){ return '<button class="btn btn-sm '+(CF.who===n?'btn-primary':'btn-ghost')+'" onclick="CF.who=\''+n.replace(/'/g,"\\'")+'\';CF.show=40;caRender()">'+escapeHtml(n)+'</button>'; }).join('')
+    +'<button class="btn btn-sm '+(CFL.who===''?'btn-primary':'btn-ghost')+'" onclick="CFL.who=\'\';CFL.show=40;caRender()">All chatters</button>'
+    +names.map(function(n){ return '<button class="btn btn-sm '+(CFL.who===n?'btn-primary':'btn-ghost')+'" onclick="CFL.who=\''+n.replace(/'/g,"\\'")+'\';CFL.show=40;caRender()">'+escapeHtml(n)+'</button>'; }).join('')
     +'</div></div>';
 
-  var list=CF.rows.filter(function(r){ return (!CF.kind||r.kind===CF.kind)&&(!CF.who||r.sender===CF.who); });
-  if(CF.kind) h+='<div class="ca-card"><div class="ca-mini">'+escapeHtml(CF_KIND[CF.kind][1])+'</div></div>';
+  var list=CFL.rows.filter(function(r){ return (!CFL.kind||r.kind===CFL.kind)&&(!CFL.who||r.sender===CFL.who); });
+  if(CFL.kind) h+='<div class="ca-card"><div class="ca-mini">'+escapeHtml(CF_KIND[CFL.kind][1])+'</div></div>';
 
   h+='<div class="ca-card"><div class="ca-head"><h3>'+list.length+' flagged message'+(list.length===1?'':'s')+'</h3></div>'
-    +list.slice(0,CF.show).map(function(r){
+    +list.slice(0,CFL.show).map(function(r){
       return '<div style="border-bottom:1px solid var(--border);padding:10px 0;">'
         +'<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">'
         +'<b style="color:var(--text);">'+escapeHtml(r.sender)+'</b> → '+escapeHtml(r.fan_name||'')
@@ -11137,7 +11255,7 @@ function cfRender(){
         +'<div style="font-size:11px;color:var(--yellow);margin-top:4px;">'+escapeHtml(r.what||'')+'</div>'
         +'</div>';
     }).join('')
-    +(list.length>CF.show?'<div style="text-align:center;margin-top:12px;"><button class="btn btn-sm btn-ghost" onclick="CF.show+=40;caRender()">Show 40 more ('+(list.length-CF.show)+' left)</button></div>':'')
+    +(list.length>CFL.show?'<div style="text-align:center;margin-top:12px;"><button class="btn btn-sm btn-ghost" onclick="CFL.show+=40;caRender()">Show 40 more ('+(list.length-CFL.show)+' left)</button></div>':'')
     +'</div>';
   return h;
 }
