@@ -7842,11 +7842,11 @@ function cfAEST(ts){
 function cfMins(r){ if(!r||!r.started_at||!r.finished_at) return null; return Math.round((new Date(r.finished_at)-new Date(r.started_at))/6000)/10; }
 // Known IG UI layouts — mirrors TEMPLATES in phone_service/layout.py. Anything
 // else the phones report shows as-is (unknown-xxxx) until it's given a name here.
-var CF_LAYOUTS={'A-classic':'A · classic','B-search':'B · settings search','C-captions':'C · captions editor'};
+var CF_LAYOUTS={'IG443':'IG 443','IG423':'IG 423'};
 function cfLayoutChip(a){
   var l=a.ui_layout; if(!l) return '<span class="cf-chip cf-none" title="not seen yet — runs a health check or post to detect">?</span>';
   var p=a.ui_probe||{}, tip=Object.keys(p).filter(function(k){return k!=='seen_at';}).map(function(k){return k+': '+p[k];}).join('\n')+(a.ui_layout_locked?'\n(set by hand)':'');
-  var cls=l.indexOf('unknown-')===0?'cf-warn':'cf-ok';
+  var cls=CF_LAYOUTS[l]?'cf-ok':'cf-warn';
   return '<span class="cf-chip '+cls+'" title="'+accEscapeAttr(tip)+'">'+escapeHtml(CF_LAYOUTS[l]||l)+(a.ui_layout_locked?' 🔒':'')+'</span>';
 }
 function cfSyncLayoutFilter(){
@@ -7885,7 +7885,8 @@ async function loadCloudFarm(){
   CF.today={}; (q[4].data||[]).forEach(function(r){ CF.today[r.account_id]=r; });
   CF.jobs=q[5].data||[];
   if(!STATE.accounts||!STATE.accounts.length){ var r=await sb.from('accounts').select('id,handle,email,platform,model_id,status'); STATE.accounts=r.data||[]; }
-  if(!CF.loaded){ CF.loaded=true; STATE.phoneAccounts.forEach(function(a){ if(a.enabled) CF.sel.add(a.id); }); }
+  // Nothing is pre-ticked: Run batch only ever runs what Liam ticks (24 Sep).
+  if(!CF.loaded){ CF.loaded=true; }
   var fm=document.getElementById('cf-f-model');
   if(fm&&fm.options.length<=1){ var ms={}; STATE.phoneAccounts.forEach(function(a){ if(a.model) ms[a.model]=1; }); Object.keys(ms).sort().forEach(function(m){ var o=document.createElement('option'); o.value=m; o.textContent=m; fm.appendChild(o); }); }
   renderCloudFarm(); cfPool();
@@ -8016,8 +8017,12 @@ function cfDrawStarts(n,spreadMin,minGapMin){
   return out.sort(function(a,b){return a-b;});
 }
 async function cfRunBatch(){
-  var ids=Array.from(CF.sel).filter(function(id){ var a=(STATE.phoneAccounts||[]).find(function(x){return x.id===id;}); return a&&a.health!=='banned'; });
+  // Only phones that are ticked AND visible under the current filters run.
+  // Anything ticked then filtered out of view is dropped, never carried over.
+  var picked=cfPhones().filter(function(a){ return CF.sel.has(a.id)&&cfSelectable(a); });
+  var ids=picked.map(function(a){return a.id;});
   if(!ids.length){ alert('Select at least one phone.'); return; }
+  if(!confirm('Run '+(document.getElementById('cf-kind').value)+' on '+ids.length+' phone(s):\n\n'+picked.map(function(a){return '• '+(a.handle||a.profile_name);}).join('\n'))) return;
   var kind=document.getElementById('cf-kind').value, spread=parseInt(document.getElementById('cf-spread').value,10), par=Math.max(1,Math.min(6,parseInt(document.getElementById('cf-par').value,10)||4));
   var prewarm=document.getElementById('cf-prewarm').value==='1', health=document.getElementById('cf-health').value;
   var clipKey=null;
@@ -8040,7 +8045,8 @@ async function cfRunBatch(){
   if(!confirm('Queue '+rows.length+' × '+kind.replace('_',' ')+'?\n\nStarts '+first+' → '+last+' AEST, about '+par+' phones at once (≥'+gap+' min between starts).')) return;
   var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Queuing…';
   var r=await cfQueue(rows);
-  if(msg) msg.innerHTML=r.ok+' queued'+(r.errs.length?' · <span style="color:var(--red);">'+r.errs.length+' failed: '+escapeHtml(r.errs[0])+'</span>':'')+'. Phones start on their drawn times; this page refreshes itself.';
+  if(msg) msg.innerHTML=r.ok+' queued ('+picked.map(function(a){return escapeHtml(a.handle||a.profile_name);}).join(', ')+')'+(r.errs.length?' · <span style="color:var(--red);">'+r.errs.length+' failed: '+escapeHtml(r.errs[0])+'</span>':'')+'. Phones start on their drawn times; this page refreshes itself.';
+  CF.sel.clear();      // ticks never carry into the next batch
   loadCloudFarm(); [60000,180000,420000,900000].forEach(function(t){ setTimeout(loadCloudFarm,t); });
 }
 async function cfQueueOne(id,kind){
