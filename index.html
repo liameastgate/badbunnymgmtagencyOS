@@ -608,6 +608,18 @@
 
       <div class="stats-grid" id="overview-stats"></div>
 
+      <!-- Import coverage — each Infloww export lands in its own table and nothing links
+           them, so a week that was never uploaded is simply absent rather than flagged.
+           Model invoices only generate on a Creator Stats upload, so a missed week is also
+           a missed payout run. This makes the gap visible. -->
+      <div class="card" id="import-watch-card" style="margin:14px 0;display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0;">Import Coverage</div>
+          <div id="import-watch-summary" style="font-size:11px;color:var(--text2);"></div>
+        </div>
+        <div id="import-watch-body"></div>
+      </div>
+
       <!-- Quick earnings breakdown by day/week/month, sourced from Sales Records -->
       <div class="card" style="margin:14px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
@@ -1331,6 +1343,10 @@
       <!-- History -->
       <div id="report-tab-history" style="display:none;">
         <div id="report-history-alert" class="alert" style="margin-bottom:12px;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <div id="invoice-gap-note" style="font-size:12px;color:var(--text2);"></div>
+          <button class="btn btn-sm btn-ghost" onclick="backfillModelInvoices()">&#8635; Backfill missing invoices</button>
+        </div>
         <div id="report-history-groups"></div>
         <div id="report-empty" class="empty" style="display:none;"><div class="empty-icon">📊</div><p>No reports yet</p></div>
       </div>
@@ -2587,9 +2603,10 @@
         <select id="cf-f-model" onchange="renderCloudFarm()" style="width:auto;"><option value="">All models</option></select>
         <select id="cf-f-backend" onchange="renderCloudFarm()" style="width:auto;"><option value="">Both vendors</option><option value="multilogin">Multilogin</option><option value="geelark">GeeLark</option></select>
         <select id="cf-f-health" onchange="renderCloudFarm()" style="width:auto;"><option value="">Any health</option><option value="healthy">healthy</option><option value="cautious">cautious</option><option value="shadowbanned">shadowbanned</option><option value="banned">banned</option><option value="unchecked">unchecked</option></select>
+        <select id="cf-f-layout" onchange="renderCloudFarm()" style="width:auto;"><option value="">Any layout</option></select>
         <input id="cf-q" placeholder="search handle / name" style="width:200px;" oninput="renderCloudFarm()">
         <span style="flex:1;"></span>
-        <span style="font-size:12px;color:var(--text2);">Select: <a href="#" onclick="cfSelect('on');return false;">all in use</a> · <a href="#" onclick="cfSelect('ok');return false;">healthy only</a> · <a href="#" onclick="cfSelect('none');return false;">none</a></span>
+        <span style="font-size:12px;color:var(--text2);">Select: <a href="#" onclick="cfSelect('all');return false;">all (on)</a> ·<a href="#" onclick="cfSelect('ok');return false;">healthy only</a> · <a href="#" onclick="cfSelect('none');return false;">none</a> <span id="cf-selcount" style="color:var(--text3);"></span></span>
       </div>
       <div class="card" style="padding:0 6px;"><div id="cf-table"></div></div>
       <div class="card" id="cf-plan" style="margin-top:12px;"></div>
@@ -3252,7 +3269,7 @@ async function cfLoadJobs(){
     const when=new Date(j.created_at).toLocaleString();
     const extra = j.status==='done' ? `${j.outputs_count} file(s)`
                 : j.status==='failed' ? (j.error||'failed')
-                : j.status==='running' ? 'working...' : 'waiting';
+                : j.status==='running' ? 'working...' : j.status==='cancelled' ? 'cancelled' : 'waiting';
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(128,128,128,.18);">
       <span style="width:9px;height:9px;border-radius:50%;background:${CF_DOT[j.status]||'#888'};flex:none;"></span>
       <div style="flex:1;min-width:0;">
@@ -3464,6 +3481,7 @@ async function loadAllData() {
 
 // ── Overview ─────────────────────────────────────────────────
 async function renderOverview() {
+  renderImportCoverage();
   const { data } = await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
   STATE.reports = data||[];
   const weeks = [...new Set(STATE.reports.map(r=>r.week_of))];
@@ -6843,17 +6861,31 @@ async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
 
   // Re-uploading the same week (a correction) should replace any invoice for it that's
   // still unpaid, but must never touch one that's already been paid out.
-  const{data:existing}=await sb.from('invoices').select('id,model_id,status').eq('source','auto').eq('week_of',weekOf).eq('week_end',weekEnd);
-  const existingByModel=new Map((existing||[]).map(i=>[i.model_id,i]));
+  // week_end has to be part of the match, but NULL needs .is(): PostgREST renders
+  // .eq(col,null) as "week_end=eq.null", which matches nothing at all (NULL = NULL is
+  // unknown in SQL), so an existing invoice would be missed and a second one inserted
+  // beside it. Empty string is treated as absent too -- it reaches here from a template
+  // literal in the history buttons and would otherwise be sent as a bogus date.
+  let exQ=sb.from('invoices').select('id,model_id,status')
+            .eq('role','model').eq('source','auto').eq('week_of',weekOf);
+  exQ = (weekEnd==null||weekEnd==='') ? exQ.is('week_end',null) : exQ.eq('week_end',weekEnd);
+  const{data:existing}=await exQ;
+  // Keep EVERY prior row per model, not just the last. A Map built straight from the list
+  // silently overwrites earlier entries, so a pre-existing duplicate pair would have one
+  // half deleted and a fresh row inserted -- leaving the duplicate in place permanently.
+  const existingByModel=new Map();
+  (existing||[]).forEach(i=>{
+    if(!existingByModel.has(i.model_id)) existingByModel.set(i.model_id,[]);
+    existingByModel.get(i.model_id).push(i);
+  });
 
   const toInsert=[], toDeleteIds=[];
   let skippedPaid=0;
   eligible.forEach(r=>{
-    const prior=existingByModel.get(r.model_id);
-    if(prior){
-      if(prior.status==='paid'){ skippedPaid++; return; }
-      toDeleteIds.push(prior.id);
-    }
+    const priors=existingByModel.get(r.model_id)||[];
+    // If any prior for this model/week is already paid, leave the whole set alone.
+    if(priors.some(p=>p.status==='paid')){ skippedPaid++; return; }
+    priors.forEach(p=>toDeleteIds.push(p.id));
     const model=STATE.models.find(m=>m.id===r.model_id);
     toInsert.push({
       model_id:r.model_id,
@@ -6879,10 +6911,189 @@ async function generateModelInvoicesFromReport(rows,weekOf,weekEnd){
   return {generated:toInsert.length, skippedPaid};
 }
 
+// ── Model-invoice gap repair ─────────────────────────────────────────────────
+// generateModelInvoicesFromReport() only ever fires on a Creator Stats upload, so a week
+// uploaded before that feature existed -- or uploaded in parts -- leaves weekly_reports
+// rows with no matching invoice, and nothing surfaces it. These let you see and close that
+// gap. Safe to re-run: the generator skips anything already marked paid, and only rows that
+// are actually missing an invoice are passed in, so existing rows are left alone.
+
+// Pure, so it can be tested without Supabase. Mirrors the generator's own eligibility
+// rules exactly -- a row needs a model, a positive agency cut, and a non-hidden model --
+// otherwise this would report "gaps" the generator would refuse to fill, forever.
+function computeInvoiceGaps(reps, invs, models){
+  const hidden=new Set((models||[]).filter(m=>m.hidden).map(m=>m.id));
+  const key=(mid,wo,we)=>[mid,wo||'',we||''].join('|');
+  const have=new Set((invs||[]).map(i=>key(i.model_id,i.week_of,i.week_end)));
+  const byWeek=new Map();
+  (reps||[]).forEach(r=>{
+    if(!r.model_id || hidden.has(r.model_id)) return;
+    if(!(parseFloat(r.agency_net||0)>0)) return;
+    if(have.has(key(r.model_id,r.week_of,r.week_end))) return;
+    const k=(r.week_of||'')+'|'+(r.week_end||'');
+    if(!byWeek.has(k)) byWeek.set(k,{week_of:r.week_of, week_end:r.week_end, rows:[], amount:0});
+    const g=byWeek.get(k);
+    g.rows.push(r);
+    g.amount+=parseFloat(r.agency_net||0);
+  });
+  return [...byWeek.values()].sort((a,b)=>String(b.week_of).localeCompare(String(a.week_of)));
+}
+
+async function findInvoiceGaps(){
+  const[reps,invs]=await Promise.all([
+    sb.from('weekly_reports').select('*'),
+    sb.from('invoices').select('model_id,week_of,week_end').eq('role','model').eq('source','auto')
+  ]);
+  return computeInvoiceGaps(reps.data||[], invs.data||[], STATE.models||[]);
+}
+
+// Generation is read-then-write with an await in between, so two overlapping runs would
+// both see "nothing exists yet" and both insert. One flag covers every entry point.
+var _invoiceGenBusy=false;
+
+async function backfillModelInvoices(){
+  if(_invoiceGenBusy) return;
+  _invoiceGenBusy=true;
+  try{
+  const gaps=await findInvoiceGaps();
+  if(!gaps.length) return showAlert('report-history-alert','Nothing missing — every week already has its invoices.','success');
+  const n=gaps.reduce((t,g)=>t+g.rows.length,0);
+  const total=gaps.reduce((t,g)=>t+g.amount,0);
+  if(!confirm('Generate '+n+' missing invoice'+(n!==1?'s':'')+' across '+gaps.length+' week'+(gaps.length!==1?'s':'')+', totalling $'+fmt(total)+'?\n\nInvoices already marked paid are never touched.')) return;
+  let made=0; const errs=[];
+  for(const g of gaps){
+    const res=await generateModelInvoicesFromReport(g.rows,g.week_of,g.week_end);
+    if(res.error) errs.push(g.week_of+': '+res.error.message); else made+=res.generated;
+  }
+  showAlert('report-history-alert',
+    errs.length ? 'Generated '+made+', but some weeks failed — '+errs.join('; ')
+                : 'Generated '+made+' invoice'+(made!==1?'s':'')+'.',
+    errs.length?'error':'success');
+  loadReportHistory();
+  } finally { _invoiceGenBusy=false; }
+}
+
+async function regenerateWeekInvoices(weekOf,weekEnd){
+  weekEnd=weekEnd||null;   // '' arrives from the template literal in the history buttons
+  if(_invoiceGenBusy) return;
+  _invoiceGenBusy=true;
+  try{
+  const q=sb.from('weekly_reports').select('*').eq('week_of',weekOf);
+  const{data}=await (weekEnd ? q.eq('week_end',weekEnd) : q.is('week_end',null));
+  if(!data||!data.length) return showAlert('report-history-alert','No report rows found for that week.','error');
+  const res=await generateModelInvoicesFromReport(data,weekOf,weekEnd);
+  if(res.error) return showAlert('report-history-alert',res.error.message,'error');
+  showAlert('report-history-alert',
+    res.generated+' invoice'+(res.generated!==1?'s':'')+' generated'+(res.skippedPaid?', '+res.skippedPaid+' left alone (already paid)':'')+'.',
+    'success');
+  loadReportHistory();
+  } finally { _invoiceGenBusy=false; }
+}
+
+// ── Import coverage watcher ──────────────────────────────────────────────────
+// Lays every week side by side across the three Infloww feeds so a week nobody uploaded
+// reads as a hole instead of just not existing.
+function weekSeries(firstISO,lastISO){
+  // Plain calendar stepping on local date parts -- deliberately not toISOString(), which
+  // converts to UTC first and drops a locally-constructed midnight back a day in AEST.
+  const out=[];
+  const[y,m,d]=String(firstISO).split('-').map(Number);
+  const[ly,lm,ld]=String(lastISO).split('-').map(Number);
+  let cur=new Date(y,m-1,d); const last=new Date(ly,lm-1,ld);
+  let guard=0;
+  while(cur<=last && guard++<520){
+    out.push(toLocalISO(cur));
+    cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+7);
+  }
+  return out;
+}
+
+function currentWeekMonday(today){
+  const d=today?new Date(today.getFullYear(),today.getMonth(),today.getDate()):new Date();
+  // (getDay()+6)%7 counts back to Monday from any day INCLUDING Sunday. The naive
+  // getDate()-getDay()+1 rolls Sunday FORWARD to the next Monday instead.
+  d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return toLocalISO(d);
+}
+
+// feeds: { label: Set(week_of) }. Returns newest-first, current (part-done) week excluded.
+function computeImportCoverage(feeds, todayMonday, limit){
+  const labels=Object.keys(feeds);
+  const all=[];
+  labels.forEach(l=>feeds[l].forEach(w=>{ if(w) all.push(w); }));
+  if(!all.length) return [];
+  all.sort();
+  const weeks=weekSeries(all[0], todayMonday).filter(w=>w<todayMonday);
+  const rows=weeks.map(w=>{
+    const present={}; let missing=0;
+    labels.forEach(l=>{ const ok=feeds[l].has(w); present[l]=ok; if(!ok) missing++; });
+    return {week:w, present:present, missing:missing};
+  }).reverse();
+  return limit?rows.slice(0,limit):rows;
+}
+
+async function renderImportCoverage(){
+  const card=document.getElementById('import-watch-card');
+  const body=document.getElementById('import-watch-body');
+  if(!card||!body) return;
+  const[wr,sr,cp]=await Promise.all([
+    sb.from('weekly_reports').select('week_of'),
+    sb.from('sales_records').select('week_of'),
+    sb.from('chatter_performance').select('week_of')
+  ]);
+  const feeds={
+    'Creator stats': new Set((wr.data||[]).map(r=>r.week_of)),
+    'Sales record':  new Set((sr.data||[]).map(r=>r.week_of)),
+    'Employee perf': new Set((cp.data||[]).map(r=>r.week_of))
+  };
+  const labels=Object.keys(feeds);
+  const rows=computeImportCoverage(feeds, currentWeekMonday(new Date()), 10);
+  if(!rows.length){ card.style.display='none'; return; }
+  card.style.display='';
+
+  const incomplete=rows.filter(r=>r.missing>0).length;
+  const sum=document.getElementById('import-watch-summary');
+  if(sum) sum.innerHTML = incomplete
+    ? '<span style="color:var(--danger,#ff5c5c);font-weight:700;">'+incomplete+' of the last '+rows.length+' week'+(rows.length!==1?'s':'')+' incomplete</span>'
+    : '<span style="color:var(--accent2);">All '+rows.length+' recent weeks complete</span>';
+
+  const tick='<span style="color:var(--accent2);">&#10003;</span>';
+  const cross='<span style="color:var(--danger,#ff5c5c);font-weight:700;">&mdash;</span>';
+  body.innerHTML='<div class="table-wrap"><table><thead><tr><th>Week of</th>'+
+    labels.map(l=>'<th style="text-align:center;">'+l+'</th>').join('')+
+    '</tr></thead><tbody>'+
+    rows.map(function(r){
+      return '<tr'+(r.missing?' style="background:rgba(255,92,92,0.06);"':'')+'>'+
+        '<td style="white-space:nowrap;">'+fmtDate(r.week)+'</td>'+
+        labels.map(function(l){ return '<td style="text-align:center;">'+(r.present[l]?tick:cross)+'</td>'; }).join('')+
+      '</tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
 async function loadReportHistory(){
-  const{data}=await sb.from('weekly_reports').select('*').order('week_of',{ascending:false});
+  const[repRes,invRes]=await Promise.all([
+    sb.from('weekly_reports').select('*').order('week_of',{ascending:false}),
+    sb.from('invoices').select('model_id,week_of,week_end').eq('role','model').eq('source','auto')
+  ]);
+  const data=repRes.data;
+  // Which (model, week) pairs already have an auto invoice, so each week can show whether
+  // its payout run actually completed -- not merely that the stats were uploaded.
+  const invKey=(mid,wo,we)=>[mid,wo||'',we||''].join('|');
+  const invoiced=new Set((invRes.data||[]).map(i=>invKey(i.model_id,i.week_of,i.week_end)));
   const container=document.getElementById('report-history-groups'); const empty=document.getElementById('report-empty');
   container.innerHTML='';
+
+  // Headline the shortfall, so it is visible without opening every week in turn.
+  const note=document.getElementById('invoice-gap-note');
+  if(note){
+    const gaps=computeInvoiceGaps(data||[], invRes.data||[], STATE.models||[]);
+    const missing=gaps.reduce((t,g)=>t+g.rows.length,0);
+    const owed=gaps.reduce((t,g)=>t+g.amount,0);
+    note.innerHTML = missing
+      ? '<span style="color:var(--danger,#ff5c5c);font-weight:700;">'+missing+' invoice'+(missing!==1?'s':'')+' never generated</span> across '+gaps.length+' week'+(gaps.length!==1?'s':'')+' &middot; $'+fmt(owed)+' in agency commission not raised'
+      : '<span style="color:var(--accent2);">Every week has its invoices.</span>';
+  }
+
   if(!data||!data.length){empty.style.display='block';return;} empty.style.display='none';
 
   // Group by period key (week_of + week_end)
@@ -6902,6 +7113,15 @@ async function loadReportHistory(){
 
     const idsAttr=JSON.stringify(rows.map(r=>r.id)).replace(/"/g,"'");
 
+    // Only rows the generator would actually act on count towards coverage -- a zero-earning
+    // or hidden model is not a missing invoice, it is correctly skipped.
+    const hiddenIds=new Set((STATE.models||[]).filter(m=>m.hidden).map(m=>m.id));
+    const billable=rows.filter(r=>r.model_id && !hiddenIds.has(r.model_id) && parseFloat(r.agency_net||0)>0);
+    const covered=billable.filter(r=>invoiced.has(invKey(r.model_id,r.week_of,r.week_end))).length;
+    const invBadge=billable.length
+      ? '<span style="margin-left:12px;font-size:12px;font-weight:700;color:'+(covered<billable.length?'var(--danger,#ff5c5c)':'var(--accent2)')+';">'+covered+'/'+billable.length+' invoiced</span>'
+      : '';
+
     const wrap=document.createElement('div');
     wrap.className='card'; wrap.style.marginBottom='10px';
     wrap.innerHTML=`
@@ -6911,7 +7131,9 @@ async function loadReportHistory(){
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">${rows.length} model${rows.length!==1?'s':''}</span>
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">Earnings: <strong style="color:#fff;">$${fmt(totalE)}</strong></span>
           <span style="margin-left:12px;font-size:12px;color:var(--text2);">Agency Net: <strong style="color:var(--accent2);">$${fmt(totalN)}</strong></span>
+          ${invBadge}
         </div>
+        <button class="btn btn-sm btn-ghost" style="margin-left:12px;" onclick="event.stopPropagation();regenerateWeekInvoices('${wStart}','${wEnd||''}')" title="Re-run invoice generation for this week. Paid invoices are never touched.">&#8635; Invoices</button>
         <button class="btn btn-sm btn-danger" style="margin-left:12px;" onclick="event.stopPropagation();deleteReportGroup(${idsAttr},'${label.replace(/'/g,"\\'")}')">✕ Delete Week</button>
         <span onclick="toggleHistoryGroup('${gid}')" id="${gid}-chevron" style="cursor:pointer;color:var(--text2);font-size:12px;margin-left:12px;">▼</span>
       </div>
@@ -7497,6 +7719,28 @@ function cfAEST(ts){
   return pre+cfTime(d);
 }
 function cfMins(r){ if(!r||!r.started_at||!r.finished_at) return null; return Math.round((new Date(r.finished_at)-new Date(r.started_at))/6000)/10; }
+// Known IG UI layouts — mirrors TEMPLATES in phone_service/layout.py. Anything
+// else the phones report shows as-is (unknown-xxxx) until it's given a name here.
+var CF_LAYOUTS={'A-classic':'A · classic','B-search':'B · settings search','C-captions':'C · captions editor'};
+function cfLayoutChip(a){
+  var l=a.ui_layout; if(!l) return '<span class="cf-chip cf-none" title="not seen yet — runs a health check or post to detect">?</span>';
+  var p=a.ui_probe||{}, tip=Object.keys(p).filter(function(k){return k!=='seen_at';}).map(function(k){return k+': '+p[k];}).join('\n')+(a.ui_layout_locked?'\n(set by hand)':'');
+  var cls=l.indexOf('unknown-')===0?'cf-warn':'cf-ok';
+  return '<span class="cf-chip '+cls+'" title="'+accEscapeAttr(tip)+'">'+escapeHtml(CF_LAYOUTS[l]||l)+(a.ui_layout_locked?' 🔒':'')+'</span>';
+}
+function cfSyncLayoutFilter(){
+  var sel=document.getElementById('cf-f-layout'); if(!sel) return;
+  var cur=sel.value, seen={}; (STATE.phoneAccounts||[]).forEach(function(a){ seen[a.ui_layout||'unset']=(seen[a.ui_layout||'unset']||0)+1; });
+  sel.innerHTML='<option value="">Any layout</option>'+Object.keys(seen).sort().map(function(k){ return '<option value="'+escapeHtml(k)+'">'+escapeHtml(CF_LAYOUTS[k]||k)+' ('+seen[k]+')</option>'; }).join('');
+  sel.value=seen[cur]?cur:'';
+}
+async function cfSetLayout(id){
+  var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
+  var names=Object.keys(CF_LAYOUTS);
+  var v=prompt('UI layout for this phone.\nKnown: '+names.join(', ')+'\nBlank = auto-detect from runs.',a.ui_layout_locked?(a.ui_layout||''):'');
+  if(v===null) return; v=v.trim();
+  await cfSetPhone(id, v?{ui_layout:v,ui_layout_locked:true}:{ui_layout_locked:false});
+}
 function cfHealthChip(a){
   var h=a.health||'unchecked', cls={healthy:'cf-ok',cautious:'cf-warn',shadowbanned:'cf-shadow',banned:'cf-bad'}[h]||'cf-none';
   var label=h==='shadowbanned'?'possible shadowban':h==='banned'?'BANNED':h;
@@ -7526,9 +7770,9 @@ async function loadCloudFarm(){
   renderCloudFarm(); cfPool();
 }
 function cfPhones(){
-  var fm=(document.getElementById('cf-f-model')||{}).value||'', fb=(document.getElementById('cf-f-backend')||{}).value||'', fh=(document.getElementById('cf-f-health')||{}).value||'', q=((document.getElementById('cf-q')||{}).value||'').toLowerCase().trim();
+  var fm=(document.getElementById('cf-f-model')||{}).value||'', fb=(document.getElementById('cf-f-backend')||{}).value||'', fh=(document.getElementById('cf-f-health')||{}).value||'', fl=(document.getElementById('cf-f-layout')||{}).value||'', q=((document.getElementById('cf-q')||{}).value||'').toLowerCase().trim();
   return (STATE.phoneAccounts||[]).filter(function(a){
-    if(fm&&(a.model||'')!==fm) return false; if(fb&&(a.backend||'multilogin')!==fb) return false; if(fh&&(a.health||'unchecked')!==fh) return false;
+    if(fm&&(a.model||'')!==fm) return false; if(fb&&(a.backend||'multilogin')!==fb) return false; if(fh&&(a.health||'unchecked')!==fh) return false; if(fl&&(a.ui_layout||'unset')!==fl) return false;
     if(q&&![a.profile_name,a.handle,a.model,a.notes].some(function(v){return String(v||'').toLowerCase().includes(q);})) return false;
     return true; });
 }
@@ -7536,6 +7780,7 @@ function cfRunsFor(id){ return (STATE.phoneRuns||[]).filter(function(r){return r
 function cfNextJob(id){ return CF.jobs.find(function(j){return j.account_id===id;}); }
 function renderCloudFarm(){
   var wrap=document.getElementById('cf-table'); if(!wrap) return;
+  cfSyncLayoutFilter();
   var P=cfPhones(), all=STATE.phoneAccounts||[];
   var runsToday=0, postsToday=0, minsToday=0; Object.keys(CF.today).forEach(function(k){ runsToday+=CF.today[k].runs||0; postsToday+=CF.today[k].posts||0; minsToday+=parseFloat(CF.today[k].minutes||0); });
   var st=document.getElementById('cf-stats');
@@ -7547,12 +7792,12 @@ function renderCloudFarm(){
     if(!CF.flags.length) fl.innerHTML='';
     else fl.innerHTML='<div class="card" style="border-color:rgba(255,200,60,.45);margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>🚩 Flags ('+CF.flags.length+')</b><span class="cf-sub">from Account Status checks and run outcomes</span></div>'
       +CF.flags.map(function(f){ var a=all.find(function(x){return x.id===f.account_id;})||{}; var d=f.detail||{};
-        var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn'}[f.kind]||'cf-none';
+        var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn',layout_new:'cf-warn',check_failed:'cf-warn'}[f.kind]||'cf-none';
         return '<div class="cf-flag"><span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace('_',' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div>';
   }
   if(STATE._phoneErr){ wrap.innerHTML='<div style="color:var(--red);padding:12px;">'+escapeHtml(STATE._phoneErr)+'</div>'; return; }
   if(!P.length){ wrap.innerHTML='<div class="cf-sub" style="padding:14px;">No phones match. Sync from Multilogin or GeeLark to pull them in.</div>'; cfEstimate(); return; }
-  var h='<table class="cf-t"><tr><th style="width:30px;"></th><th>Phone</th><th>Model</th><th>Health</th><th>Last run</th><th>Runs today</th><th>Posts today</th><th>Stories today</th><th>Next</th><th style="width:34px;"></th></tr>';
+  var h='<table class="cf-t"><tr><th style="width:30px;"><input type="checkbox" id="cf-sel-all" title="Select / unselect all shown" onchange="cfSelectAllVisible(this.checked)"></th><th>Phone</th><th>Model</th><th>Health</th><th>Layout</th><th>Last run</th><th>Runs today</th><th>Posts today</th><th>Stories today</th><th>Next</th><th style="width:34px;"></th></tr>';
   P.forEach(function(a){
     var runs=cfRunsFor(a.id), lr=runs[0], t=CF.today[a.id]||{}, nj=cfNextJob(a.id);
     var busy=nj&&nj.status==='running';
@@ -7560,14 +7805,14 @@ function renderCloudFarm(){
     var next= nj&&!busy ? cfAEST(nj.not_before)+' '+escapeHtml(nj.kind) : a.enabled ? (CF.settings.enabled?'scheduled':'—') : 'off';
     if(a.posting_paused) next+=' <span class="cf-sub">· posts paused</span>';
     var dis=a.health==='banned'||!a.enabled;
-    h+='<tr class="cf-row"><td><input type="checkbox" '+(CF.sel.has(a.id)?'checked':'')+' '+(a.health==='banned'?'disabled':'')+' onchange="cfTick(\''+a.id+'\',this.checked)"></td>'
+    h+='<tr class="cf-row"><td><input type="checkbox" '+(CF.sel.has(a.id)?'checked':'')+' '+(cfSelectable(a)?'':'disabled title="turn the phone on first"')+' onchange="cfTick(\''+a.id+'\',this.checked)"></td>'
       +'<td><b>'+escapeHtml(a.handle||a.profile_name||a.profile_id)+'</b><div class="cf-sub">'+escapeHtml(a.profile_name||'')+' · '+escapeHtml(a.backend||'multilogin')+(a.enabled?'':' · <span style="color:var(--text3);">off</span>')+'</div></td>'
-      +'<td>'+escapeHtml(a.model||'—')+'</td><td>'+cfHealthChip(a)+'</td><td>'+last+'</td><td>'+(t.runs||0)+'</td><td>'+(t.posts||0)+'</td><td>'+(t.stories||0)+'</td><td class="cf-sub">'+next+'</td>'
+      +'<td>'+escapeHtml(a.model||'—')+'</td><td>'+cfHealthChip(a)+'</td><td onclick="cfSetLayout(\''+a.id+'\')" style="cursor:pointer;" title="click to set by hand">'+cfLayoutChip(a)+'</td><td>'+last+'</td><td>'+(t.runs||0)+'</td><td>'+(t.posts||0)+'</td><td>'+(t.stories||0)+'</td><td class="cf-sub">'+next+'</td>'
       +'<td><button class="btn btn-sm btn-ghost" style="padding:2px 8px;" onclick="cfToggle(\''+a.id+'\')">'+(CF.open.has(a.id)?'▾':'▸')+'</button></td></tr>';
-    h+='<tr class="cf-exp '+(CF.open.has(a.id)?'open':'')+'"><td colspan="10">'+(CF.open.has(a.id)?cfExpandHtml(a,runs):'')+'</td></tr>';
+    h+='<tr class="cf-exp '+(CF.open.has(a.id)?'open':'')+'"><td colspan="11">'+(CF.open.has(a.id)?cfExpandHtml(a,runs):'')+'</td></tr>';
   });
   wrap.innerHTML=h+'</table>';
-  cfEstimate(); cfRenderPlan(); cfRenderSched();
+  cfSyncSelAll(); cfEstimate(); cfRenderPlan(); cfRenderSched();
   clearTimeout(CF._tick); if(CF.jobs.some(function(j){return j.status==='running';})&&document.getElementById('page-cloud-farm').classList.contains('active')) CF._tick=setTimeout(loadCloudFarm,20000);
 }
 function cfExpandHtml(a,runs){
@@ -7604,8 +7849,19 @@ function cfExpandHtml(a,runs){
     +(a.notes?'<div class="cf-sub" style="margin-top:4px;">'+escapeHtml(a.notes)+'</div>':'')+actions+'</div></div>';
 }
 function cfToggle(id){ if(CF.open.has(id)) CF.open.delete(id); else CF.open.add(id); renderCloudFarm(); }
-function cfTick(id,on){ if(on) CF.sel.add(id); else CF.sel.delete(id); cfEstimate(); }
-function cfSelect(mode){ CF.sel.clear(); if(mode!=='none') cfPhones().forEach(function(a){ if(a.health==='banned') return; if(mode==='on'&&a.enabled) CF.sel.add(a.id); if(mode==='ok'&&a.enabled&&a.health==='healthy') CF.sel.add(a.id); }); renderCloudFarm(); }
+function cfTick(id,on){ if(on) CF.sel.add(id); else CF.sel.delete(id); cfSyncSelAll(); cfEstimate(); }
+// The worker only claims jobs for phones that are turned on, so a job queued
+// on an off phone sits there forever. Every selector skips off + banned.
+function cfSelectable(a){ return a.enabled && a.health!=='banned'; }
+function cfSelect(mode){ CF.sel.clear(); if(mode!=='none') cfPhones().forEach(function(a){ if(!cfSelectable(a)) return; if(mode==='all'||mode==='on') CF.sel.add(a.id); if(mode==='ok'&&a.health==='healthy') CF.sel.add(a.id); }); renderCloudFarm(); }
+// Header checkbox: ticks/unticks every phone in the current filter.
+function cfSelectAllVisible(on){ cfPhones().forEach(function(a){ if(!cfSelectable(a)) return; if(on) CF.sel.add(a.id); else CF.sel.delete(a.id); }); renderCloudFarm(); }
+function cfSyncSelAll(){
+  var cb=document.getElementById('cf-sel-all'); var cnt=document.getElementById('cf-selcount');
+  var vis=cfPhones().filter(cfSelectable), n=vis.filter(function(a){return CF.sel.has(a.id);}).length;
+  if(cb){ cb.checked=vis.length>0&&n===vis.length; cb.indeterminate=n>0&&n<vis.length; }
+  if(cnt) cnt.textContent=CF.sel.size?'· '+CF.sel.size+' selected':'';
+}
 function cfEstimate(){
   var el=document.getElementById('cf-est'); if(!el) return;
   var n=CF.sel.size, kind=(document.getElementById('cf-kind')||{}).value||'warmup', sp=parseInt((document.getElementById('cf-spread')||{}).value||'0',10);
@@ -10799,12 +11055,96 @@ async function renderChatAnalyser(){
   caRender();
 }
 function caSetTab(t){ CA.tab=t; caRender(); }
+// ── Attention: what chatters got wrong ───────────────────────────────────────
+// Admin only, and gated in the database as well as here — chatter_flags returns
+// nothing to anyone whose profile role is not admin, so a chatter poking the API
+// cannot read another chatter's mistakes.
+var CF={rows:[],loaded:false,kind:'',who:'',show:40};
+var CF_KIND={
+  opener_to_known:['Opened a man he already knows','Sent the cold-open line into a thread with real history. The clearest sign the conversation was never read.'],
+  repeat_question:['Asked the same thing twice','Same question to the same man on separate days.'],
+  asked_again:['Re-asked something he answered','Asked where he is from after ten-plus messages.'],
+  banned_phrase:['Retired phrase','Names his silence or hands him an out. Section 10 retires these.'],
+  pet_name:['Pet name','Not the house voice on a male page.']
+};
+var CF_ORDER=['opener_to_known','repeat_question','asked_again','banned_phrase','pet_name'];
+
+function cfIsAdmin(){ return (STATE.profile&&STATE.profile.role)==='admin'; }
+
+async function cfLoad(){
+  var r=await sb.from('chatter_flags').select('*').limit(1200);
+  CF.rows=r.data||[]; CF.loaded=true;
+}
+
+function cfRender(){
+  if(!cfIsAdmin()) return '<div class="ca-card"><div class="ca-mini">Admins only.</div></div>';
+  if(!CF.loaded){ cfLoad().then(caRender); return '<div class="ca-card"><div class="ca-mini">Reading the last 45 days…</div></div>'; }
+  if(!CF.rows.length) return '<div class="ca-card"><div class="ca-mini">Nothing flagged in the last 45 days. Either they are on it, or the exports have not been pushed lately.</div></div>';
+
+  var by={}, who={};
+  CF.rows.forEach(function(r){
+    (by[r.kind]=by[r.kind]||[]).push(r);
+    who[r.sender]=who[r.sender]||{};
+    who[r.sender][r.kind]=(who[r.sender][r.kind]||0)+1;
+  });
+
+  var h='<div class="ca-card"><div class="ca-head"><h3>Only you can see this</h3></div>'
+    +'<div class="ca-mini" style="line-height:1.55;">Pulled from the message exports, last 45 days. Every line is something a chatter actually sent — click one to read it. Nobody else in the app can see this tab, and the database refuses the query for anyone who is not an admin.</div></div>';
+
+  // who, by kind
+  var names=Object.keys(who).sort(function(a,b){
+    var s=function(n){ return CF_ORDER.reduce(function(t,k){ return t+(who[n][k]||0); },0); };
+    return s(b)-s(a);
+  });
+  h+='<div class="ca-card"><div class="ca-head"><h3>By chatter</h3></div><div class="ca-wrap"><table class="ca-table"><thead><tr><th>Chatter</th>'
+    +CF_ORDER.map(function(k){ return '<th title="'+escapeHtml(CF_KIND[k][1])+'">'+CF_KIND[k][0]+'</th>'; }).join('')
+    +'<th>Total</th></tr></thead><tbody>'
+    +names.map(function(n){
+        var tot=CF_ORDER.reduce(function(t,k){ return t+(who[n][k]||0); },0);
+        return '<tr><td><b>'+escapeHtml(n)+'</b></td>'
+          +CF_ORDER.map(function(k){ var v=who[n][k]||0;
+              return '<td'+(v?' style="color:var(--yellow);font-weight:700;"':' style="color:var(--text2);"')+'>'+(v||'—')+'</td>'; }).join('')
+          +'<td><b>'+tot+'</b></td></tr>';
+      }).join('')
+    +'</tbody></table></div></div>';
+
+  // filters
+  h+='<div class="ca-card"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+    +'<button class="btn btn-sm '+(CF.kind===''?'btn-primary':'btn-ghost')+'" onclick="CF.kind=\'\';CF.show=40;caRender()">Everything ('+CF.rows.length+')</button>'
+    +CF_ORDER.filter(function(k){ return (by[k]||[]).length; }).map(function(k){
+        return '<button class="btn btn-sm '+(CF.kind===k?'btn-primary':'btn-ghost')+'" onclick="CF.kind=\''+k+'\';CF.show=40;caRender()">'+CF_KIND[k][0]+' ('+by[k].length+')</button>'; }).join('')
+    +'</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'
+    +'<button class="btn btn-sm '+(CF.who===''?'btn-primary':'btn-ghost')+'" onclick="CF.who=\'\';CF.show=40;caRender()">All chatters</button>'
+    +names.map(function(n){ return '<button class="btn btn-sm '+(CF.who===n?'btn-primary':'btn-ghost')+'" onclick="CF.who=\''+n.replace(/'/g,"\\'")+'\';CF.show=40;caRender()">'+escapeHtml(n)+'</button>'; }).join('')
+    +'</div></div>';
+
+  var list=CF.rows.filter(function(r){ return (!CF.kind||r.kind===CF.kind)&&(!CF.who||r.sender===CF.who); });
+  if(CF.kind) h+='<div class="ca-card"><div class="ca-mini">'+escapeHtml(CF_KIND[CF.kind][1])+'</div></div>';
+
+  h+='<div class="ca-card"><div class="ca-head"><h3>'+list.length+' flagged message'+(list.length===1?'':'s')+'</h3></div>'
+    +list.slice(0,CF.show).map(function(r){
+      return '<div style="border-bottom:1px solid var(--border);padding:10px 0;">'
+        +'<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">'
+        +'<b style="color:var(--text);">'+escapeHtml(r.sender)+'</b> → '+escapeHtml(r.fan_name||'')
+        +' · '+escapeHtml(r.creator)+(r.total_net>0?' · '+fsMoney(r.total_net)+(r.stage?' '+escapeHtml(r.stage):''):'')
+        +' · '+fmtDateTime(r.ts)+'</div>'
+        +'<div style="font-size:13px;line-height:1.5;">'+escapeHtml(r.quote||'')+'</div>'
+        +'<div style="font-size:11px;color:var(--yellow);margin-top:4px;">'+escapeHtml(r.what||'')+'</div>'
+        +'</div>';
+    }).join('')
+    +(list.length>CF.show?'<div style="text-align:center;margin-top:12px;"><button class="btn btn-sm btn-ghost" onclick="CF.show+=40;caRender()">Show 40 more ('+(list.length-CF.show)+' left)</button></div>':'')
+    +'</div>';
+  return h;
+}
+
 function caRender(){
   var el=document.getElementById('chat-analyser-body'); if(!el) return; caInjectCss();
   var tabs=[['runs','📥 Upload'],['funnel','🎯 Funnel'],['unworked','⏰ Unworked'],['chatters','🧑‍💻 Chatters'],['openers','👋 First messages'],['bumps','🔔 Bumps & blasts'],['ppv','💸 Pricing'],['rules','🚫 Rules']];
+  if(cfIsAdmin()) tabs.push(['flags','🔒 Attention']);
   var head='<div class="tabs">'+tabs.map(function(t){return '<div class="tab '+(CA.tab===t[0]?'active':'')+'" onclick="caSetTab(\''+t[0]+'\')">'+t[1]+'</div>';}).join('')+'</div>';
   var body='';
-  if(CA.tab==='runs') body=caRenderRuns();
+  if(CA.tab==='flags') body=cfRender();
+  else if(CA.tab==='runs') body=caRenderRuns();
   else if(!CA.run) body='<div class="empty" style="margin-top:24px;"><div class="empty-icon">🧪</div><p>No run yet — upload a Message Dashboard export first.</p></div>';
   else body=caRenderSummary()+(
     CA.tab==='funnel'?caRenderFunnel():
