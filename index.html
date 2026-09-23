@@ -2601,11 +2601,10 @@
       </div>
       <span id="ph-sync-msg" style="font-size:12px;color:var(--text2);"></span>
       <div id="cf-stats" class="stats-grid" style="margin:14px 0;"></div>
-      <div id="cf-flags"></div>
+      <div class="card" id="cf-plan" style="margin-bottom:12px;"></div>
       <div class="card" style="margin-bottom:12px;">
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
           <div><label class="cf-l">Run</label><select id="cf-kind" onchange="cfEstimate()"><option value="warmup">Warm-up</option><option value="post_auto">Post — next unused clip</option><option value="post_pick">Post — pick a clip…</option><option value="story">Story CTA (link sticker)</option><option value="health">Health check only</option></select></div>
-          <div><label class="cf-l">At once (max)</label><input type="number" id="cf-par" value="4" min="1" max="6" style="width:70px;" onchange="cfEstimate()"></div>
           <div><label class="cf-l">Spread over</label><select id="cf-spread" onchange="cfEstimate()"><option value="45">45 min</option><option value="20">20 min</option><option value="90">90 min</option><option value="0">Now</option></select></div>
           <div><label class="cf-l">Warm-up before post</label><select id="cf-prewarm"><option value="1">Yes</option><option value="0">No</option></select></div>
           <div><label class="cf-l">Health check</label><select id="cf-health"><option value="daily">If not done today</option><option value="always">Always</option><option value="skip">Skip</option></select></div>
@@ -2625,7 +2624,7 @@
         <span style="font-size:12px;color:var(--text2);">Select: <a href="#" onclick="cfSelect('all');return false;">all (on)</a> ·<a href="#" onclick="cfSelect('ok');return false;">healthy only</a> · <a href="#" onclick="cfSelect('none');return false;">none</a> <span id="cf-selcount" style="color:var(--text3);"></span></span>
       </div>
       <div class="card" style="padding:0 6px;"><div id="cf-table"></div></div>
-      <div class="card" id="cf-plan" style="margin-top:12px;"></div>
+      <div id="cf-flags" style="margin-top:12px;"></div>
     </div>
     <div class="page" id="page-accounts">
       <div class="page-title">🔐 Accounts</div>
@@ -7829,7 +7828,7 @@ async function phEdit(id){
 // is what they did; phone_flags is what IG said about them; phone_settings
 // ('scheduler') is the fleet plan. Everything is shown in AEST.
 // ══════════════════════════════════════════════════════════════════════════
-var CF={sel:new Set(),open:new Set(),settings:{},flags:[],today:{},jobs:[],loaded:false};
+var CF={sel:new Set(),open:new Set(),settings:{},flags:[],today:{},jobs:[],loaded:false,flagsOpen:false};
 var CF_TZ='Australia/Sydney';
 function cfDay(d){ return new Intl.DateTimeFormat('en-AU',{timeZone:CF_TZ,day:'numeric',month:'short'}).format(d); }
 function cfTime(d){ return new Intl.DateTimeFormat('en-AU',{timeZone:CF_TZ,hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
@@ -7912,10 +7911,11 @@ function renderCloudFarm(){
   var fl=document.getElementById('cf-flags');
   if(fl){
     if(!CF.flags.length) fl.innerHTML='';
-    else fl.innerHTML='<div class="card" style="border-color:rgba(255,200,60,.45);margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>🚩 Flags ('+CF.flags.length+')</b><span class="cf-sub">from Account Status checks and run outcomes</span></div>'
+    else fl.innerHTML='<div class="card" style="border-color:rgba(255,200,60,.45);margin-bottom:12px;padding:8px 14px;"><div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="CF.flagsOpen=!CF.flagsOpen;renderCloudFarm();"><b>'+(CF.flagsOpen?'▾':'▸')+' 🚩 Flags ('+CF.flags.length+')</b><span class="cf-sub">'+(CF.flagsOpen?'click to collapse · <a href="#" onclick="event.stopPropagation();cfDismissAll();return false;">dismiss all</a>':'click to expand')+'</span></div>'
+      +(CF.flagsOpen?'<div style="margin-top:6px;">':'<div style="display:none;">')
       +CF.flags.map(function(f){ var a=all.find(function(x){return x.id===f.account_id;})||{}; var d=f.detail||{};
         var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn',layout_new:'cf-warn',check_failed:'cf-warn'}[f.kind]||'cf-none';
-        return '<div class="cf-flag"><span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace('_',' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div>';
+        return '<div class="cf-flag"><span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace('_',' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div></div>';
   }
   if(STATE._phoneErr){ wrap.innerHTML='<div style="color:var(--red);padding:12px;">'+escapeHtml(STATE._phoneErr)+'</div>'; return; }
   if(!P.length){ wrap.innerHTML='<div class="cf-sub" style="padding:14px;">No phones match. Sync from Multilogin or GeeLark to pull them in.</div>'; cfEstimate(); return; }
@@ -8022,8 +8022,7 @@ async function cfRunBatch(){
   var picked=cfPhones().filter(function(a){ return CF.sel.has(a.id)&&cfSelectable(a); });
   var ids=picked.map(function(a){return a.id;});
   if(!ids.length){ alert('Select at least one phone.'); return; }
-  if(!confirm('Run '+(document.getElementById('cf-kind').value)+' on '+ids.length+' phone(s):\n\n'+picked.map(function(a){return '• '+(a.handle||a.profile_name);}).join('\n'))) return;
-  var kind=document.getElementById('cf-kind').value, spread=parseInt(document.getElementById('cf-spread').value,10), par=Math.max(1,Math.min(6,parseInt(document.getElementById('cf-par').value,10)||4));
+  var kind=document.getElementById('cf-kind').value, spread=parseInt(document.getElementById('cf-spread').value,10), par=6;   // the service runs up to 6 phones at once; spacing comes from "Spread over"
   var prewarm=document.getElementById('cf-prewarm').value==='1', health=document.getElementById('cf-health').value;
   var clipKey=null;
   if(kind==='post_pick'){ clipKey=await cfPickClip(); if(!clipKey) return; }
@@ -8042,7 +8041,7 @@ async function cfRunBatch(){
     return {account_id:id,kind:k,payload:p,not_before:new Date(now+offs[i]*60000).toISOString(),priority:5};
   });
   var first=cfAEST(rows[0].not_before), last=cfAEST(rows[rows.length-1].not_before);
-  if(!confirm('Queue '+rows.length+' × '+kind.replace('_',' ')+'?\n\nStarts '+first+' → '+last+' AEST, about '+par+' phones at once (≥'+gap+' min between starts).')) return;
+  if(!confirm('Run '+kind.replace('_',' ')+' on '+rows.length+' phone(s), starting '+first+(rows.length>1?' → '+last:'')+' AEST:\n\n'+picked.map(function(a){return '• '+(a.handle||a.profile_name);}).join('\n'))) return;
   var msg=document.getElementById('ph-sync-msg'); if(msg) msg.textContent='Queuing…';
   var r=await cfQueue(rows);
   if(msg) msg.innerHTML=r.ok+' queued ('+picked.map(function(a){return escapeHtml(a.handle||a.profile_name);}).join(', ')+')'+(r.errs.length?' · <span style="color:var(--red);">'+r.errs.length+' failed: '+escapeHtml(r.errs[0])+'</span>':'')+'. Phones start on their drawn times; this page refreshes itself.';
@@ -8100,6 +8099,7 @@ async function cfShot(runId){
   document.body.appendChild(ov); ov.querySelector('.modal-close').onclick=function(){ov.remove();}; ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
 }
 async function cfDismiss(id){ await sb.from('phone_flags').update({dismissed_at:new Date().toISOString(),dismissed_by:(STATE.profile&&STATE.profile.email)||''}).eq('id',id); loadCloudFarm(); }
+async function cfDismissAll(){ if(!CF.flags.length||!confirm('Dismiss all '+CF.flags.length+' flags?')) return; await sb.from('phone_flags').update({dismissed_at:new Date().toISOString(),dismissed_by:(STATE.profile&&STATE.profile.email)||''}).in('id',CF.flags.map(function(f){return f.id;})); loadCloudFarm(); }
 async function cfSetPhone(id,patch){ const{error}=await sb.from('phone_accounts').update(patch).eq('id',id); if(error){ alert('Could not save: '+error.message); return; } loadCloudFarm(); }
 async function cfEditPhone(id){
   var a=STATE.phoneAccounts.find(function(x){return x.id===id;}); if(!a) return;
