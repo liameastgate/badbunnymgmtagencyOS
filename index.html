@@ -3319,9 +3319,20 @@ async function cfLoadReady(){
   document.getElementById('cf-ready-empty').style.display=files.length?'none':'block';
   if(error||!files.length){ box.innerHTML=''; return; }
   box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.18);">
-      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.title||f.r2_key)} <span class="stat-label" style="font-size:11px;">· ${escapeHtml(f.state||'')}</span></div>
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.title||f.r2_key)} <span class="stat-label" style="font-size:11px;">· ${escapeHtml(f.state||'')} · ${escapeHtml(new Date(f.created_at).toLocaleString('en-AU',{timeZone:'Australia/Sydney',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</span></div>
+      <button class="btn btn-sm btn-ghost" onclick="cfPreview('${accEscapeAttr(f.r2_key)}','${accEscapeAttr(f.title||'')}')">▶ Preview</button>
       <button class="btn btn-sm btn-ghost" onclick="cfDownload('${accEscapeAttr(f.r2_key)}')">Download</button>
     </div>`).join('');
+}
+// Play the finished file exactly as the phone will post it (signed URL, ~1 min).
+async function cfPreview(path,title){
+  try{
+    const url=await r2SignedUrl(path,'GET');
+    let m=document.getElementById('cf-preview-modal');
+    if(!m){ m=document.createElement('div'); m.id='cf-preview-modal'; m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;'; m.onclick=function(e){ if(e.target===m){ m.querySelector('video').pause(); m.remove(); } }; document.body.appendChild(m); }
+    m.innerHTML='<div style="max-width:420px;width:92vw;"><div style="display:flex;justify-content:space-between;align-items:center;color:#fff;margin-bottom:8px;font-size:13px;"><span>'+escapeHtml(title||path.split('/').pop())+'</span><button class="btn btn-sm btn-ghost" onclick="var m=document.getElementById(\'cf-preview-modal\');m.querySelector(\'video\').pause();m.remove();">✕</button></div>'
+      +'<video src="'+url+'" controls autoplay playsinline style="width:100%;max-height:80vh;border-radius:12px;background:#000;"></video></div>';
+  }catch(e){ cfAlert('Could not load that file: '+(e.message||e),'error'); }
 }
 async function cfDownload(path){
   // Signed URL rather than a public bucket: the link works for a minute and
@@ -4179,7 +4190,7 @@ function libPools(items){
 // inside their content. Every file carries model + category + lifecycle state, so the
 // "folders" are just saved filters -- nothing is physically filed anywhere, and a file
 // can be re-filed without moving bytes.
-var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders'};
+var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders',factory:false};
 // What the Meta scanner said, as a filter you can act on. The verdict lives in
 // content_scans, so this is a view over existing data -- nothing is copied or moved.
 var LIB_OUTCOMES={
@@ -4229,6 +4240,7 @@ function libFiltered(){
   if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : i.category===LIB_F.category; });
   if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
   if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
+  if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
   var q=(LIB_F.q||'').toLowerCase().trim();
   if(q) items=items.filter(function(i){
     var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
@@ -4333,6 +4345,7 @@ function renderLibraryList(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     +'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
     +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
+    +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
     +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
