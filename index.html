@@ -1901,8 +1901,10 @@
         <div class="card-title">Submit Invoice</div>
         <div class="form-grid">
           <div class="form-group"><label>Your Role</label><select id="inv-role"><option value="chatter">Chatter</option><option value="traffic">Traffic Team</option><option value="va">VA / Manager</option></select></div>
-          <div class="form-group"><label>Week From</label><input type="date" id="inv-week-start" onchange="syncInvWeek()"></div>
-          <div class="form-group"><label>Week To</label><input type="date" id="inv-week-end"></div>
+          <div class="form-group"><label>Week</label><select id="inv-week" onchange="syncInvWeek()"></select></div>
+          <div class="form-group"><label>Days worked <span style="font-weight:400;color:var(--text2);">(leave as Full week unless you started or finished mid-week)</span></label>
+            <select id="inv-days-worked"><option value="">Full week</option><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option></select></div>
+          <input type="hidden" id="inv-week-start"><input type="hidden" id="inv-week-end">
           <div class="form-group"><label>Salary Earnings ($)</label><input type="number" id="inv-salary" placeholder="0.00" step="0.01" min="0"></div>
           <div class="form-group"><label>Commission Earnings ($)</label><input type="number" id="inv-commission" placeholder="0.00" step="0.01" min="0"></div>
           <div class="form-group full"><label>Chatter Name</label><input type="text" id="inv-desc" placeholder="e.g. Bella — who this invoice is for"></div>
@@ -3275,6 +3277,15 @@ const CF_LABEL={photo2video:'Photos → source clips', caption:'Caption only',
 const CF_DOT={queued:'#9aa3ad', running:'#2f7fe0', done:'#1f9d55',
               failed:'#c0392b', cancelled:'#9aa3ad'};
 
+// Queued: cancelled at once. Running: the worker sees the new status between
+// steps (before each script and before upload) and stops without uploading.
+async function cfCancelJob(id,status){
+  if(!confirm(status==='running'?'Stop this job? It ends at the next step and nothing is uploaded.':'Cancel this queued job?')) return;
+  const {error}=await sb.from('render_jobs').update({status:'cancelled',finished_at:new Date().toISOString()}).eq('id',id).in('status',['queued','running']);
+  if(error){ cfAlert('Could not cancel: '+error.message,'error'); return; }
+  cfAlert(status==='running'?'Stopping at the next step…':'Cancelled.','success');
+  cfLoadJobs();
+}
 async function cfLoadJobs(){
   const id=cfModelId(); const box=document.getElementById('cf-jobs');
   if(!id||!box) return;
@@ -3294,6 +3305,7 @@ async function cfLoadJobs(){
         <div style="font-weight:600;">${CF_LABEL[j.job_type]||j.job_type}</div>
         <div class="stat-label" style="font-size:11.5px;">${when} · ${extra}</div>
       </div>
+      ${(j.status==='queued'||j.status==='running')?`<button class="btn btn-sm btn-ghost" style="color:var(--red);" onclick="cfCancelJob('${j.id}','${j.status}')">✕ Cancel</button>`:''}
       <button class="btn btn-sm btn-ghost" onclick="cfShowLog('${j.id}')">Output</button>
     </div>`;
   }).join('');
@@ -6477,6 +6489,17 @@ function previewChatterReport(rows) {
   const weekStart=wkStartEl.value||autoDate.start; const weekEnd=wkEndEl.value||autoDate.end;
   if(!weekStart) return showAlert('chatter-report-alert','Could not detect date range — please select a Week From manually.','error');
 
+  // Unlike Sales and Creator Stats, this export cannot be split after the fact: Infloww
+  // totals each chatter over the whole range before you download it, so there is no daily
+  // detail underneath to re-cut. Storing a fortnight as one "week" would quietly skew every
+  // per-week chatter figure, so refuse it and say what to do instead.
+  const wkStartMon=csMonday(weekStart), wkEndMon=csMonday(weekEnd||weekStart);
+  if(wkStartMon && wkEndMon && wkStartMon!==wkEndMon){
+    const n=Math.round((new Date(wkEndMon)-new Date(wkStartMon))/604800000)+1;
+    return showAlert('chatter-report-alert',
+      'This export covers '+n+' weeks ('+weekStart+' to '+weekEnd+'). Employee Performance is already totalled by Infloww before export, so it cannot be split into weeks here. Re-export it one week at a time — Monday to Sunday.','error');
+  }
+
   _parsedChatterPerf=rows.map(row=>{
     // getField() trims/lowercases and tries each candidate name against the row's actual
     // keys, not just an exact bracket match -- a plain row['Unlock rate']||row['Unlock Rate']
@@ -7513,6 +7536,10 @@ function previewSales(rows){
   if(autoStart && !wkStartEl.value) wkStartEl.value=autoStart;
   if(autoEnd && !wkEndEl.value) wkEndEl.value=autoEnd;
   const weekStart=wkStartEl.value||autoStart; const weekEnd=wkEndEl.value||autoEnd;
+  // Each sale is filed under the calendar week it actually happened in, not the week the
+  // export happens to start on. A fortnight export used to be stamped as one 14-day
+  // "week", which made every week-filtered view double-count it.
+  const spanWeeks=[...new Set(dates.map(d=>csMonday(d)).filter(Boolean))].sort();
 
   _parsedSales=validRows.map(row=>{
     const employeeName=String(row['Employee']||'').trim();
@@ -7531,7 +7558,11 @@ function previewSales(rows){
     const {chatter, matchType:chatterMatchType}=findChatterMatch(employeeName, employeeEmail);
 
     return {
-      sale_date:dateKey(row), week_of:weekStart, week_end:weekEnd,
+      sale_date:dateKey(row),
+      // Own week, from this sale's own date. Falls back to the export range only if the
+      // date is unparseable, so a bad row can't silently vanish from every weekly view.
+      week_of:(csMonday(extractDateOnly(dateKey(row)))||weekStart),
+      week_end:(csMonday(extractDateOnly(dateKey(row)))?csAddDays(csMonday(extractDateOnly(dateKey(row))),6):weekEnd),
       chatter_id:chatter?chatter.id:null, chatter_name:employeeName, chatter_email:employeeEmail, chatter_match_type:chatterMatchType,
       model_id:model?model.id:null, model_name:modelNameRaw, model_match_type:modelMatchType,
       fan_name:fanName, fan_id:fanId,
@@ -7625,13 +7656,30 @@ function reassignSalesChatter(key,chatterId){
 async function saveSalesRecords(){
   const raw=_parsedSales||[];
   if(!raw.length) return showAlert('sales-alert','No data to save.','error');
-  const proceed=await confirmReplaceWeek('sales_records',raw[0].week_of,raw[0].week_end,'sales record');
-  if(!proceed) return;
-  const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
-  const rows=raw.map(r=>({...r, upload_batch_id:batchId}));
-  const{error}=await sb.from('sales_records').insert(rows);
-  if(error) return showAlert('sales-alert',error.message,'error');
-  showAlert('sales-alert',`Saved! ${rows.length} sales recorded.`,'success');
+
+  // Rows now carry their own week, so a wider export saves as several weeks -- each with
+  // its own replace-check and its own upload batch, so any one week can be redone alone.
+  const weeks=new Map();
+  raw.forEach(r=>{
+    const k=(r.week_of||'')+'|'+(r.week_end||'');
+    if(!weeks.has(k)) weeks.set(k,[]);
+    weeks.get(k).push(r);
+  });
+
+  let saved=0, savedWeeks=0; const notes=[];
+  for(const k of [...weeks.keys()].sort()){
+    const group=weeks.get(k);
+    const proceed=await confirmReplaceWeek('sales_records',group[0].week_of,group[0].week_end,'sales record');
+    if(!proceed){ notes.push(group[0].week_of+' skipped'); continue; }
+    const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+    const{error}=await sb.from('sales_records').insert(group.map(r=>({...r, upload_batch_id:batchId})));
+    if(error){ notes.push(group[0].week_of+': '+error.message); continue; }
+    saved+=group.length; savedWeeks++;
+  }
+
+  let msg=`Saved ${saved} sale${saved!==1?'s':''} across ${savedWeeks} week${savedWeeks!==1?'s':''}.`;
+  if(notes.length) msg+=` — ${notes.join('; ')}`;
+  showAlert('sales-alert',msg,notes.length?'error':'success');
   _parsedSales=null;
   document.getElementById('sales-preview').innerHTML='';
   document.getElementById('sales-save').style.display='none';
@@ -8994,6 +9042,7 @@ async function loadHoursSummary(){
 
 // ── Invoices ─────────────────────────────────────────────────
 async function renderInvoicePage(){
+  populateInvWeeks();
   const role=STATE.profile.role; const isAdmin=role==='admin'||role==='va'; const isFullAdmin=role==='admin';
   document.getElementById('invoice-admin-panel').style.display=isAdmin?'block':'none';
   const filterBar=document.getElementById('inv-view-filter'); if(filterBar) filterBar.style.display=isAdmin?'block':'none';
@@ -9138,11 +9187,34 @@ async function uploadInvFile(){
   }catch(e){console.error(e);return null;}
 }
 
+// Invoice periods are whole calendar weeks, Monday to Sunday, same as Employee Performance
+// and Sales Records. Free date fields let people file Thursday-to-Wednesday "weeks", which
+// can never be reconciled against data bucketed by week -- so the week is chosen from a
+// list and the boundaries are derived, not typed.
+function invWeekOptions(count){
+  const out=[];
+  let mon=currentWeekMonday(new Date());
+  for(let i=0;i<(count||14);i++){
+    const end=csAddDays(mon,6);
+    out.push({value:mon, end:end, label:fmtDate(mon)+' – '+fmtDate(end)+(i===0?'  (this week)':'')});
+    mon=csAddDays(mon,-7);
+  }
+  return out;
+}
+function populateInvWeeks(){
+  const sel=document.getElementById('inv-week');
+  if(!sel||sel.options.length) return;
+  sel.innerHTML=invWeekOptions(14).map(function(w,i){
+    return '<option value="'+w.value+'" data-end="'+w.end+'"'+(i===1?' selected':'')+'>'+w.label+'</option>';
+  }).join('');
+  syncInvWeek();
+}
 function syncInvWeek(){
-  const start=document.getElementById('inv-week-start').value;
-  if(!start)return;
-  const d=new Date(start); d.setDate(d.getDate()+6);
-  document.getElementById('inv-week-end').value=d.toISOString().split('T')[0];
+  const sel=document.getElementById('inv-week');
+  if(!sel||!sel.value) return;
+  const start=sel.value, end=csAddDays(start,6);
+  document.getElementById('inv-week-start').value=start;
+  document.getElementById('inv-week-end').value=end;
 }
 
 async function submitInvoice(){
@@ -9155,7 +9227,12 @@ async function submitInvoice(){
   // range string, which Postgres rejects). week_end also lets an approved invoice sync into
   // Expenses with a matching period instead of just a single day.
   const weekOf=weekStart||weekEnd||'';
-  if(!weekOf||total===0)return showAlert('inv-alert','Fill in week dates and at least one earnings amount.','error');
+  if(!weekOf||total===0)return showAlert('inv-alert','Pick a week and enter at least one earnings amount.','error');
+  // Belt and braces: the picker can only produce a Monday, but a stale field or an edited
+  // DOM must not be able to file a period that cannot be reconciled.
+  if(csMonday(weekOf)!==weekOf||csAddDays(weekOf,6)!==weekEnd){
+    return showAlert('inv-alert','Invoice periods have to be a full Monday-to-Sunday week. Pick the week from the list.','error');
+  }
   const fileUrl=await uploadInvFile();
   const inv={
     submitted_by_email:STATE.profile.email,
@@ -9167,6 +9244,7 @@ async function submitInvoice(){
     salary_amount:salary,
     commission_amount:commission,
     description:document.getElementById('inv-desc').value.trim(),
+    days_worked:(parseInt(document.getElementById('inv-days-worked').value,10)||null),
     invoice_file_url:fileUrl,
     status:'pending'
   };
@@ -9176,6 +9254,7 @@ async function submitInvoice(){
   document.getElementById('inv-salary').value='';
   document.getElementById('inv-commission').value='';
   document.getElementById('inv-desc').value='';
+  const dw=document.getElementById('inv-days-worked'); if(dw) dw.value='';
   document.getElementById('inv-total-display').textContent='$0.00';
   clearInvFile();
   renderMyInvoices();
