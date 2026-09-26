@@ -1148,6 +1148,7 @@
         <div class="card">
           <div class="card-title">⬆️ Drop this week's Infloww exports</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Drop all of them at once — each file is identified by its own column headers, so the order you drop them in doesn't matter. Nothing is saved until you press Import.</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:var(--surface);border-radius:6px;">Weeks run <strong style="color:var(--text);">Monday 00:00 to Sunday 23:59, UTC+8</strong> — the timezone your Infloww account exports in, and the one your chatters work to. One invoice per week. A wider export is split into calendar weeks automatically.</div>
           <div id="bulk-drop" class="dropzone" ondrop="handleBulkDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('bulk-file').click()" style="padding:28px;text-align:center;cursor:pointer;">
             <div style="font-size:30px;">📥</div>
             <div style="margin-top:6px;font-size:13px;">Drop files here, or click to choose</div>
@@ -6274,11 +6275,15 @@ function classifyInflowwRows(headers){
   // would swallow it.
   if(any('creator','account') && any('total earnings net','renew on %','active fans','profile visitors')) return 'creator';
   if(any('fan','fan id') && any('earnings','gross revenue','net revenue')) return 'sales';
-  if(any('employees','employee') && any('golden ratio','fan cvr','sales/hr','creators','dms sent')) return 'employee';
+  if(any('employees','employee') && any('golden ratio','fan cvr','sales/hr','creators','direct messages sent','dms sent')) return 'employee';
+  // Message Dashboard. Header set taken from the watcher, which already parses this export
+  // (MSG_HDR = Sender, Creator, Creator Message, Sent to, Sent date) -- same file, so the
+  // two pipelines cannot disagree about what a Message Dashboard looks like.
+  if(any('sender','creator message','fans message') && any('sent date','sent to','creator')) return 'messages';
   return 'unknown';
 }
 
-const BULK_LABELS={creator:'Creator Stats', sales:'Sales Record', employee:'Employee Performance', unknown:'Not recognised'};
+const BULK_LABELS={creator:'Creator Stats', sales:'Sales Record', employee:'Employee Performance', messages:'Message Dashboard', unknown:'Not recognised'};
 
 function handleBulkDrop(e){
   e.preventDefault();
@@ -6311,22 +6316,67 @@ function handleBulkFiles(files){
   });
 }
 
+// Which Mon-Sun weeks a dropped file actually covers. Used to spot real collisions --
+// two files of the same TYPE are fine (different weeks), two files of the same WEEK are
+// not, because the second silently replaces the first.
+function bulkFileWeeks(f){
+  try{
+    if(f.kind==='creator'){
+      const daily=parseDailyCreatorRows(f.detailRows||[]);
+      if(daily.length) return weeksCovered(daily);
+      const d=extractDateOnly(infDateVal((f.rows||[])[0]||{}));
+      const w=d?csMonday(d):null;
+      return w?[w]:[];
+    }
+    const set=new Set();
+    (f.rows||[]).forEach(r=>{
+      const d=extractDateOnly(infDateVal(r));
+      const w=d?csMonday(d):null;
+      if(w) set.add(w);
+    });
+    return [...set].sort();
+  }catch(e){ return []; }
+}
+
+// previewSales/previewChatterReport/previewReport only auto-fill their week inputs when
+// blank, so a second file of the same type would silently inherit the first file's week.
+// Clearing between files is what makes importing several of one type safe.
+function bulkClearWeekInputs(kind){
+  const ids = kind==='sales'    ? ['sales-week-start','sales-week-end']
+            : kind==='employee' ? ['chatters-week-start','chatters-week-end']
+            :                     ['report-week-start','report-week-end'];
+  ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+}
+
 function renderBulkQueue(){
   const el=document.getElementById('bulk-list');
   if(!el) return;
   if(!_bulkQueue.length){ el.innerHTML=''; return; }
-  const usable=_bulkQueue.filter(f=>f.kind!=='unknown');
+  const pending=_bulkQueue.filter(f=>f.kind==='messages');
+  const usable=_bulkQueue.filter(f=>f.kind!=='unknown'&&f.kind!=='messages');
+  usable.forEach(f=>{ if(!f.weeks) f.weeks=bulkFileWeeks(f); });
+  // A clash is the same TYPE covering the same WEEK twice -- that is the only case where
+  // one file would overwrite another. Several files of one type across different weeks is
+  // exactly what dropping a month of exports looks like, and is fine.
   const dupes=new Set();
-  const seen=new Set();
-  usable.forEach(f=>{ if(seen.has(f.kind)) dupes.add(f.kind); seen.add(f.kind); });
-  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>File</th><th>Detected as</th><th>Rows</th></tr></thead><tbody>'+
+  const seenWeeks=new Set();
+  usable.forEach(f=>{
+    (f.weeks||[]).forEach(w=>{
+      const k=f.kind+'|'+w;
+      if(seenWeeks.has(k)) dupes.add(BULK_LABELS[f.kind]+' week of '+w);
+      seenWeeks.add(k);
+    });
+  });
+  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>File</th><th>Detected as</th><th>Rows</th><th>Covers</th></tr></thead><tbody>'+
     _bulkQueue.map(f=>'<tr'+(f.kind==='unknown'?' style="background:rgba(255,92,92,0.06);"':'')+'>'+
       '<td style="font-size:12px;">'+escapeHtml(f.name)+'</td>'+
       '<td style="'+(f.kind==='unknown'?'color:var(--danger,#ff5c5c);font-weight:700;':'color:var(--accent2);')+'">'+BULK_LABELS[f.kind]+
         (f.error?' <span style="color:var(--text2);font-size:11px;">('+escapeHtml(f.error)+')</span>':'')+'</td>'+
-      '<td>'+(f.rows.length||'—')+'</td></tr>').join('')+
+      '<td>'+(f.rows.length||'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+((f.weeks&&f.weeks.length)?(f.weeks.length>1?f.weeks.length+' weeks · '+f.weeks[0]+' →':f.weeks[0]):'—')+'</td></tr>').join('')+
     '</tbody></table></div>'+
-    (dupes.size?'<div style="margin-top:10px;font-size:12px;color:var(--danger,#ff5c5c);">Two files look like the same export ('+[...dupes].map(k=>BULK_LABELS[k]).join(', ')+'). Remove one — importing both would overwrite the first.</div>':'')+
+    (dupes.size?'<div style="margin-top:10px;font-size:12px;color:var(--danger,#ff5c5c);">Two files cover the same period ('+[...dupes].join('; ')+'). Remove one — the second would overwrite the first.</div>':'')+
+    (pending.length?'<div style="margin-top:10px;font-size:12px;color:var(--text2);">Message Dashboard goes through the watcher, not here — drop it in your Downloads folder and it is picked up within a minute. Deliberate: the watcher owns the one parser that builds fan profiles, and a second copy could silently duplicate every message. Everything else below imports now.</div>':'')+
     '<div class="btn-row" style="margin-top:12px;">'+
       (usable.length&&!dupes.size?'<button class="btn btn-primary" onclick="runBulkImport()">Import '+usable.length+' file'+(usable.length!==1?'s':'')+'</button>':'')+
       '<button class="btn btn-ghost" onclick="_bulkQueue=[];renderBulkQueue();document.getElementById(\'bulk-alert\').style.display=\'none\';">Clear</button>'+
@@ -6339,16 +6389,22 @@ async function runBulkImport(){
   const ORDER=['sales','employee','creator'];
   const done=[];
   for(const kind of ORDER){
-    const f=_bulkQueue.find(x=>x.kind===kind);
-    if(!f) continue;
-    try{
-      if(kind==='sales'){        previewSales(f.rows);                 await saveSalesRecords(); }
-      else if(kind==='employee'){previewChatterReport(f.rows);         await saveChatterPerformance(); }
-      else {                     previewReport(f.rows,f.detailRows);   await saveReportRows(); }
-      done.push(BULK_LABELS[kind]);
-    }catch(err){
-      showAlert('bulk-alert','Stopped on '+BULK_LABELS[kind]+': '+err.message+(done.length?' — '+done.join(', ')+' already imported.':''),'error');
-      return;
+    // Every file of this type, oldest period first, rather than just the first one found.
+    const files=_bulkQueue.filter(x=>x.kind===kind)
+      .sort((a,b)=>String((a.weeks||[])[0]||'').localeCompare(String((b.weeks||[])[0]||'')));
+    for(const f of files){
+      try{
+        // Each preview only auto-fills its week inputs when blank, so without this a second
+        // file of the same type would be saved under the first file's week.
+        bulkClearWeekInputs(kind);
+        if(kind==='sales'){        previewSales(f.rows);               await saveSalesRecords(); }
+        else if(kind==='employee'){previewChatterReport(f.rows);       await saveChatterPerformance(); }
+        else {                     previewReport(f.rows,f.detailRows); await saveReportRows(); }
+        done.push(BULK_LABELS[kind]+(f.weeks&&f.weeks.length?' ('+f.weeks[0]+(f.weeks.length>1?' +'+(f.weeks.length-1):'')+')':''));
+      }catch(err){
+        showAlert('bulk-alert','Stopped on '+f.name+': '+err.message+(done.length?' — already imported: '+done.join(', ')+'.':''),'error');
+        return;
+      }
     }
   }
   showAlert('bulk-alert', done.length?('Imported: '+done.join(', ')+'.'):'Nothing to import.', done.length?'success':'error');
