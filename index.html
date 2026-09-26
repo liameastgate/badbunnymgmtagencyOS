@@ -6835,6 +6835,87 @@ function parseDailyCreatorRows(detailRows){
   }).filter(r=>r.stat_date && r.model_name);
 }
 
+// ── Multi-week Creator Stats ─────────────────────────────────────────────────
+// Infloww lets you export any date range, but an invoice period is exactly one
+// calendar week (Mon 00:00 to the next Mon 00:00). Taking the week from the export's
+// own range means a fortnight export produced ONE fourteen-day row per creator and
+// therefore one fourteen-day invoice -- real money, wrong period.
+//
+// The export's second sheet carries one row per creator per DAY, so the weeks can be
+// rebuilt properly. Fields are split three ways because they do not aggregate alike:
+//   SUM   money and counts accumulate over the week
+//   LAST  snapshots (active fans, following, renew %) are a state at a moment, and
+//         the week-end value is exactly what a single-week export would have reported
+//   MEAN  averages and rates cannot be summed, and an average of averages is the
+//         closest honest answer available from daily granularity
+const CS_SUM=['subscription_earnings','recurring_subscription_earnings','tips_earnings',
+  'message_earnings','streams_earnings','posts_earnings','refunds','new_subscribers',
+  'subscriber_renewals','change_in_expired_fans','number_of_spenders','fans_chatted',
+  'messages_sent','ppvs_sent','profile_visitors','guest_profile_visitors','user_profile_visitors'];
+const CS_LAST=['following','fans_with_renew_on','of_ranking_pct'];
+const CS_MEAN=['avg_hourly_earnings','avg_spend_per_spender','avg_spend_per_transaction',
+  'avg_earnings_per_fan','engagement_earnings_ratio_pct','contribution_pct',
+  'new_subscriber_conversion_pct','avg_subscription_length_days','reply_time_minutes'];
+
+// Monday of the week a YYYY-MM-DD falls in. Uses UTC parts so a locally-constructed
+// midnight can't slide a day in AEST, and (getUTCDay()+6)%7 counts back to Monday from
+// any day INCLUDING Sunday -- the naive -getDay()+1 jumps Sunday forward a week.
+function csMonday(dateStr){
+  const[y,m,d]=String(dateStr).slice(0,10).split('-').map(Number);
+  if(!y||!m||!d) return null;
+  const dt=new Date(Date.UTC(y,m-1,d));
+  dt.setUTCDate(dt.getUTCDate()-((dt.getUTCDay()+6)%7));
+  return dt.toISOString().slice(0,10);
+}
+function csAddDays(dateStr,n){
+  const[y,m,d]=String(dateStr).split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  dt.setUTCDate(dt.getUTCDate()+n);
+  return dt.toISOString().slice(0,10);
+}
+
+// Pure: daily rows in, one aggregate per (week, creator) out. Testable without the DOM.
+function aggregateDailyToWeeks(daily){
+  const groups=new Map();
+  (daily||[]).forEach(r=>{
+    const wk=csMonday(r.stat_date);
+    if(!wk||!r.model_name) return;
+    const key=wk+'|'+r.model_name;
+    if(!groups.has(key)) groups.set(key,{week_of:wk, week_end:csAddDays(wk,6), raw_name:r.model_name, days:[]});
+    groups.get(key).days.push(r);
+  });
+  return [...groups.values()].map(g=>{
+    g.days.sort((a,b)=>String(a.stat_date).localeCompare(String(b.stat_date)));
+    const last=g.days[g.days.length-1]||{};
+    const out={week_of:g.week_of, week_end:g.week_end, raw_name:g.raw_name, days:g.days.length};
+    const sum=f=>g.days.reduce((t,d)=>t+(parseFloat(d[f])||0),0);
+    out.total_earnings=sum('total_earnings');
+    CS_SUM.forEach(f=>{ out[f]=g.days.some(d=>d[f]!==null&&d[f]!==undefined)?sum(f):null; });
+    CS_LAST.forEach(f=>{ out[f]=last[f]!==undefined?last[f]:null; });
+    CS_MEAN.forEach(f=>{
+      const vals=g.days.map(d=>d[f]).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
+      out[f]=vals.length?vals.reduce((t,v)=>t+Number(v),0)/vals.length:null;
+    });
+    // Snapshots the weekly sheet reports at period end.
+    out.active_fans=last.active_fans!==undefined?last.active_fans:0;
+    out.renew_pct=last.renew_pct!==undefined?last.renew_pct:0;
+    // The weekly sheet's own splits; the daily sheet carries the same headers.
+    out.msg_net=out.message_earnings||0;
+    out.tips_net=out.tips_earnings||0;
+    out.sub_net=(out.subscription_earnings||0)+(out.recurring_subscription_earnings||0);
+    out.new_fans=out.new_subscribers||0;
+    out.chatter_wages=0;
+    return out;
+  }).sort((a,b)=>a.week_of.localeCompare(b.week_of)||a.raw_name.localeCompare(b.raw_name));
+}
+
+// How many distinct Mon-Sun weeks a set of daily rows touches.
+function weeksCovered(daily){
+  const set=new Set();
+  (daily||[]).forEach(r=>{ const w=csMonday(r.stat_date); if(w) set.add(w); });
+  return [...set].sort();
+}
+
 function previewReport(rows, detailRows) {
   const firstDate = infDateVal(rows[0]);
   const autoDate = parseInflowwDate(firstDate);
@@ -6844,7 +6925,7 @@ function previewReport(rows, detailRows) {
   if(autoDate.end   && !document.getElementById('report-week-end').value)   document.getElementById('report-week-end').value=autoDate.end;
   if(!weekStart||!weekEnd) return showAlert('report-alert','Could not detect date range — please select manually.','error');
 
-  const parsed=rows.map(row=>{
+  let parsed=rows.map(row=>{
     // Exact Infloww Creator Statistics column names
     const name = row['Creator']||row['Account']||row['Model']||row['Name']||'';
     const earnings    = cleanAmount(row['Total earnings Net']||row['Total Earnings']||row['Earnings']||0);
@@ -6871,8 +6952,26 @@ function previewReport(rows, detailRows) {
     return r;
   }).filter(r=>r.total_earnings>0||r.raw_name);
 
-  _parsedRows=parsed;
   _parsedDailyRows=parseDailyCreatorRows(detailRows);
+
+  // A single-week export is already one period, so leave it exactly as it was. Only a
+  // wider range is rebuilt, and only when the daily sheet is actually present -- without
+  // it there is nothing to split on and guessing would be worse than refusing.
+  const spans=weeksCovered(_parsedDailyRows);
+  if(spans.length>1){
+    if(!_parsedDailyRows.length){
+      return showAlert('report-alert','This export covers '+spans.length+' weeks but has no day-by-day sheet, so it cannot be split into invoice weeks. Re-export with "by day" enabled, or one week at a time.','error');
+    }
+    parsed=aggregateDailyToWeeks(_parsedDailyRows).map(function(agg){
+      const{model,matchType}=findModelMatch(agg.raw_name);
+      const r=Object.assign({},agg,{match_type:matchType});
+      delete r.days;
+      deriveRowFields(r,model);
+      return r;
+    }).filter(function(r){ return r.total_earnings>0||r.raw_name; });
+  }
+
+  _parsedRows=parsed;
   renderReportPreview();
 }
 
@@ -6882,12 +6981,17 @@ function renderReportPreview(){
   const totalN=parsed.reduce((s,r)=>s+r.agency_net,0);
   const modelOptions=(m,selectedId)=>`<option value=""${!selectedId?' selected':''}>— Unmatched (20% default) —</option>`+
     STATE.models.map(mo=>`<option value="${mo.id}"${mo.id===selectedId?' selected':''}>${mo.name}</option>`).join('');
-  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} accounts · ${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}</div><div class="table-wrap"><table><thead><tr><th>Creator (from CSV)</th><th>Matched Model</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th title="The agency's cut">Agency Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
+  const wkSet=[...new Set(parsed.map(r=>r.week_of))].sort();
+  const wkLabel = wkSet.length>1
+    ? `${wkSet.length} weeks · split into calendar weeks, one invoice each`
+    : `${parsed[0]?.week_of||''} to ${parsed[0]?.week_end||''}`;
+  let html=`<div class="card"><div class="card-title" style="color:var(--accent2);">${parsed.length} rows · ${wkLabel}</div><div class="table-wrap"><table><thead><tr><th>Week</th><th>Creator (from CSV)</th><th>Matched Model</th><th>Total</th><th>Msgs+Tips</th><th>Type</th><th title="The agency's cut">Agency Split</th><th>Agency Net</th><th>Renew %</th><th>Active Fans</th></tr></thead><tbody>`;
   parsed.forEach((r,i)=>{
     const matchBadge = r.match_type==='exact'?'':
       r.match_type==='fuzzy'?`<span style="color:var(--yellow);font-size:10px;font-weight:700;margin-left:6px;" title="Matched by similarity — double-check this">~ fuzzy</span>`:
       `<span style="color:var(--red);font-size:10px;font-weight:700;margin-left:6px;">unmatched</span>`;
     html+=`<tr>
+      <td style="white-space:nowrap;font-size:11px;color:var(--text2);">${r.week_of}</td>
       <td><strong>${r.raw_name}</strong>${matchBadge}</td>
       <td><select onchange="reassignReportRow(${i},this.value)" style="width:150px;font-size:12px;">${modelOptions(r,r.model_id)}</select></td>
       <td>$${fmt(r.total_earnings)}</td>
@@ -6920,34 +7024,55 @@ function reassignReportRow(i,modelId){
 async function saveReportRows(){
   const raw=_parsedRows||[];
   if(!raw.length) return showAlert('report-alert','No data to save.','error');
-  const weekOf=raw[0].week_of, weekEnd=raw[0].week_end;
-  const proceed=await confirmReplaceWeek('weekly_reports',weekOf,weekEnd,'creator stats');
-  if(!proceed) return;
-  // Always clear any existing daily rows in this same date range before inserting fresh ones --
-  // creator_stats_daily has no week_of of its own to key a replace-check off, and stale rows
-  // here would double the day-of-week chart even if the weekly summary check above passed.
-  await sb.from('creator_stats_daily').delete().gte('stat_date',weekOf).lte('stat_date',weekEnd);
-  // Strip fields that don't exist in the weekly_reports DB schema
-  const all=raw.map(({msg_net,tips_net,sub_net,mgmt_type,raw_name,match_type,...r})=>r);
-  const{error}=await sb.from('weekly_reports').insert(all);
-  if(error) return showAlert('report-alert',error.message,'error');
-  let msg=`Saved! ${all.length} rows recorded.`;
-  // Daily rows (creator_stats_daily) are a bonus, not the primary save -- if this fails,
-  // the weekly summary above is still safely saved, so surface it as a note, not a hard error.
-  const dailyRaw=_parsedDailyRows||[];
-  if(dailyRaw.length){
-    const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
-    const dailyRows=dailyRaw.map(r=>({...r, upload_batch_id:batchId}));
-    const{error:dailyError}=await sb.from('creator_stats_daily').insert(dailyRows);
-    msg+= dailyError ? ` (Daily breakdown did not save: ${dailyError.message})` : ` +${dailyRows.length} daily rows.`;
+
+  // A multi-week export is saved as separate calendar weeks, because an invoice period is
+  // one week. Each week gets its own replace-check, its own rows and its own invoice run --
+  // saving them as a single period is what produced fourteen-day invoices.
+  const weeks=new Map();
+  raw.forEach(r=>{
+    const k=(r.week_of||'')+'|'+(r.week_end||'');
+    if(!weeks.has(k)) weeks.set(k,[]);
+    weeks.get(k).push(r);
+  });
+  const keys=[...weeks.keys()].sort();
+
+  let savedRows=0, savedWeeks=0, invoices=0, skippedPaid=0, dailyTotal=0;
+  const notes=[];
+
+  for(const k of keys){
+    const group=weeks.get(k);
+    const weekOf=group[0].week_of, weekEnd=group[0].week_end;
+    const proceed=await confirmReplaceWeek('weekly_reports',weekOf,weekEnd,'creator stats');
+    if(!proceed){ notes.push(weekOf+' skipped'); continue; }
+
+    // creator_stats_daily has no week_of of its own to key a replace-check off, so clear
+    // the range first -- stale rows would double the day-of-week chart.
+    await sb.from('creator_stats_daily').delete().gte('stat_date',weekOf).lte('stat_date',weekEnd);
+
+    const all=group.map(({msg_net,tips_net,sub_net,mgmt_type,raw_name,match_type,days,...r})=>r);
+    const{error}=await sb.from('weekly_reports').insert(all);
+    if(error){ notes.push(weekOf+': '+error.message); continue; }
+    savedRows+=all.length; savedWeeks++;
+
+    const dailyForWeek=(_parsedDailyRows||[]).filter(d=>d.stat_date>=weekOf&&d.stat_date<=weekEnd);
+    if(dailyForWeek.length){
+      const batchId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+      const{error:dErr}=await sb.from('creator_stats_daily').insert(dailyForWeek.map(r=>({...r, upload_batch_id:batchId})));
+      if(dErr) notes.push(weekOf+' daily: '+dErr.message); else dailyTotal+=dailyForWeek.length;
+    }
+
+    const invResult=await generateModelInvoicesFromReport(group,weekOf,weekEnd);
+    if(invResult.error) notes.push(weekOf+' invoices: '+invResult.error.message);
+    else { invoices+=invResult.generated; skippedPaid+=invResult.skippedPaid||0; }
   }
-  // Auto-generate this week's agency-commission invoices straight off the numbers just saved --
-  // reuses row.agency_net (the agency's split cut of the earnings) so the invoice amount is
-  // the agency's cut, matching the Agency Net column shown in the preview table above.
-  const invResult=await generateModelInvoicesFromReport(raw,weekOf,weekEnd);
-  if(invResult.error) msg+=` (Invoices did not auto-generate: ${invResult.error.message})`;
-  else if(invResult.generated) msg+=` · ${invResult.generated} model invoice${invResult.generated!==1?'s':''} generated${invResult.skippedPaid?`, ${invResult.skippedPaid} skipped (already paid)`:''}.`;
-  showAlert('report-alert',msg,'success');
+
+  let msg=`Saved ${savedRows} row${savedRows!==1?'s':''} across ${savedWeeks} week${savedWeeks!==1?'s':''}`;
+  if(dailyTotal) msg+=` · ${dailyTotal} daily rows`;
+  if(invoices) msg+=` · ${invoices} model invoice${invoices!==1?'s':''} generated`;
+  if(skippedPaid) msg+=` (${skippedPaid} left alone, already paid)`;
+  if(notes.length) msg+=` — ${notes.join('; ')}`;
+  showAlert('report-alert',msg,notes.length?'error':'success');
+
   _parsedRows=null; _parsedDailyRows=null;
   document.getElementById('csv-preview').innerHTML='';
   document.getElementById('csv-save').style.display='none';
