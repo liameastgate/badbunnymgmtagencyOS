@@ -11125,7 +11125,10 @@ function fsCard(f){
   var mx=Math.max.apply(null,local.concat([1]));
   var h='<div class="fs-card">'
     +'<div class="fs-h"><h2>'+escapeHtml(f.fan_name||('fan '+f.fan_id))+'</h2><span class="fs-tier '+tier[0]+'">'+tier[1]+'</span><span class="fs-page">'+escapeHtml(f.creator)+'</span><span class="fs-sub">id '+f.fan_id+'</span></div>'
-    +'<div class="fs-sub">'+(f.tz_label?'Probably <b>'+escapeHtml(f.tz_label)+'</b> (from when he messages, '+f.msgs_in+' msgs)':'Timezone unknown — not enough messages yet')
+    // tz_label was a guess at the fan's country from the hours he messages. It reads as
+    // a stated fact on a card, it is wrong for anyone who works nights or travels, and
+    // nothing should be decided on it. Removed rather than caveated.
+    +'<div class="fs-sub">'+f.msgs_in+' message'+(f.msgs_in===1?'':'s')
     +' · subscribed '+fmtDate(f.subscribed_at)+(f.sub_count>1?' · '+f.sub_count+' subs':'')+' · first seen '+fmtDate(f.first_seen)+'</div>'
     +'<div class="fs-stats">'
     +'<div class="fs-st"><div class="v good">'+fsMoney(f.total_net)+'</div><div class="k">'+f.purchases+' purchases · net</div></div>'
@@ -11164,7 +11167,7 @@ function fsCard(f){
     +'</div>';
 
   // when he's around
-  h+='<div class="fs-card"><div class="fs-sec">When he messages (his local time'+(f.tz_label?', '+escapeHtml(f.tz_label):'')+')</div>'
+  h+='<div class="fs-card"><div class="fs-sec">When he messages <span style="font-weight:400;color:var(--text2);">(UTC+8, the export timezone)</span></div>'
     +'<div class="fs-hours">'+local.map(function(v){return '<i style="height:'+Math.max(4,Math.round(v/mx*100))+'%" class="'+(v===mx&&v>0?'peak':'')+'" title="'+v+'"></i>';}).join('')+'</div>'
     +'<div class="fs-axis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div></div>';
 
@@ -11292,7 +11295,7 @@ function wlPaint(){
     var out='<div class="wl-row'+(mine?' mine':taken?' taken':'')+'">'
       +'<div class="wl-top"><span class="wl-q '+r.queue+'">'+WL_Q[r.queue]+'</span>'
       +'<span class="wl-nm" onclick="wlOpen('+id+')">'+escapeHtml(r.fan_name||('fan '+r.fan_id))+'</span>'
-      +'<span class="wl-pg">'+escapeHtml(r.creator)+(r.tz_label?' · '+escapeHtml(r.tz_label):'')+'</span></div>'
+      +'<span class="wl-pg">'+escapeHtml(r.creator)+'</span></div>'
       +'<div class="wl-why">'+escapeHtml(r.reason||'')+'</div>';
     if(C.level) out+='<div class="wl-why" style="color:var(--yellow);">'+escapeHtml(C.guidance||C.what||'')+'</div>';
     if(r.summary) out+='<div class="wl-sum">'+escapeHtml(String(r.summary).slice(0,260))+'</div>';
