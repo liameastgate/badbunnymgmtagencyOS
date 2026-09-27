@@ -2324,6 +2324,19 @@
       <div id="today-body"></div>
       <div id="new-subs-body"></div>
       <div id="fan-stats-body" hidden></div>
+      <div class="card" id="fx-card" style="margin-top:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px;">Fan profiles</div>
+            <div style="font-size:12px;color:var(--text2);" id="fx-status">Reads each fan's thread and writes what they actually said — facts, open loops, what they can spend.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="fxCheck()">Check</button>
+            <button class="btn btn-primary btn-sm" id="fx-run" onclick="fxRun()">Build profiles</button>
+          </div>
+        </div>
+        <div id="fx-log" style="margin-top:10px;font-size:12px;color:var(--text2);"></div>
+      </div>
     </div>
     <div class="page" id="page-chat-analyser">
       <div class="page-title">Chat Analyser</div>
@@ -10872,6 +10885,69 @@ async function nqOutcome(id, outcome){
   var res = await sb.from('sub_queue').update(patch).eq('id', id);
   if(res.error){ toast && toast('Did not save — refreshing'); await nqRefresh(); }
 }
+// ── Fan profile extraction ───────────────────────────────────────────────────
+// Calls the fan-extract edge function, which reads fan_messages and writes fan_profiles.
+// Batched because an edge function is killed after ~150s and each fan is one model call:
+// ask for a few, see how many are left, go again. The loop stops on any error rather than
+// repeating it once per remaining fan -- a billing or rate-limit failure applies to all
+// of them, and burning through the queue to produce the same message is just noise.
+var _fxBusy=false;
+
+async function fxCall(payload){
+  const{data:sess}=await sb.auth.getSession();
+  const token=sess&&sess.session&&sess.session.access_token;
+  if(!token) throw new Error('not signed in');
+  const res=await fetch(SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/fan-extract',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify(payload||{})});
+  const body=await res.json().catch(function(){ return {}; });
+  if(!res.ok) throw new Error(body.error||('extract failed ('+res.status+')'));
+  return body;
+}
+
+// Batch of 0 does no model calls -- it just reports the size of the queue.
+async function fxCheck(){
+  const el=document.getElementById('fx-status');
+  try{
+    const r=await fxCall({batch:1, dry:true});
+    if(el) el.textContent=(r.remaining||0)+' fan'+((r.remaining||0)!==1?'s':'')+' waiting to be read.';
+  }catch(e){ if(el) el.textContent='Could not check: '+e.message; }
+}
+
+async function fxRun(){
+  if(_fxBusy) return;
+  _fxBusy=true;
+  const btn=document.getElementById('fx-run'), log=document.getElementById('fx-log');
+  if(btn){ btn.disabled=true; btn.textContent='Working…'; }
+  let total=0, cost=0, rounds=0;
+  const urgent=[];
+  try{
+    while(rounds++<200){
+      const r=await fxCall({batch:6});
+      total+=(r.done||0); cost+=(r.cost_usd||0);
+      if(r.urgent&&r.urgent.length) urgent.push.apply(urgent,r.urgent);
+      if(log) log.textContent=total+' profile'+(total!==1?'s':'')+' built · '+(r.remaining||0)+' to go'+(cost?' · ~$'+cost.toFixed(2):'');
+      if(r.ok===false){                       // billing, rate limit, anything upstream
+        if(log) log.innerHTML='<span style="color:var(--danger,#ff5c5c);">Stopped: '+escapeHtml(r.error||'unknown error')+'</span><br>'+total+' built before it stopped.';
+        break;
+      }
+      if(!r.remaining){ if(log) log.textContent='Done — '+total+' profile'+(total!==1?'s':'')+' built'+(cost?', ~$'+cost.toFixed(2):'')+'.'; break; }
+    }
+  }catch(e){
+    if(log) log.innerHTML='<span style="color:var(--danger,#ff5c5c);">'+escapeHtml(e.message)+'</span>';
+  }finally{
+    _fxBusy=false;
+    if(btn){ btn.disabled=false; btn.textContent='Build profiles'; }
+  }
+  // A fan saying something serious should never be buried in a progress line.
+  if(urgent.length){
+    alert('URGENT — '+urgent.length+' fan'+(urgent.length!==1?'s have':' has')+' said something serious. Read these yourself:\n\n'+
+      urgent.map(function(u){ return 'fan '+u.fan_id+': '+(u.what||'')+'\n  "'+(u.quote||'')+'"'; }).join('\n\n'));
+  }
+  fxCheck();
+}
+
 // ── Fan Stats ────────────────────────────────────────────────────────────────
 // One profile per fan per page, rebuilt from the Infloww exports the watcher
 // pushes (fan_sales + fan_messages -> fan_stats). Nothing here is typed by hand
