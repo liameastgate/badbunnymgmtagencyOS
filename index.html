@@ -6360,12 +6360,104 @@ function bulkClearWeekInputs(kind){
   ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
 
+// ── Message Dashboard import ─────────────────────────────────────────────────
+// Ports the watcher's parsing so the app can take this export directly instead of
+// routing it through the Downloads folder. It MUST agree with sub_queue_watcher.py
+// byte for byte: fan_messages.hash is the primary key, so a hash differing by one
+// character writes a second copy of a message that is already stored. The offset,
+// the date format, the tag stripper and the hash inputs are all copied deliberately
+// rather than reimplemented. Verified against rows the watcher itself wrote.
+const MD_TZ_OFFSET_HOURS=8;   // Infloww exports in UTC+8 (Asia/Chongqing)
+const MD_MONTHS={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+
+function mdClean(v){ return String(v==null?'':v).replace(/<[^>]+>/g,' ').trim(); }
+function mdFanId(v){ const m=String(v==null?'':v).match(/\(u(\d+)\)/); return m?m[1]:null; }
+function mdMoney(v){
+  if(v==null) return 0;
+  const n=parseFloat(String(v).replace(/\$/g,'').replace(/,/g,'').trim());
+  return isNaN(n)?0:n;
+}
+// "Sep 16, 2026" + "10:03:58" (UTC+8) -> the UTC instant, as Python's to_utc() does.
+function mdParseTs(dateV,timeV){
+  const ds=String(dateV==null?'':dateV).trim();
+  const m=ds.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  if(!m||!(m[1] in MD_MONTHS)) return null;
+  const parts=String(timeV==null?'':timeV).trim().split(':');
+  const hh=parseInt(parts[0]||'0',10)||0, mi=parseInt(parts[1]||'0',10)||0;
+  const ss=Math.trunc(parseFloat(parts[2]||'0'))||0;
+  return new Date(Date.UTC(parseInt(m[3],10),MD_MONTHS[m[1]],parseInt(m[2],10),hh,mi,ss)
+                  - MD_TZ_OFFSET_HOURS*3600*1000);
+}
+// Python datetime.isoformat() on a naive value -- no trailing Z, no offset.
+function mdNaiveIso(d){ return d.toISOString().replace(/\.\d{3}Z$/,''); }
+async function mdSha1(str){
+  const buf=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function mdHash(){
+  return mdSha1([].slice.call(arguments).map(x=>String(x==null?'':x)).join('|'));
+}
+
+// One export row can yield two messages: what the creator sent and what the fan replied.
+async function mdParseRows(rows){
+  const out=[], seen=new Set();
+  for(const r of (rows||[])){
+    const creator=String(r['Creator']||'').trim();
+    if(!creator) continue;
+    const ts=mdParseTs(r['Sent date'],r['Sent time']);
+    if(!ts) continue;
+    const sentTo=String(r['Sent to']||'');
+    const fid=mdFanId(sentTo);
+    const name=(sentTo.split(' (')[0]||'').trim()||null;
+    const fkey=fid?('u'+fid):('n:'+String(name||'').toLowerCase());
+    const cm=mdClean(r['Creator Message']), fm=mdClean(r['Fans Message']);
+    const price=mdMoney(r['Price']);
+    const bought=String(r['Purchased']||'').toLowerCase()==='yes';
+    const sender=(String(r['Sender']||'').trim()||null);
+    const status=(String(r['Status']||'').trim()||null);
+
+    const add=async(direction,text,snd)=>{
+      const h=await mdHash(creator,fkey,mdNaiveIso(ts),direction,text.slice(0,200),snd||'');
+      if(seen.has(h)) return;
+      seen.add(h);
+      out.push({hash:h, creator:creator, fan_id:fid, fan_key:fkey, fan_name:name,
+                ts:ts.toISOString(), direction:direction, sender:snd,
+                text:text.slice(0,4000), price:price, purchased:bought, status:status});
+    };
+    if(cm) await add('out',cm,sender);
+    if(fm) await add('in',fm,null);
+  }
+  return out;
+}
+
+async function importMessageDashboard(rows,onProgress){
+  const parsed=await mdParseRows(rows);
+  if(!parsed.length) return {sent:0, note:'nothing parsable in that file'};
+  const{data:sess}=await sb.auth.getSession();
+  const token=sess&&sess.session&&sess.session.access_token;
+  if(!token) throw new Error('not signed in');
+  const url=SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/fan-ingest-admin';
+  let sent=0;
+  for(let i=0;i<parsed.length;i+=500){
+    const chunk=parsed.slice(i,i+500);
+    const res=await fetch(url,{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      // Rebuild fan stats only on the final chunk -- it is a full rollup, not incremental.
+      body:JSON.stringify({messages:chunk, refresh:(i+500>=parsed.length)})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(body.error||('ingest failed ('+res.status+')'));
+    sent+=chunk.length;
+    if(onProgress) onProgress(sent,parsed.length);
+  }
+  return {sent:sent, total:parsed.length};
+}
+
 function renderBulkQueue(){
   const el=document.getElementById('bulk-list');
   if(!el) return;
   if(!_bulkQueue.length){ el.innerHTML=''; return; }
-  const pending=_bulkQueue.filter(f=>f.kind==='messages');
-  const usable=_bulkQueue.filter(f=>f.kind!=='unknown'&&f.kind!=='messages');
+  const pending=[];
+  const usable=_bulkQueue.filter(f=>f.kind!=='unknown');
   usable.forEach(f=>{ if(!f.weeks) f.weeks=bulkFileWeeks(f); });
   // A clash is the same TYPE covering the same WEEK twice -- that is the only case where
   // one file would overwrite another. Several files of one type across different weeks is
@@ -6388,7 +6480,7 @@ function renderBulkQueue(){
       '<td style="font-size:11px;color:var(--text2);white-space:nowrap;">'+((f.weeks&&f.weeks.length)?(f.weeks.length>1?f.weeks.length+' weeks · '+f.weeks[0]+' →':f.weeks[0]):'—')+'</td></tr>').join('')+
     '</tbody></table></div>'+
     (dupes.size?'<div style="margin-top:10px;font-size:12px;color:var(--danger,#ff5c5c);">Two files cover the same period ('+[...dupes].join('; ')+'). Remove one — the second would overwrite the first.</div>':'')+
-    (pending.length?'<div style="margin-top:10px;font-size:12px;color:var(--text2);">Message Dashboard goes through the watcher, not here — drop it in your Downloads folder and it is picked up within a minute. Deliberate: the watcher owns the one parser that builds fan profiles, and a second copy could silently duplicate every message. Everything else below imports now.</div>':'')+
+    (_bulkQueue.some(f=>f.kind==='messages')?'<div style="margin-top:10px;font-size:12px;color:var(--text2);">Message Dashboard feeds Fan Stats and the Chat Analyser. Messages already stored are skipped, so re-importing an overlapping export is safe. The AI profile extraction still runs in the watcher.</div>':'')+
     '<div class="btn-row" style="margin-top:12px;">'+
       (usable.length&&!dupes.size?'<button class="btn btn-primary" onclick="runBulkImport()">Import '+usable.length+' file'+(usable.length!==1?'s':'')+'</button>':'')+
       '<button class="btn btn-ghost" onclick="_bulkQueue=[];renderBulkQueue();document.getElementById(\'bulk-alert\').style.display=\'none\';">Clear</button>'+
@@ -6398,7 +6490,7 @@ function renderBulkQueue(){
 // Creator Stats is deliberately imported LAST: saving it is what generates that week's
 // model invoices, so the other data should already be in place when it runs.
 async function runBulkImport(){
-  const ORDER=['sales','employee','creator'];
+  const ORDER=['sales','employee','creator','messages'];
   const done=[];
   for(const kind of ORDER){
     // Every file of this type, oldest period first, rather than just the first one found.
@@ -6411,7 +6503,15 @@ async function runBulkImport(){
         bulkClearWeekInputs(kind);
         if(kind==='sales'){        previewSales(f.rows);               await saveSalesRecords(); }
         else if(kind==='employee'){previewChatterReport(f.rows);       await saveChatterPerformance(); }
-        else {                     previewReport(f.rows,f.detailRows); await saveReportRows(); }
+        else if(kind==='creator'){ previewReport(f.rows,f.detailRows); await saveReportRows(); }
+        else {
+          showAlert('bulk-alert','Reading '+f.rows.length+' message rows…','success');
+          const res=await importMessageDashboard(f.rows,function(n,total){
+            showAlert('bulk-alert','Messages: '+n+' of '+total+' sent…','success');
+          });
+          done.push(BULK_LABELS[kind]+' ('+(res.sent||0)+' messages)');
+          continue;
+        }
         done.push(BULK_LABELS[kind]+(f.weeks&&f.weeks.length?' ('+f.weeks[0]+(f.weeks.length>1?' +'+(f.weeks.length-1):'')+')':''));
       }catch(err){
         showAlert('bulk-alert','Stopped on '+f.name+': '+err.message+(done.length?' — already imported: '+done.join(', ')+'.':''),'error');
