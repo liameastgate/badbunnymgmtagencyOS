@@ -4437,14 +4437,48 @@ function libCardHtml(i){
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
     +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+orderChip+postedChip+phoneChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
-    +'<div style="display:flex;gap:3px;flex-wrap:wrap;">'
-    +(st!=='retired'?'<button class="btn btn-sm btn-primary" onclick="libOpenPost(\''+i.id+'\')" title="Record that this went out on an account">📌</button>':'')
-    +'<button class="btn btn-sm btn-ghost" onclick="libSaveToPhone(\''+i.id+'\',this)" title="Save to camera roll">📲</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="downloadLibraryItem(\''+i.id+'\')" title="Download">⬇</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="editLibraryItem(\''+i.id+'\')" title="Edit">✏</button>'
-    +reviewBtns+nsfwBtn+stateBtns
-    +'<button class="btn btn-sm btn-danger" onclick="deleteLibraryItem(\''+i.id+'\')" title="Delete">✕</button>'
+    +'<div style="display:flex;gap:6px;align-items:center;">'
+    +'<select class="lib-act" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
+    +libCardActionOptions(i)
+    +'</select>'
     +'</div></div></div>';
+}
+// One dropdown per card instead of a row of icon buttons. "Move to →" lists every
+// category this file isn't already in (so a photo can go straight to the Story CTA bank).
+function libCardActionOptions(i){
+  var st=i.state||'fresh', h='<option value="">Actions…</option>';
+  h+='<optgroup label="Do">';
+  if(st!=='retired') h+='<option value="post">📌 Record posting</option>';
+  h+='<option value="phone">📲 Save to camera roll</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
+  h+='</optgroup><optgroup label="Move to →">';
+  Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k!==i.category) h+='<option value="cat:'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
+  h+='</optgroup><optgroup label="State">';
+  if(st==='needs_review') h+='<option value="state:fresh">✓ Clear review → Fresh</option>';
+  if(st==='retired') h+='<option value="state:fresh">↩ Back to Fresh</option>'; else h+='<option value="state:retired">💤 Retire</option>';
+  if(st==='in_use') h+='<option value="state:reusable">☁️ Force Reusable</option>';
+  h+='</optgroup><optgroup label="Danger"><option value="delete">✕ Delete</option></optgroup>';
+  return h;
+}
+async function libCardAction(id,sel){
+  var v=sel.value; sel.value='';
+  if(!v) return;
+  if(v==='post') return libOpenPost(id);
+  if(v==='phone') return libSaveToPhone(id,sel);
+  if(v==='download') return downloadLibraryItem(id);
+  if(v==='edit') return editLibraryItem(id);
+  if(v==='delete') return deleteLibraryItem(id);
+  if(v.indexOf('state:')===0) return libSetState(id,v.slice(6));
+  if(v.indexOf('cat:')===0){
+    var cat=v.slice(4);
+    if(cat==='nsfw') return libMarkNsfw(id);
+    var cur=(STATE.library||[]).find(function(x){return x.id===id;});
+    if(cur&&cur.state==='needs_review') return libReview(id,cat);   // moving a held file also releases it
+    var r=await sb.from('content_library').update({category:cat}).eq('id',id).select();
+    if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
+    var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) it.category=cat;
+    renderLibraryList();
+    var stt=document.getElementById('cl-upload-status'); if(stt){ stt.style.display='block'; stt.textContent='Moved 1 file → '+LIB_CATEGORIES[cat].label; }
+  }
 }
 
 // ── Bulk actions ────────────────────────────────────────────────────────────
@@ -11647,15 +11681,39 @@ var CF_KIND={
   repeat_question:['Asked the same thing twice','Same question to the same man on separate days.'],
   asked_again:['Re-asked something he answered','Asked where he is from after ten-plus messages.'],
   banned_phrase:['Retired phrase','Names his silence or hands him an out. Section 10 retires these.'],
-  pet_name:['Pet name','Not the house voice on a male page.']
+  pet_name:['Pet name','Not the house voice on a male page.'],
+  early_ppv:['Pitched too early','First paid ask before he had said three things. Across the roster the first ask opens at 31% when he has sent 1-2 messages and 51% when he has sent 11-20 \u2014 same content, same hour of work, half the hit rate.']
 };
-var CF_ORDER=['opener_to_known','repeat_question','asked_again','banned_phrase','pet_name'];
+var CF_ORDER=['early_ppv','opener_to_known','repeat_question','asked_again','banned_phrase','pet_name'];
 
 function cfIsAdmin(){ return (STATE.profile&&STATE.profile.role)==='admin'; }
 
 async function cflLoad(){
   var r=await sb.from('chatter_flags').select('*').limit(1200);
-  CFL.rows=r.data||[]; CFL.loaded=true;
+  CFL.rows=r.data||[];
+  var p=await sb.from('chatter_patience').select('*');
+  CFL.patience=p.data||[];
+  CFL.loaded=true;
+}
+
+// How long each chatter waits before asking for money, and what it costs them.
+function cflPatience(){
+  var P=CFL.patience||[]; if(!P.length) return '';
+  return '<div class="ca-card"><div class="ca-head"><h3>Patience before the first ask</h3></div>'
+    +'<div class="ca-mini" style="margin-bottom:10px;line-height:1.55;">How much the fan had said before his first PPV. Across every fan on the roster the first ask opens at <b>31%</b> when he has sent 1-2 messages and <b>51%</b> when he has sent 11-20 \u2014 same content, same hour of work, roughly half the hit rate. Gregger sent <b>30</b> messages before his first ask and has unlocked 15 of 17 PPVs since.</div>'
+    +'<div class="ca-wrap"><table class="ca-table"><thead><tr>'
+    +'<th>Chatter</th><th>First asks</th><th>Median msgs first</th><th>Too early</th>'
+    +'<th>Opens when early</th><th>Opens when patient</th><th>Avg LTV</th></tr></thead><tbody>'
+    +P.map(function(r){
+      var bad=Number(r.pct_too_early)>=25;
+      return '<tr><td><b>'+escapeHtml(r.chatter)+'</b></td><td>'+r.first_asks+'</td><td>'+r.median_his_msgs+'</td>'
+        +'<td'+(bad?' style="color:var(--red);font-weight:700;"':'')+'>'+r.asks_too_early+' ('+r.pct_too_early+'%)</td>'
+        +'<td>'+(r.open_pct_when_early==null?'\u2014':r.open_pct_when_early+'%')+'</td>'
+        +'<td>'+(r.open_pct_when_patient==null?'\u2014':r.open_pct_when_patient+'%')+'</td>'
+        +'<td>'+fsMoney(r.avg_ltv)+'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +'<div class="ca-mini" style="margin-top:10px;">Patience is necessary, not sufficient \u2014 a chatter can wait and still be dull. Read it next to the open rate, never on its own.</div></div>';
 }
 
 function cfRender(){
@@ -11672,6 +11730,8 @@ function cfRender(){
 
   var h='<div class="ca-card"><div class="ca-head"><h3>Only you can see this</h3></div>'
     +'<div class="ca-mini" style="line-height:1.55;">Pulled from the message exports, last 45 days. Every line is something a chatter actually sent — click one to read it. Nobody else in the app can see this tab, and the database refuses the query for anyone who is not an admin.</div></div>';
+
+  h+=cflPatience();
 
   // who, by kind
   var names=Object.keys(who).sort(function(a,b){
