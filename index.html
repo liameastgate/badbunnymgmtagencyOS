@@ -818,6 +818,9 @@
           <option value="social">📱 IG / TikTok / Snap</option>
           <option value="reddit_x">🔞 Reddit / X</option>
           <option value="photos">📸 Non-nude photos</option>
+          <option value="stories">📖 Story CTA bank</option>
+          <option value="repurpose">♻️ Repurpose bank (already captioned, post as-is)</option>
+          <option value="sounds">🎵 Sounds</option>
           <option value="nsfw">🔥 NSFW · OnlyFans only</option>
         </select></div>
         <div id="cl-up-alert" style="font-size:12px;color:#e6b428;min-height:16px;"></div>
@@ -3887,7 +3890,8 @@ var LIB_CATEGORIES={
   social:  {label:'IG / TikTok / Snap', short:'Social',  icon:'📱', accept:'video/*,image/*', hint:'Reels, stories, snaps — anything for the phone accounts'},
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
-  stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Photos the phones post as link-sticker stories — one per account per day, never repeated within 30 days'},
+  stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
+  repurpose:{label:'Repurpose bank',    short:'Repurpose',icon:'♻️', accept:'video/*',        hint:'Talking heads and clips that already have their audio + caption — reposted as-is with fresh metadata, never re-captioned. Proven performers for trial reels.'},
   sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
   // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
   // slips through into a social category and can't actually be posted there.
@@ -4044,7 +4048,13 @@ function libIsVideo(it){ return /^video\//.test(it.content_type||'')||/\.(mp4|mo
 function libFmtSize(b){ return b?(b>1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB'):''; }
 function libFmtDur(s){ if(!s) return ''; s=Math.round(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function libStateChip(it){ const s=LIB_STATES[it.state]||LIB_STATES.fresh; return '<span class="cscan" style="'+s.style+'" title="'+escapeHtml(s.help)+'">'+s.icon+' '+s.label+'</span>'; }
-function libCatChip(it){ const c=LIB_CATEGORIES[it.category]; return c?'<span class="cscan cscan-grey">'+c.icon+' '+c.short+'</span>':''; }
+// A file has one home category plus any number of extra ones (content_library.categories[]).
+function libInCat(i,k){ return i.category===k || ((i.categories||[]).indexOf(k)>=0); }
+function libCatChip(it){
+  const c=LIB_CATEGORIES[it.category]; var h=c?'<span class="cscan cscan-grey">'+c.icon+' '+c.short+'</span>':'';
+  (it.categories||[]).forEach(function(k){ var e=LIB_CATEGORIES[k]; if(e&&k!==it.category) h+='<span class="cscan cscan-grey" title="Also in '+escapeHtml(e.label)+'">+'+e.icon+' '+e.short+'</span>'; });
+  return h;
+}
 function libThumbHtml(it,size){
   const w=size||120, h=Math.round(w*0.62);
   const inner=it.thumb_data?'<img src="'+it.thumb_data+'" style="width:100%;height:100%;object-fit:cover;display:block;">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);">'+(libIsVideo(it)?'🎬':'🖼')+'</div>';
@@ -4263,7 +4273,7 @@ function libGoFactory(){ STATE._cfPreselect=(LIB_F.model&&LIB_F.model!=='agency'
 function libFiltered(){
   var items=(STATE.library||[]);
   if(LIB_F.model) items=items.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
-  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : i.category===LIB_F.category; });
+  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : libInCat(i,LIB_F.category); });
   if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
   if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
   if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
@@ -4314,7 +4324,7 @@ function renderLibraryList(){
         var fresh=mine.filter(function(i){return (i.state||'fresh')==='fresh';}).length;
         var bytes=mine.reduce(function(s,i){return s+(i.size_bytes||0);},0);
         var cats=Object.keys(LIB_CATEGORIES).map(function(c){
-          var n=mine.filter(function(i){return i.category===c;}).length;
+          var n=mine.filter(function(i){return libInCat(i,c);}).length;
           return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+n+'</b></div>';
         }).join('');
         var unfiled=mine.filter(function(i){return !i.category;}).length;
@@ -4341,7 +4351,7 @@ function renderLibraryList(){
   // ── Level 2: inside one model ───────────────────────────────────────────
   var mine=all.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
   var catTab=function(val,label,icon){
-    var n=(val==='none'?mine.filter(function(i){return !i.category;}):val?mine.filter(function(i){return i.category===val;}):mine).length;
+    var n=(val==='none'?mine.filter(function(i){return !i.category;}):val?mine.filter(function(i){return libInCat(i,val);}):mine).length;
     var on=LIB_F.category===val;
     return '<button onclick="LIB_F.category=\''+val+'\';renderLibraryList()" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;">'+(icon?icon+' ':'')+label+' <span style="opacity:.7;">'+n+'</span></button>';
   };
@@ -4358,7 +4368,7 @@ function renderLibraryList(){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
     +'<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-right:2px;">Scan result</span>'
     +(function(){
-      var scoped=mine.filter(function(i){ return !LIB_F.category || (LIB_F.category==='none'?!i.category:i.category===LIB_F.category); });
+      var scoped=mine.filter(function(i){ return !LIB_F.category || (LIB_F.category==='none'?!i.category:libInCat(i,LIB_F.category)); });
       var btn=function(val,label,icon){
         var n=(val?scoped.filter(function(i){return libOutcomeOf(i)===val;}):scoped).length;
         var on=LIB_F.outcome===val;
@@ -4391,6 +4401,7 @@ function renderLibraryList(){
     +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'category\')">🏷 Set category</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
     +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
     +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
@@ -4452,6 +4463,9 @@ function libCardActionOptions(i){
   h+='<option value="phone">📲 Save to camera roll</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
   h+='</optgroup><optgroup label="Move to →">';
   Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k!==i.category) h+='<option value="cat:'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
+  h+='</optgroup><optgroup label="Also in → (tick / untick)">';
+  var extra=i.categories||[];
+  Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k===i.category||k==='nsfw') return; var on=extra.indexOf(k)>=0; h+='<option value="also:'+k+'">'+(on?'☑':'☐')+' '+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
   h+='</optgroup><optgroup label="State">';
   if(st==='needs_review') h+='<option value="state:fresh">✓ Clear review → Fresh</option>';
   if(st==='retired') h+='<option value="state:fresh">↩ Back to Fresh</option>'; else h+='<option value="state:retired">💤 Retire</option>';
@@ -4468,6 +4482,16 @@ async function libCardAction(id,sel){
   if(v==='edit') return editLibraryItem(id);
   if(v==='delete') return deleteLibraryItem(id);
   if(v.indexOf('state:')===0) return libSetState(id,v.slice(6));
+  if(v.indexOf('also:')===0){
+    var k=v.slice(5), it2=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it2) return;
+    var list=(it2.categories||[]).slice(); var at=list.indexOf(k);
+    if(at>=0) list.splice(at,1); else list.push(k);
+    var r2=await sb.from('content_library').update({categories:list}).eq('id',id).select();
+    if(r2.error||!r2.data||!r2.data.length){ alert('Could not update — '+(r2.error?r2.error.message:'no permission')); return; }
+    it2.categories=list; renderLibraryList();
+    var s2=document.getElementById('cl-upload-status'); if(s2){ s2.style.display='block'; s2.textContent=(at>=0?'Removed from ':'Added to ')+LIB_CATEGORIES[k].label; }
+    return;
+  }
   if(v.indexOf('cat:')===0){
     var cat=v.slice(4);
     if(cat==='nsfw') return libMarkNsfw(id);
@@ -4499,6 +4523,22 @@ async function libBulkMove(what){
     if(cp===null) return;
     var ci=parseInt(cp,10)-1; if(!keys[ci]){ alert('No category '+cp); return; }
     patch={category:keys[ci]}; label=LIB_CATEGORIES[keys[ci]].label;
+  } else if(what==='also'){
+    var ak=Object.keys(LIB_CATEGORIES).filter(function(k){return k!=='nsfw';});
+    var ao=ak.map(function(k,n){return (n+1)+' = '+LIB_CATEGORIES[k].label;}).join('\n');
+    var ap=prompt('ALSO put '+ids.length+' file'+(ids.length===1?'':'s')+' in which category? (they stay where they are too)\n\n'+ao,'4');
+    if(ap===null) return;
+    var ai=parseInt(ap,10)-1; if(!ak[ai]){ alert('No category '+ap); return; }
+    var addk=ak[ai], okn=0;
+    for(var x=0;x<ids.length;x++){
+      var it=(STATE.library||[]).find(function(z){return z.id===ids[x];}); if(!it||it.category===addk) continue;
+      var lst=(it.categories||[]).slice(); if(lst.indexOf(addk)<0) lst.push(addk);
+      var rr=await sb.from('content_library').update({categories:lst}).eq('id',ids[x]).select();
+      if(!rr.error&&rr.data&&rr.data.length){ it.categories=lst; okn++; }
+    }
+    LIB_SEL={}; renderLibraryList();
+    var st2=document.getElementById('cl-upload-status'); if(st2){ st2.style.display='block'; st2.textContent='Added '+okn+' file'+(okn===1?'':'s')+' to '+LIB_CATEGORIES[addk].label; }
+    return;
   } else {
     var sk=Object.keys(LIB_STATES);
     var so=sk.map(function(k,n){return (n+1)+' = '+LIB_STATES[k].label;}).join('\n');
