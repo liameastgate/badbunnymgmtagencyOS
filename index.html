@@ -11722,9 +11722,10 @@ var CF_KIND={
   asked_again:['Re-asked something he answered','Asked where he is from after ten-plus messages.'],
   banned_phrase:['Retired phrase','Names his silence or hands him an out. Section 10 retires these.'],
   pet_name:['Pet name','Not the house voice on a male page.'],
-  early_ppv:['Pitched too early','First paid ask before he had said three things. Across the roster the first ask opens at 31% when he has sent 1-2 messages and 51% when he has sent 11-20 \u2014 same content, same hour of work, half the hit rate.']
+  early_ppv:['Pitched too early','Playbook v1: 15 messages from the chatter before any locked PPV. Across 530 first asks the unlock rate runs 16% at 0-2 messages from us, 34% at 6-9 and 37% at 10 or more \u2014 and the chatters who blast earliest also ask for the most money. Anything under 6 messages is flagged retroactively.'],
+  ppv_stacking:['Stacked PPVs','He unlocked one and got another within three hours with at most one message in between. The rule is: ask what he liked, build the mood for 5-6 messages, then send the next. No tolerance \u2014 this is how whales get burnt.']
 };
-var CF_ORDER=['early_ppv','opener_to_known','repeat_question','asked_again','banned_phrase','pet_name'];
+var CF_ORDER=['early_ppv','ppv_stacking','opener_to_known','repeat_question','asked_again','banned_phrase','pet_name'];
 
 function cfIsAdmin(){ return (STATE.profile&&STATE.profile.role)==='admin'; }
 
@@ -11733,7 +11734,34 @@ async function cflLoad(){
   CFL.rows=r.data||[];
   var p=await sb.from('chatter_patience').select('*');
   CFL.patience=p.data||[];
+  var c=await sb.from('chatter_compliance').select('*');
+  CFL.compliance=c.data||[];
   CFL.loaded=true;
+}
+
+// Playbook v1 compliance: the 15-message floor and the no-stacking rule, per chatter.
+function cflCompliance(){
+  var C=(CFL.compliance||[]).filter(function(r){return r.chatter;});
+  if(!C.length) return '';
+  C.sort(function(a,b){ return (Number(b.pct_blatant)||0)-(Number(a.pct_blatant)||0); });
+  return '<div class="ca-card"><div class="ca-head"><h3>Playbook v1 \u2014 the two hard floors</h3></div>'
+    +'<div class="ca-mini" style="margin-bottom:10px;line-height:1.55;">Rule: <b>15 messages from the chatter</b> before any locked PPV, and <b>no back-to-back PPV</b> once he starts unlocking. Last 45 days. Across 530 first asks the unlock rate runs <b>16%</b> at 0-2 messages from us, <b>34%</b> at 6-9, <b>37%</b> at 10 or more \u2014 and the earliest askers also carry the <i>highest</i> average price, which is the same mistake twice.</div>'
+    +'<div class="ca-wrap"><table class="ca-table"><thead><tr>'
+    +'<th>Chatter</th><th>Model</th><th>First asks</th><th>Median msgs from us</th>'
+    +'<th>Under 15</th><th>Under 6</th><th>Stacked PPVs</th><th>Avg first price</th><th>Opens</th></tr></thead><tbody>'
+    +C.map(function(r){
+      var bl=Number(r.pct_blatant)||0, st=Number(r.stacking_events)||0;
+      return '<tr><td><b>'+escapeHtml(r.chatter||'')+'</b></td><td>'+escapeHtml(r.creator||'')+'</td>'
+        +'<td>'+(r.first_ppvs||0)+'</td>'
+        +'<td>'+(r.median_our_msgs==null?'\u2014':Math.round(r.median_our_msgs))+'</td>'
+        +'<td>'+(r.pct_under_floor==null?'\u2014':r.pct_under_floor+'%')+'</td>'
+        +'<td'+(bl>=40?' style="color:var(--red);font-weight:700;"':'')+'>'+(r.pct_blatant==null?'\u2014':r.pct_blatant+'%')+'</td>'
+        +'<td'+(st>0?' style="color:var(--red);font-weight:700;"':'')+'>'+st+'</td>'
+        +'<td>'+fsMoney(r.avg_first_price)+'</td>'
+        +'<td>'+(r.pct_opened==null?'\u2014':r.pct_opened+'%')+'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +'<div class="ca-mini" style="margin-top:10px;">The floor starts <b>11 Oct 2026</b>. Everything before that date only flags below 6 messages, so this table is a baseline, not a charge sheet \u2014 read the trend from here.</div></div>';
 }
 
 // How long each chatter waits before asking for money, and what it costs them.
@@ -11771,6 +11799,7 @@ function cfRender(){
   var h='<div class="ca-card"><div class="ca-head"><h3>Only you can see this</h3></div>'
     +'<div class="ca-mini" style="line-height:1.55;">Pulled from the message exports, last 45 days. Every line is something a chatter actually sent — click one to read it. Nobody else in the app can see this tab, and the database refuses the query for anyone who is not an admin.</div></div>';
 
+  h+=cflCompliance();
   h+=cflPatience();
 
   // who, by kind
@@ -12622,15 +12651,15 @@ function defaultContractSections(){
     {h:'1. Purpose', b:`The Model hereby engages the Manager to provide account management and promotional services for the Model's OnlyFans account, and the Manager agrees to provide such services under the terms set forth in this Agreement.`},
     {h:'2. Services Provided by Manager', b:`The Manager shall:\na. Manage and operate the Model's OnlyFans account on behalf of the Model.\nb. Provide advertising and promotional services to drive traffic and subscribers to the account, at the Manager's expense.\nc. Oversee subscriber interactions, pay-per-view (PPV) messaging, promotions, and content posting strategy (subject to the Model's consent for content provided).\nd. Provide reporting of account performance and revenues to the Model.`},
     {h:'3. Responsibilities of Model', b:`The Model shall:\na. Provide original content (photos, videos, and related materials) for use on the OnlyFans platform.\nb. Retain all intellectual property rights in their content.\nc. Cooperate with Manager in ensuring timely provision of content.\nd. Maintain compliance with OnlyFans' Terms of Service and applicable laws.`},
-    {h:'4. Revenue Sharing', b:`a. All revenues generated through the OnlyFans account ("Gross Profits") shall be split as follows: {{model_split_pct}}% to the Model / {{agency_split_pct}}% to the Management.\nb. Gross Profits are defined as revenues received from OnlyFans after OnlyFans' platform fees are deducted, but before any other expenses.\nc. Payouts will be made via {{payment_method}}, {{payout_schedule}}.\nd. This split reflects the agency's responsibility to cover the costs of traffic/marketing, providing around-the-clock chatting services, and time spent posting and managing the account.`},
+    {h:'4. Revenue Sharing', b:`a. The net profits generated through the OnlyFans account ("Net Profits") shall be split as follows: {{model_split_pct}}% to the Model / {{agency_split_pct}}% to the Management.\nb. Net Profits are defined as revenues received from OnlyFans after OnlyFans' platform fees, payment processing fees and any business expenses agreed in writing between the parties have been deducted.\nc. Payouts will be made via {{payment_method}}, {{payout_schedule}}.\nd. This split reflects the agency's responsibility to cover the costs of traffic/marketing, providing around-the-clock chatting services, and time spent posting and managing the account.`},
     {h:'5. Expenses', b:`a. Manager shall be solely responsible for covering advertising, marketing, and promotional expenses.\nb. The Model shall not be obligated to reimburse the Manager for such expenses.`},
     {h:'6. Confidentiality', b:`a. The Manager agrees to maintain strict confidentiality regarding the Model's personal information, content, and account details, and shall not disclose such information to third parties without written consent, except as required by law.\nb. The Model agrees to maintain strict confidentiality regarding the Manager's proprietary business information, including but not limited to chatting scripts, standard operating procedures, pricing structures, marketing and traffic strategies, and the identities of the Manager's staff and chatters, and shall not disclose such information to any third party, including any current or future manager or agency, without the Manager's prior written consent.\nc. This confidentiality obligation survives termination of this Agreement.`},
     {h:'7. Intellectual Property of Agency Materials', b:`All chatting scripts, standard operating procedures, marketing materials, growth strategies, and other work product created by or on behalf of the Manager in the course of providing services under this Agreement ("Agency Materials") are and remain the sole property of the Manager. The Model is granted a limited license to use the Agency Materials solely in connection with the Model's account during the term of this Agreement, and shall not copy, retain, distribute, or use the Agency Materials for any purpose after termination of this Agreement.`},
-    {h:'8. Non-Solicitation', b:`During the term of this Agreement and for twelve (12) months following its termination, the Model shall not directly or indirectly solicit, hire, engage, or encourage any chatter, staff member, or contractor of the Manager to leave their engagement with the Manager or to provide similar services to the Model or any competing agency.`},
+    {h:'8. Non-Solicitation', b:`During the term of this Agreement, the Model shall not directly or indirectly solicit, hire, engage, or encourage any chatter, staff member, or contractor of the Manager to leave their engagement with the Manager or to provide similar services to the Model or any competing agency.`},
     {h:'9. Non-Disparagement', b:`Neither Party shall make any public statement, whether written or verbal, that is intended to or reasonably likely to disparage, defame, or harm the reputation or goodwill of the other Party, both during the term of this Agreement and after its termination. This clause does not limit either Party's right to make truthful statements required by law or in connection with a legal proceeding.`},
     {h:'10. Representations & Warranties', b:`The Model represents and warrants that:\na. She is at least eighteen (18) years of age as of the date of this Agreement, and will remain the minimum legal age required under applicable law for the duration of this Agreement.\nb. She owns or holds all necessary rights, licenses, and consents (including from any other individuals appearing in her content) to provide the content supplied to the Manager for use under this Agreement.\nc. All information she provides to the Manager, including identity and age verification documents, is true, accurate, and not misleading.`},
     {h:'11. Indemnification', b:`The Model agrees to indemnify and hold harmless the Manager from and against any claims, losses, damages, liabilities, and expenses (including reasonable legal fees) arising out of or related to any breach of the Model's representations and warranties under this Agreement, or the Model's violation of any applicable law or third party's rights.`},
-    {h:'12. Term & Termination', b:`a. This Agreement shall commence on the date first written above and shall remain in effect until terminated by either Party.\nb. Either Party may terminate this Agreement by providing thirty (30) days' written notice to the other Party.\nc. Upon termination, the Manager shall return full access and control of the OnlyFans account to the Model within five (5) business days of the effective date of termination, including all account credentials and any content or materials belonging to the Model.\nd. Sections 6 (Confidentiality), 7 (Intellectual Property of Agency Materials), 8 (Non-Solicitation), 9 (Non-Disparagement), and 11 (Indemnification) shall survive termination of this Agreement.`},
+    {h:'12. Term & Termination', b:`a. This Agreement shall commence on the date first written above and shall remain in effect until terminated by either Party.\nb. Either Party may terminate this Agreement by providing seven (7) days' written notice to the other Party.\nc. Upon termination, the Manager shall return full access and control of the OnlyFans account to the Model within five (5) business days of the effective date of termination, including all account credentials and any content or materials belonging to the Model.\nd. Sections 6 (Confidentiality), 7 (Intellectual Property of Agency Materials), 9 (Non-Disparagement), and 11 (Indemnification) shall survive termination of this Agreement.`},
     {h:'13. Independent Contractor Relationship', b:`The Parties agree that the Manager is acting as an independent contractor. Nothing in this Agreement shall be construed as creating a partnership, joint venture, or employer-employee relationship.`},
     {h:'14. Governing Law & Dispute Resolution', b:`a. This Agreement shall be governed by and construed in accordance with the laws of {{governing_state}}, Australia.\nb. In the event of any dispute arising out of or relating to this Agreement, the Parties shall first attempt to resolve the dispute through good-faith negotiation. If the dispute cannot be resolved within thirty (30) days, either Party may pursue mediation before resorting to formal legal proceedings, which shall be brought exclusively in the courts of {{governing_state}}, Australia.`},
     {h:'15. Entire Agreement', b:`This Agreement constitutes the entire understanding between the Parties and supersedes all prior agreements, whether written or oral.`}
@@ -12699,7 +12728,9 @@ async function saveContractSettings(){
     payment_method:document.getElementById('contract-payment-method').value.trim(),
     payout_schedule:document.getElementById('contract-payout-schedule').value.trim()
   };
-  await sb.from('agency_settings').upsert({key:'contract_settings',value:_contractSettings},{onConflict:'key'});
+  const r=await sb.from('agency_settings').upsert({key:'contract_settings',value:_contractSettings},{onConflict:'key'});
+  if(r.error){ alert('Could not save contract defaults — '+r.error.message); return; }
+  if(typeof toast==='function') toast('Contract defaults saved');
 }
 
 // Page dispatcher -- same staff-hub-vs-model-own-view split as loadModelSheets()/loadContentPerformance().
@@ -12869,7 +12900,9 @@ async function openContractForModel(modelId){
 }
 
 async function saveContractField(modelId,key,value){
-  await sb.from('model_contracts').update({[key]:value}).eq('model_id',modelId);
+  const r=await sb.from('model_contracts').update({[key]:value}).eq('model_id',modelId).select('model_id');
+  if(r.error){ alert('Could not save '+key.replace(/_/g,' ')+' — '+r.error.message); return; }
+  if(!r.data||!r.data.length){ alert('Could not save '+key.replace(/_/g,' ')+' — no contract row for this model, or it is locked. Use "Backfill Missing Contracts" or Reset first.'); return; }
   if(window._currentContract&&window._currentContract.model_id===modelId){
     window._currentContract[key]=value;
     const c=document.getElementById('contract-doc-container');
