@@ -4068,10 +4068,49 @@ async function libPreview(id){
     scanShow(it.title||'Preview', libIsVideo(it)?'<video src="'+u+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>':'<img src="'+u+'" style="width:100%;height:100%;object-fit:contain;">');
   }catch(e){ scanShow(it.title||'Preview','<div style="color:var(--red);">Could not load: '+escapeHtml(e.message)+'</div>'); }
 }
+// A real file name for the saved copy: the title, with the stored file's extension if the title lacks one.
+function libDownloadName(it){
+  var ext=((it.r2_key||'').match(/\.([a-z0-9]{2,5})$/i)||[])[1]||'';
+  var base=(it.title||'content').replace(/[\\\/:*?"<>|]+/g,'_').trim()||'content';
+  return (ext && !new RegExp('\\.'+ext+'$','i').test(base)) ? base+'.'+ext : base;
+}
+// Save the file to disk (not just open it in a tab, where a video only plays).
+// Pulls it as a blob so the download attribute works cross-origin; if that is
+// refused (CORS / too big for memory) it falls back to opening the signed link.
+async function libSaveFile(it){
+  var url=await libItemUrl(it);
+  try{
+    var res=await fetch(url); if(!res.ok) throw new Error('fetch '+res.status);
+    var blob=await res.blob(), href=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=href; a.download=libDownloadName(it);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(href); },60000);
+    return 'saved';
+  }catch(e){ window.open(url,'_blank'); return 'opened'; }
+}
 async function downloadLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  try{ window.open(await libItemUrl(it),'_blank'); }catch(e){ alert('Could not get download link: '+e.message); }
+  try{ await libSaveFile(it); }catch(e){ alert('Could not get download link: '+e.message); }
 }
+// Download a list of library items one after another (selected, or everything shown in
+// the current model + category view). Sequential, so a big batch doesn't hold every
+// video in memory at once; the browser may ask once to allow multiple downloads.
+async function libDownloadMany(list){
+  if(!list.length){ alert('Nothing to download here.'); return; }
+  var bytes=list.reduce(function(t,i){ return t+(i.size_bytes||0); },0);
+  if(list.length>1 && !confirm('Download '+list.length+' file'+(list.length===1?'':'s')+(bytes?' ('+libFmtSize(bytes)+')':'')+'?\n\nIf your browser asks to allow multiple downloads, click Allow.')) return;
+  var st=document.getElementById('cl-upload-status'), ok=0, fail=[];
+  for(var n=0;n<list.length;n++){
+    if(st){ st.style.display='block'; st.textContent='⬇ Downloading '+(n+1)+'/'+list.length+' · '+(list[n].title||''); }
+    try{ await libSaveFile(list[n]); ok++; }catch(e){ fail.push(list[n].title||list[n].id); }
+    await new Promise(function(r){ setTimeout(r,350); });
+  }
+  if(st){ st.style.display='block'; st.textContent='⬇ Downloaded '+ok+' of '+list.length+(fail.length?' — failed: '+fail.slice(0,5).join(', ')+(fail.length>5?'…':''):''); }
+}
+function libBulkDownload(){
+  var L=STATE.library||[]; libDownloadMany(L.filter(function(i){ return LIB_SEL[i.id]; }));
+}
+function libDownloadShown(){ libDownloadMany(libFiltered()); }
 // Phone: hand the original file to the native share sheet -> "Save Video" lands it in the
 // camera roll at full quality. Falls back to a plain download when sharing files isn't supported.
 async function libSaveToPhone(id,btn){
@@ -4384,6 +4423,7 @@ function renderLibraryList(){
     +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="libDownloadShown()" title="Download every file in the current view (model + category + filters)">⬇ Download all shown</button>'
     +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
 
   var p=libPools(mine);
@@ -4402,6 +4442,7 @@ function renderLibraryList(){
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'category\')">🏷 Set category</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
+    +'<button class="btn btn-sm btn-primary" onclick="libBulkDownload()">⬇ Download</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
     +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
     +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
