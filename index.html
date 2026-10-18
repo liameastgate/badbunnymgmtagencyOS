@@ -4111,22 +4111,82 @@ function libBulkDownload(){
   var L=STATE.library||[]; libDownloadMany(L.filter(function(i){ return LIB_SEL[i.id]; }));
 }
 function libDownloadShown(){ libDownloadMany(libFiltered()); }
-// Phone: hand the original file to the native share sheet -> "Save Video" lands it in the
-// camera roll at full quality. Falls back to a plain download when sharing files isn't supported.
-async function libSaveToPhone(id,btn){
-  const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  const old=btn?btn.textContent:''; if(btn){ btn.textContent='⏳'; btn.disabled=true; }
-  try{
-    const url=await libItemUrl(it);
-    if(navigator.share&&navigator.canShare){
-      const res=await fetch(url); if(!res.ok) throw new Error('fetch '+res.status);
-      const blob=await res.blob();
-      const file=new File([blob],(it.title||'content').replace(/[^\w.\- ]/g,'_'),{type:it.content_type||blob.type||'application/octet-stream'});
-      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return; }
+// ── Save to the phone's photo album ─────────────────────────────────────────
+// iPhone: the ONLY way a web page can put files into Photos is the share sheet ("Save N
+// Videos"), and Safari only opens it straight off a tap. Fetching videos takes longer than
+// that, so it's two taps: Prepare (download into memory, with progress) -> Save N to Photos.
+// Batches are capped so a pile of big videos can't run Safari out of memory and kill the tab.
+// Android: normal downloads already appear in the Gallery, so it just downloads them.
+var LIB_PHOTOS_BATCH_BYTES=400*1048576, LIB_PHOTOS_BATCH_MAX=20;
+function libIsIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1); }
+function libIsPhone(){ return libIsIOS()||/Android/i.test(navigator.userAgent); }
+function libMimeOf(it){
+  if(it.content_type&&/^(image|video)\//.test(it.content_type)) return it.content_type;
+  var ext=((it.r2_key||'').match(/\.([a-z0-9]+)$/i)||[])[1]||''; ext=ext.toLowerCase();
+  return ({mp4:'video/mp4',m4v:'video/mp4',mov:'video/quicktime',webm:'video/webm',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',gif:'image/gif'})[ext]||'application/octet-stream';
+}
+// Split into batches by size + count, in the order given.
+function libPhotoBatches(list){
+  var out=[], cur=[], bytes=0;
+  list.forEach(function(it){
+    var b=it.size_bytes||0;
+    if(cur.length && (cur.length>=LIB_PHOTOS_BATCH_MAX || bytes+b>LIB_PHOTOS_BATCH_BYTES)){ out.push(cur); cur=[]; bytes=0; }
+    cur.push(it); bytes+=b;
+  });
+  if(cur.length) out.push(cur);
+  return out;
+}
+function libSaveToPhone(id){ var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) libSaveToPhotos([it]); }
+function libBulkSaveToPhotos(){ var L=STATE.library||[]; libSaveToPhotos(L.filter(function(i){ return LIB_SEL[i.id]; })); }
+function libSaveShownToPhotos(){ libSaveToPhotos(libFiltered()); }
+async function libSaveToPhotos(list){
+  list=(list||[]).filter(function(i){ return /^(image|video)\//.test(libMimeOf(i)); });
+  if(!list.length){ alert('Nothing to save — only photos and videos can go in the photo album.'); return; }
+  if(!libIsIOS()){ return libDownloadMany(list); }          // Android/desktop: downloads land in Gallery / Downloads
+  if(!(navigator.canShare&&navigator.share)){ alert('This browser can\'t save to Photos. Open AgencyOS in Safari and try again.'); return; }
+  var batches=libPhotoBatches(list), bi=0, files=null, cancelled=false;
+  var ov=document.getElementById('lib-photos-sheet'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='lib-photos-sheet';
+  ov.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:10000;background:var(--surface,#11131c);border-top:1px solid var(--border,#2a2f45);padding:16px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.5);';
+  ov.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><b style="font-size:14px;">📲 Save to Photos</b><button class="btn btn-sm btn-ghost" id="lps-close">✕</button></div>'
+    +'<div id="lps-msg" style="font-size:13px;color:var(--text2);margin-bottom:12px;"></div>'
+    +'<div style="height:6px;background:var(--surface2,#1b1e2b);border-radius:4px;overflow:hidden;margin-bottom:12px;"><div id="lps-bar" style="height:100%;width:0;background:var(--accent,#1e4fff);transition:width .2s;"></div></div>'
+    +'<button class="btn btn-primary" id="lps-go" style="width:100%;padding:14px;font-size:15px;" disabled>Preparing…</button>';
+  document.body.appendChild(ov);
+  var msg=ov.querySelector('#lps-msg'), bar=ov.querySelector('#lps-bar'), go=ov.querySelector('#lps-go');
+  var done=0, failed=[];
+  ov.querySelector('#lps-close').onclick=function(){ cancelled=true; files=null; ov.remove(); };
+  async function prepare(){
+    var batch=batches[bi]; files=[]; go.disabled=true; go.textContent='Preparing…';
+    var label=batches.length>1?' (batch '+(bi+1)+' of '+batches.length+')':'';
+    for(var k=0;k<batch.length;k++){
+      if(cancelled) return;
+      msg.textContent='Getting '+(k+1)+' of '+batch.length+label+' · '+(batch[k].title||'');
+      bar.style.width=Math.round(k/batch.length*100)+'%';
+      try{
+        var res=await fetch(await libItemUrl(batch[k])); if(!res.ok) throw new Error('HTTP '+res.status);
+        var blob=await res.blob();
+        files.push(new File([blob],libDownloadName(batch[k]),{type:libMimeOf(batch[k])}));
+      }catch(e){ failed.push(batch[k].title||batch[k].id); }
     }
-    window.open(url,'_blank');
-  }catch(e){ if(e&&e.name==='AbortError') return; try{ window.open(await libItemUrl(it),'_blank'); }catch(e2){ alert('Could not save: '+e.message); } }
-  finally{ if(btn){ btn.textContent=old; btn.disabled=false; } }
+    if(cancelled) return;
+    bar.style.width='100%';
+    if(!files.length){ msg.textContent='Could not fetch these files'+(failed.length?' ('+failed.length+' failed)':'')+'.'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; return; }
+    if(!navigator.canShare({files:files})){ msg.textContent='Safari won\'t share these files. Use ⬇ Download instead (saves to Files).'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; return; }
+    var nv=files.filter(function(f){return /^video\//.test(f.type);}).length, kind=nv===files.length?'Video':(nv===0?'Image':'Item');
+    msg.textContent='Ready. Tap the button, then choose "Save '+(files.length===1?kind:files.length+' '+kind+'s')+'".'+(failed.length?' ('+failed.length+' couldn\'t be fetched)':'');
+    go.textContent='Save '+files.length+' to Photos'+label; go.disabled=false;
+  }
+  go.onclick=async function(){
+    if(!files||!files.length) return;
+    var f=files; go.disabled=true;
+    try{ await navigator.share({files:f}); done+=f.length; }
+    catch(e){ if(!e||e.name!=='AbortError'){ msg.textContent='Could not open the share sheet: '+(e&&e.message||e); go.disabled=false; return; } go.disabled=false; msg.textContent='Cancelled — tap again to save these.'; return; }
+    files=null; bi++;
+    if(bi<batches.length){ prepare(); }
+    else { msg.textContent='Done — '+done+' saved to Photos'+(failed.length?', '+failed.length+' failed: '+failed.slice(0,3).join(', '):'')+'.'; bar.style.width='100%'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; }
+  };
+  prepare();
 }
 function editLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
@@ -4423,6 +4483,7 @@ function renderLibraryList(){
     +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
+    +(libIsPhone()?'<button class="btn btn-ghost btn-sm" onclick="libSaveShownToPhotos()" title="Save every photo/video in the current view to this phone\'s photo album">📲 Save all shown to Photos</button>':'')
     +'<button class="btn btn-ghost btn-sm" onclick="libDownloadShown()" title="Download every file in the current view (model + category + filters)">⬇ Download all shown</button>'
     +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
 
@@ -4442,7 +4503,8 @@ function renderLibraryList(){
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'category\')">🏷 Set category</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
-    +'<button class="btn btn-sm btn-primary" onclick="libBulkDownload()">⬇ Download</button>'
+    +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
+    +'<button class="btn btn-sm '+(libIsPhone()?'btn-ghost':'btn-primary')+'" onclick="libBulkDownload()">⬇ Download</button>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
     +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
     +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
@@ -4501,7 +4563,7 @@ function libCardActionOptions(i){
   var st=i.state||'fresh', h='<option value="">Actions…</option>';
   h+='<optgroup label="Do">';
   if(st!=='retired') h+='<option value="post">📌 Record posting</option>';
-  h+='<option value="phone">📲 Save to camera roll</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
+  h+='<option value="phone">📲 Save to Photos</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
   h+='</optgroup><optgroup label="Move to →">';
   Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k!==i.category) h+='<option value="cat:'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
   h+='</optgroup><optgroup label="Also in → (tick / untick)">';
@@ -4518,7 +4580,7 @@ async function libCardAction(id,sel){
   var v=sel.value; sel.value='';
   if(!v) return;
   if(v==='post') return libOpenPost(id);
-  if(v==='phone') return libSaveToPhone(id,sel);
+  if(v==='phone') return libSaveToPhone(id);
   if(v==='download') return downloadLibraryItem(id);
   if(v==='edit') return editLibraryItem(id);
   if(v==='delete') return deleteLibraryItem(id);
