@@ -180,7 +180,7 @@
   .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
   .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
   .sig-pad-wrap { border: 1px solid var(--border); border-radius: 8px; background: #fff; touch-action: none; overflow: hidden; }
-  .sig-pad-wrap canvas { display: block; width: 100%; height: 160px; cursor: crosshair; }
+  .sig-pad-wrap canvas { display: block; width: 100%; height: 160px; cursor: crosshair; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-group.full { grid-column: 1 / -1; }
@@ -12912,7 +12912,7 @@ async function openContractForModel(modelId){
         <div class="form-grid">
           <div class="form-group"><label>Full Legal Name</label><input type="text" id="cf-my-legal-name" value="${escapeHtml(data.model_legal_name||'')}" placeholder="As it appears on your ID" onchange="saveContractField('${modelId}','model_legal_name',this.value)"></div>
           <div class="form-group"><label>Stage Name</label><input type="text" id="cf-my-stage-name" value="${escapeHtml(data.model_stage_name||model.name||'')}" onchange="saveContractField('${modelId}','model_stage_name',this.value)"></div>
-          <div class="form-group"><label>Date</label><input type="date" id="cf-my-date" value="${data.signed_date||new Date().toISOString().split('T')[0]}" onchange="saveContractField('${modelId}','signed_date',this.value)"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="cf-my-date" value="${data.signed_date||toLocalISO(new Date())}" onchange="saveContractField('${modelId}','signed_date',this.value)"></div>
         </div>
       </div>
       <div class="card" style="max-width:760px;margin:0 auto 18px;">
@@ -12921,7 +12921,7 @@ async function openContractForModel(modelId){
         <div class="sig-pad-wrap"><canvas id="sig-canvas"></canvas></div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn btn-ghost btn-sm" onclick="clearSignature()">Clear</button>
-          <button class="btn btn-primary" onclick="submitSignedContract('${modelId}')">✍️ Sign &amp; Submit</button>
+          <button class="btn btn-primary" id="sig-submit-btn" onclick="submitSignedContract('${modelId}')">✍️ Sign &amp; Submit</button>
         </div>
         <div id="contract-alert" class="alert" style="margin-top:10px;"></div>
       </div>`;
@@ -12958,58 +12958,104 @@ async function resetContract(modelId){
 
 // ── Signature capture ───────────────────────────────────────
 var _sigCtx=null,_sigDrawing=false,_sigHasStrokes=false;
+function _sigSize(canvas){
+  // Size the bitmap to what's actually on screen. On a phone the pad can be laid out after
+  // this runs (sidebar closing, URL bar settling), so it's re-done on resize while still blank.
+  const ratio=window.devicePixelRatio||1;
+  const w=canvas.getBoundingClientRect().width||canvas.parentNode.clientWidth||300;
+  canvas.width=Math.round(w*ratio); canvas.height=Math.round(160*ratio);
+  _sigCtx=canvas.getContext('2d');
+  _sigCtx.setTransform(ratio,0,0,ratio,0,0);
+  _sigCtx.lineWidth=2.2; _sigCtx.lineCap='round'; _sigCtx.lineJoin='round'; _sigCtx.strokeStyle='#111'; _sigCtx.fillStyle='#111';
+}
 function initSignatureCanvas(){
   const canvas=document.getElementById('sig-canvas');
   if(!canvas)return;
-  const ratio=window.devicePixelRatio||1;
-  const rect=canvas.getBoundingClientRect();
-  canvas.width=Math.max(rect.width,300)*ratio; canvas.height=160*ratio;
-  _sigCtx=canvas.getContext('2d');
-  _sigCtx.scale(ratio,ratio);
-  _sigCtx.lineWidth=2.2; _sigCtx.lineCap='round'; _sigCtx.strokeStyle='#111';
-  _sigHasStrokes=false;
+  _sigSize(canvas); _sigHasStrokes=false; _sigDrawing=false;
+  let last=null;
   const pos=e=>{
     const r=canvas.getBoundingClientRect();
-    const t=e.touches?e.touches[0]:e;
-    return {x:t.clientX-r.left,y:t.clientY-r.top};
+    const t=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
+    // map screen px to canvas px even if the canvas was sized before its final layout
+    const sx=(canvas.width/(window.devicePixelRatio||1))/(r.width||1), sy=160/(r.height||160);
+    return {x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sy};
   };
-  const start=e=>{ e.preventDefault(); _sigDrawing=true; const p=pos(e); _sigCtx.beginPath(); _sigCtx.moveTo(p.x,p.y); };
-  const move=e=>{ if(!_sigDrawing)return; e.preventDefault(); const p=pos(e); _sigCtx.lineTo(p.x,p.y); _sigCtx.stroke(); _sigHasStrokes=true; };
-  const end=()=>{ _sigDrawing=false; };
-  canvas.onmousedown=start; canvas.onmousemove=move; canvas.onmouseup=end; canvas.onmouseleave=end;
-  canvas.ontouchstart=start; canvas.ontouchmove=move; canvas.ontouchend=end;
+  const start=e=>{ if(e.cancelable) e.preventDefault(); _sigDrawing=true; last=pos(e);
+    _sigCtx.beginPath(); _sigCtx.arc(last.x,last.y,1.1,0,Math.PI*2); _sigCtx.fill(); _sigHasStrokes=true;
+    if(e.pointerId!=null&&canvas.setPointerCapture){ try{canvas.setPointerCapture(e.pointerId);}catch(_){} } };
+  const move=e=>{ if(!_sigDrawing)return; if(e.cancelable) e.preventDefault(); const p=pos(e);
+    _sigCtx.beginPath(); _sigCtx.moveTo(last.x,last.y); _sigCtx.lineTo(p.x,p.y); _sigCtx.stroke(); last=p; _sigHasStrokes=true; };
+  const end=()=>{ _sigDrawing=false; last=null; };
+  canvas.onmousedown=canvas.onmousemove=canvas.onmouseup=canvas.onmouseleave=null;
+  canvas.ontouchstart=canvas.ontouchmove=canvas.ontouchend=null;
+  if(window.PointerEvent){
+    canvas.onpointerdown=start; canvas.onpointermove=move; canvas.onpointerup=end; canvas.onpointercancel=end;
+    // iOS still fires touchmove; block it so the page doesn't scroll under the finger
+    canvas.addEventListener('touchmove',function(e){ if(e.cancelable) e.preventDefault(); },{passive:false});
+  } else {
+    canvas.addEventListener('touchstart',start,{passive:false});
+    canvas.addEventListener('touchmove',move,{passive:false});
+    canvas.addEventListener('touchend',end); canvas.addEventListener('touchcancel',end);
+    canvas.onmousedown=start; canvas.onmousemove=move; canvas.onmouseup=end; canvas.onmouseleave=end;
+  }
+  if(!window._sigResizeBound){
+    window._sigResizeBound=true;
+    window.addEventListener('resize',function(){ const c=document.getElementById('sig-canvas'); if(c&&!_sigHasStrokes) _sigSize(c); });
+  }
 }
 function clearSignature(){
-  const canvas=document.getElementById('sig-canvas'); if(!canvas||!_sigCtx)return;
-  _sigCtx.clearRect(0,0,canvas.width,canvas.height);
+  const canvas=document.getElementById('sig-canvas'); if(!canvas)return;
+  _sigSize(canvas);
   _sigHasStrokes=false;
 }
 
 // ── Sign & lock ──────────────────────────────────────────────
+function _contractMsg(msg,type){
+  // Unlike showAlert this doesn't vanish after 4s, and scrolls into view -- on a phone the
+  // message sits below the fold and a disappearing error looks like "nothing happened".
+  const el=document.getElementById('contract-alert'); if(!el) return alert(msg);
+  el.className='alert alert-'+(type==='success'?'success':'error'); el.textContent=msg; el.style.display='block';
+  try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
+}
+function _withTimeout(promise,ms,fallback){
+  return Promise.race([promise, new Promise(function(res){ setTimeout(function(){ res(fallback); },ms); })]);
+}
 async function submitSignedContract(modelId){
+  const btn=document.getElementById('sig-submit-btn');
+  if(btn&&btn.disabled) return;   // stop double taps creating two submissions
+  if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();   // close the phone keyboard
   const legalName=(document.getElementById('cf-my-legal-name')?.value||'').trim();
   const stageName=(document.getElementById('cf-my-stage-name')?.value||'').trim();
-  const signedDate=document.getElementById('cf-my-date')?.value;
-  if(!legalName) return showAlert('contract-alert','Please enter your full legal name.','error');
-  if(!signedDate) return showAlert('contract-alert','Please confirm the date.','error');
-  if(!_sigHasStrokes) return showAlert('contract-alert','Please draw your signature first.','error');
+  const signedDate=document.getElementById('cf-my-date')?.value||toLocalISO(new Date());
+  if(!legalName) return _contractMsg('Please enter your full legal name.','error');
+  if(!_sigHasStrokes) return _contractMsg('Please draw your signature in the white box first.','error');
   const canvas=document.getElementById('sig-canvas');
-  const signatureData=canvas.toDataURL('image/png');
+  const old=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Submitting…'; }
+  _contractMsg('Submitting your signature — please keep this page open…','success');
+  try{
+    const signatureData=canvas.toDataURL('image/png');
+    // Best-effort IP for the audit trail. Capped at 3s: on mobile data / with tracker
+    // blocking this request can hang, and it must never stop the signing.
+    let ip=null;
+    try{ ip=await _withTimeout(fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(j=>j.ip).catch(()=>null),3000,null); }catch(e){}
 
-  // Best-effort IP capture for the audit trail -- if this fails (offline, blocked, etc.) the
-  // signing still proceeds, it just won't have an IP attached.
-  let ip=null;
-  try{ const res=await fetch('https://api.ipify.org?format=json'); const j=await res.json(); ip=j.ip; }catch(e){}
+    const{data:current}=await sb.from('model_contracts').select('*').eq('model_id',modelId).maybeSingle();
+    const record={...(current||{}), model_id:modelId, model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true};
 
-  const{data:current}=await sb.from('model_contracts').select('*').eq('model_id',modelId).single();
-  const record={...(current||{}), model_id:modelId, model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true};
-
-  const pdfUrl=await generateContractPdf(record);
-  const update={model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true, pdf_url:pdfUrl};
-  const{error}=await sb.from('model_contracts').update(update).eq('model_id',modelId);
-  if(error){ showAlert('contract-alert','Could not save — '+error.message,'error'); return; }
-  showAlert('contract-alert','Signed! This copy is now locked.','success');
-  setTimeout(()=>openContractForModel(modelId),1200);
+    // PDF is a nice-to-have copy; never let a slow phone or upload block the actual sign.
+    const pdfUrl=await _withTimeout(generateContractPdf(record),20000,null);
+    const update={model_legal_name:legalName, model_stage_name:stageName||current?.model_stage_name, signed_date:signedDate, signature_data:signatureData, signed_ip:ip, status:'signed', locked:true};
+    if(pdfUrl) update.pdf_url=pdfUrl;
+    const{data:saved,error}=await sb.from('model_contracts').update(update).eq('model_id',modelId).select('model_id');
+    if(error) throw new Error(error.message);
+    if(!saved||!saved.length) throw new Error('your contract could not be found or is already locked — ask the agency to reset it');
+    _contractMsg('Signed! This copy is now locked.','success');
+    setTimeout(()=>openContractForModel(modelId),1200);
+  }catch(e){
+    _contractMsg('Could not submit — '+(e&&e.message?e.message:e)+'. Please try again.','error');
+    if(btn){ btn.disabled=false; btn.textContent=old; }
+  }
 }
 
 // Renders a real PDF (times-roman body text + the signature image baked in) and uploads it to
