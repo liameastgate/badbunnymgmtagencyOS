@@ -4117,7 +4117,9 @@ function libDownloadShown(){ libDownloadMany(libFiltered()); }
 // that, so it's two taps: Prepare (download into memory, with progress) -> Save N to Photos.
 // Batches are capped so a pile of big videos can't run Safari out of memory and kill the tab.
 // Android: normal downloads already appear in the Gallery, so it just downloads them.
-var LIB_PHOTOS_BATCH_BYTES=400*1048576, LIB_PHOTOS_BATCH_MAX=20;
+// Two batches can be in memory at once (one on the share sheet, the next prefetching), so
+// each is capped at 250 MB to keep Safari's peak around 500 MB.
+var LIB_PHOTOS_BATCH_BYTES=250*1048576, LIB_PHOTOS_BATCH_MAX=20, LIB_PHOTOS_PARALLEL=4;
 function libIsIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1); }
 function libIsPhone(){ return libIsIOS()||/Android/i.test(navigator.userAgent); }
 function libMimeOf(it){
@@ -4139,54 +4141,87 @@ function libPhotoBatches(list){
 function libSaveToPhone(id){ var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) libSaveToPhotos([it]); }
 function libBulkSaveToPhotos(){ var L=STATE.library||[]; libSaveToPhotos(L.filter(function(i){ return LIB_SEL[i.id]; })); }
 function libSaveShownToPhotos(){ libSaveToPhotos(libFiltered()); }
+// Fetch one batch, LIB_PHOTOS_PARALLEL at a time (per-file connection setup dominates on
+// patchy wifi, so parallel is much faster than one-by-one). onProgress(bytesDone, filesDone).
+function libFetchBatch(batch,state,onProgress){
+  var files=new Array(batch.length), next=0, bytes=0, doneN=0;
+  async function worker(){
+    while(next<batch.length && !state.cancelled){
+      var k=next++, it=batch[k];
+      try{
+        var res=await fetch(await libItemUrl(it)); if(!res.ok) throw new Error('HTTP '+res.status);
+        var chunks=[], reader=res.body&&res.body.getReader?res.body.getReader():null, blob;
+        if(reader){
+          for(;;){ var r=await reader.read(); if(r.done) break; chunks.push(r.value); bytes+=r.value.length; onProgress&&onProgress(bytes,doneN); if(state.cancelled){ try{reader.cancel();}catch(e){} return; } }
+          blob=new Blob(chunks);
+        } else { blob=await res.blob(); bytes+=blob.size; }
+        files[k]=new File([blob],libDownloadName(it),{type:libMimeOf(it)});
+      }catch(e){ state.failed.push(it.title||it.id); }
+      doneN++; onProgress&&onProgress(bytes,doneN);
+    }
+  }
+  var ws=[]; for(var w=0;w<Math.min(LIB_PHOTOS_PARALLEL,batch.length);w++) ws.push(worker());
+  return Promise.all(ws).then(function(){ return files.filter(Boolean); });
+}
 async function libSaveToPhotos(list){
   list=(list||[]).filter(function(i){ return /^(image|video)\//.test(libMimeOf(i)); });
   if(!list.length){ alert('Nothing to save — only photos and videos can go in the photo album.'); return; }
   if(!libIsIOS()){ return libDownloadMany(list); }          // Android/desktop: downloads land in Gallery / Downloads
   if(!(navigator.canShare&&navigator.share)){ alert('This browser can\'t save to Photos. Open AgencyOS in Safari and try again.'); return; }
-  var batches=libPhotoBatches(list), bi=0, files=null, cancelled=false;
+  var batches=libPhotoBatches(list), bi=0, files=null, state={cancelled:false,failed:[]}, pending={}, done=0;
   var ov=document.getElementById('lib-photos-sheet'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='lib-photos-sheet';
   ov.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:10000;background:var(--surface,#11131c);border-top:1px solid var(--border,#2a2f45);padding:16px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.5);';
   ov.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><b style="font-size:14px;">📲 Save to Photos</b><button class="btn btn-sm btn-ghost" id="lps-close">✕</button></div>'
-    +'<div id="lps-msg" style="font-size:13px;color:var(--text2);margin-bottom:12px;"></div>'
+    +'<div id="lps-msg" style="font-size:13px;color:var(--text2);margin-bottom:6px;"></div>'
+    +'<div id="lps-sub" style="font-size:11.5px;color:var(--text2);opacity:.8;margin-bottom:10px;min-height:14px;"></div>'
     +'<div style="height:6px;background:var(--surface2,#1b1e2b);border-radius:4px;overflow:hidden;margin-bottom:12px;"><div id="lps-bar" style="height:100%;width:0;background:var(--accent,#1e4fff);transition:width .2s;"></div></div>'
     +'<button class="btn btn-primary" id="lps-go" style="width:100%;padding:14px;font-size:15px;" disabled>Preparing…</button>';
   document.body.appendChild(ov);
-  var msg=ov.querySelector('#lps-msg'), bar=ov.querySelector('#lps-bar'), go=ov.querySelector('#lps-go');
-  var done=0, failed=[];
-  ov.querySelector('#lps-close').onclick=function(){ cancelled=true; files=null; ov.remove(); };
-  async function prepare(){
-    var batch=batches[bi]; files=[]; go.disabled=true; go.textContent='Preparing…';
-    var label=batches.length>1?' (batch '+(bi+1)+' of '+batches.length+')':'';
-    for(var k=0;k<batch.length;k++){
-      if(cancelled) return;
-      msg.textContent='Getting '+(k+1)+' of '+batch.length+label+' · '+(batch[k].title||'');
-      bar.style.width=Math.round(k/batch.length*100)+'%';
-      try{
-        var res=await fetch(await libItemUrl(batch[k])); if(!res.ok) throw new Error('HTTP '+res.status);
-        var blob=await res.blob();
-        files.push(new File([blob],libDownloadName(batch[k]),{type:libMimeOf(batch[k])}));
-      }catch(e){ failed.push(batch[k].title||batch[k].id); }
-    }
-    if(cancelled) return;
+  var msg=ov.querySelector('#lps-msg'), sub=ov.querySelector('#lps-sub'), bar=ov.querySelector('#lps-bar'), go=ov.querySelector('#lps-go');
+  ov.querySelector('#lps-close').onclick=function(){ state.cancelled=true; files=null; pending={}; ov.remove(); };
+  var lbl=function(i){ return batches.length>1?' (batch '+(i+1)+' of '+batches.length+')':''; };
+  // Start fetching batch i (if not already) and remember its progress so the sheet can show it.
+  function start(i){
+    if(i>=batches.length||pending[i]) return pending[i];
+    var total=batches[i].reduce(function(t,x){return t+(x.size_bytes||0);},0), t0=Date.now();
+    var p={bytes:0,n:0,total:total,t0:t0};
+    p.promise=libFetchBatch(batches[i],state,function(by,n){ p.bytes=by; p.n=n; if(bi===i&&!files) paint(i); });
+    pending[i]=p; return p;
+  }
+  function paint(i){
+    var p=pending[i]; if(!p) return; var b=batches[i];
+    var secs=Math.max(.5,(Date.now()-p.t0)/1000), mbps=p.bytes/1048576/secs;
+    msg.textContent='Getting '+Math.min(p.n+1,b.length)+' of '+b.length+lbl(i)+'…';
+    sub.textContent=(p.bytes/1048576).toFixed(0)+(p.total?' / '+(p.total/1048576).toFixed(0):'')+' MB · '+mbps.toFixed(1)+' MB/s'
+      +(mbps<1&&secs>4?' — your connection is the bottleneck':'');
+    bar.style.width=Math.round((p.total?p.bytes/p.total:p.n/b.length)*100)+'%';
+  }
+  function finish(text){ msg.textContent=text; sub.textContent=''; bar.style.width='100%'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; }
+  async function ready(i){
+    go.disabled=true; go.textContent='Preparing…'; files=null; paint(i);
+    var got=await start(i).promise;
+    if(state.cancelled) return;
+    if(!got.length){ finish('Could not fetch these files'+(state.failed.length?' ('+state.failed.length+' failed)':'')+'.'); return; }
+    if(!navigator.canShare({files:got})){ finish('Safari won\'t share these files. Use ⬇ Download instead (saves to Files).'); return; }
+    files=got;
+    var nv=got.filter(function(f){return /^video\//.test(f.type);}).length, kind=nv===got.length?'Video':(nv===0?'Image':'Item');
+    msg.textContent='Ready. Tap the button, then choose "Save '+(got.length===1?kind:got.length+' '+kind+'s')+'".'+(state.failed.length?' ('+state.failed.length+' couldn\'t be fetched)':'');
+    sub.textContent=i+1<batches.length?'Next batch is loading in the background…':'';
     bar.style.width='100%';
-    if(!files.length){ msg.textContent='Could not fetch these files'+(failed.length?' ('+failed.length+' failed)':'')+'.'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; return; }
-    if(!navigator.canShare({files:files})){ msg.textContent='Safari won\'t share these files. Use ⬇ Download instead (saves to Files).'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; return; }
-    var nv=files.filter(function(f){return /^video\//.test(f.type);}).length, kind=nv===files.length?'Video':(nv===0?'Image':'Item');
-    msg.textContent='Ready. Tap the button, then choose "Save '+(files.length===1?kind:files.length+' '+kind+'s')+'".'+(failed.length?' ('+failed.length+' couldn\'t be fetched)':'');
-    go.textContent='Save '+files.length+' to Photos'+label; go.disabled=false;
+    go.textContent='Save '+got.length+' to Photos'+lbl(i); go.disabled=false;
+    start(i+1);   // prefetch while the share sheet is up
   }
   go.onclick=async function(){
     if(!files||!files.length) return;
     var f=files; go.disabled=true;
     try{ await navigator.share({files:f}); done+=f.length; }
-    catch(e){ if(!e||e.name!=='AbortError'){ msg.textContent='Could not open the share sheet: '+(e&&e.message||e); go.disabled=false; return; } go.disabled=false; msg.textContent='Cancelled — tap again to save these.'; return; }
-    files=null; bi++;
-    if(bi<batches.length){ prepare(); }
-    else { msg.textContent='Done — '+done+' saved to Photos'+(failed.length?', '+failed.length+' failed: '+failed.slice(0,3).join(', '):'')+'.'; bar.style.width='100%'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; }
+    catch(e){ go.disabled=false; msg.textContent=(e&&e.name==='AbortError')?'Cancelled — tap again to save these.':'Could not open the share sheet: '+(e&&e.message||e); return; }
+    delete pending[bi]; files=null; bi++;
+    if(bi<batches.length) ready(bi);
+    else finish('Done — '+done+' saved to Photos'+(state.failed.length?', '+state.failed.length+' failed: '+state.failed.slice(0,3).join(', '):'')+'.');
   };
-  prepare();
+  ready(0);
 }
 function editLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
