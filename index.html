@@ -179,6 +179,19 @@
   .contract-field.blank { color: var(--yellow); border-bottom-color: var(--yellow); font-weight: 700; }
   .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
   .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
+  .mu-sec { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); margin:6px 0 10px; }
+  .mu-pill { letter-spacing:.04em; text-transform:none; font-weight:700; font-size:10.5px; padding:2px 8px; border-radius:20px; }
+  .mu-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+  .mu-card { position:relative; border-radius:16px; padding:14px 13px 13px; border:1px solid var(--border); background:var(--surface); overflow:hidden; min-height:132px; display:flex; flex-direction:column; cursor:pointer; transition:transform .12s, border-color .12s; -webkit-tap-highlight-color:transparent; }
+  .mu-card:hover { border-color:var(--accent2); } .mu-card:active { transform:scale(.97); }
+  .mu-card::before { content:''; position:absolute; inset:0; background:var(--g); opacity:.16; }
+  .mu-card::after { content:''; position:absolute; left:0; right:0; top:0; height:3px; background:var(--g); }
+  .mu-card > * { position:relative; }
+  .mu-ic { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:20px; background:rgba(255,255,255,.07); margin-bottom:10px; }
+  .mu-t { font-weight:800; font-size:14.5px; line-height:1.2; color:#fff; }
+  .mu-d { font-size:11.5px; color:var(--text2); margin-top:4px; line-height:1.35; flex:1; }
+  .mu-n { margin-top:8px; font-size:10.5px; color:rgba(255,255,255,.55); }
+  @media (min-width: 900px) { .mu-grid { grid-template-columns:repeat(4,1fr); } }
   .sig-pad-wrap { border: 1px solid var(--border); border-radius: 8px; background: #fff; touch-action: none; overflow: hidden; }
   .sig-pad-wrap canvas { display: block; width: 100%; height: 160px; cursor: crosshair; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -821,7 +834,11 @@
           <option value="stories">📖 Story CTA bank</option>
           <option value="repurpose">♻️ Repurpose bank (already captioned, post as-is)</option>
           <option value="sounds">🎵 Sounds</option>
-          <option value="nsfw">🔥 NSFW · OnlyFans only</option>
+          <option value="ppv">💎 PPV videos · OF only</option>
+          <option value="sexting">💬 Sexting set · OF only</option>
+          <option value="explicit">🔥 Explicit photos · OF only</option>
+          <option value="teasing">🖤 Teasing photos · OF feed / Twitter</option>
+          <option value="nsfw">⛔ NSFW · OnlyFans only</option>
         </select></div>
         <div id="cl-up-alert" style="font-size:12px;color:#e6b428;min-height:16px;"></div>
         <div class="btn-row"><button class="btn btn-primary" onclick="libDoUpload()">📤 Choose files…</button></div>
@@ -3893,10 +3910,22 @@ var LIB_CATEGORIES={
   stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
   repurpose:{label:'Repurpose bank',    short:'Repurpose',icon:'♻️', accept:'video/*',        hint:'Talking heads and clips that already have their audio + caption — reposted as-is with fresh metadata, never re-captioned. Proven performers for trial reels.'},
   sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
+  // ── OnlyFans-only (ofOnly) ── never public. Nothing that posts to phones / the Content
+  // Factory reads these keys, and they skip the Instagram compliance scanner (it would only
+  // burn scan credits on content that is never going near Instagram).
+  ppv:     {label:'PPV videos',         short:'PPV',     icon:'💎', accept:'video/*',         ofOnly:true, hint:'Explicit short or full-length videos we sell in DMs', grad:'#ec4899,#8b5cf6'},
+  sexting: {label:'Sexting sets',       short:'Sexting', icon:'💬', accept:'video/*,image/*', ofOnly:true, hint:'A set of clips that build up — tap them in order', grad:'#f43f5e,#f97316'},
+  explicit:{label:'Explicit photos',    short:'Explicit',icon:'🔥', accept:'image/*',         ofOnly:true, hint:'Photos sold in DMs on OF', grad:'#e11d48,#be185d'},
+  teasing: {label:'Teasing photos',     short:'Teasing', icon:'🖤', accept:'image/*',         ofOnly:true, hint:'OF feed + Twitter. Underwear / lingerie is fine', grad:'#a855f7,#6366f1'},
   // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
   // slips through into a social category and can't actually be posted there.
-  nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'🔥', accept:'video/*,image/*', hint:'Too explicit to promote anywhere — paid page only'}
+  nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'⛔', accept:'video/*,image/*', ofOnly:true, hint:'Too explicit to promote anywhere — paid page only'}
 };
+// The six cards a model sees on the Upload page, in order.
+var MU_CARDS={of:['ppv','sexting','explicit','teasing'], mkt:['social','photos']};
+var MU_MKT={social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
+            photos:{label:'Non-explicit photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
+function libOfOnly(k){ return !!(LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].ofOnly); }
 var LIB_STATES={
   fresh:   {label:'Fresh',    icon:'🟢', style:'background:rgba(46,196,120,.16);color:#4ade80;',  help:'Never posted. Can go on ONE phone account.'},
   // The scanner said Instagram would remove this, so it is held out of the posting pool
@@ -4019,13 +4048,14 @@ async function libUploadFiles(files,opt){
     try{
       const url=await r2SignedUrl(key,'PUT');
       await libPutWithProgress(url,file,function(pc){ opt.onStatus&&opt.onStatus(label,'Uploading…',pc); });
-      const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:file.name,r2_key:key,size_bytes:file.size,content_type:file.type||null,
+      const meta=opt.perFile?opt.perFile(file)||{}:{};
+      const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:meta.title||file.name,tags:meta.tags||opt.tags||null,r2_key:key,size_bytes:file.size,content_type:file.type||null,
         uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
         width:probe.width||null,height:probe.height||null,duration_sec:(probe.duration&&isFinite(probe.duration))?Math.round(probe.duration*10)/10:null,bitrate_kbps:probe.kbps||null,thumb_data:probe.thumb||null};
       const{data:ins,error}=await sb.from('content_library').insert(row).select();
       if(error) throw new Error(error.message);
       const item=ins&&ins[0];
-      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video'&&autoScan) scanLibraryItem(item.id); }
+      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video'&&autoScan&&!libOfOnly(opt.category)) scanLibraryItem(item.id); }
       results.push({file,item,key});
       opt.onStatus&&opt.onStatus(label,'Done ✓',1);
     }catch(e){ results.push({file,error:e.message}); opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0); }
@@ -4249,6 +4279,7 @@ async function deleteLibraryItem(id){
 var LIB_SCAN_BATCH=4, LIB_SCAN_PASSES=4, LIB_SCAN_RUNNING=false;
 function libNeedsScan(i){
   if(!libIsVideo(i)) return false;
+  if(libOfOnly(i.category)) return false;   // never going to Instagram
   var s=libScan(i);
   return !s || !!s.scan_error;
 }
@@ -4403,6 +4434,13 @@ function renderContentUpload(){
 }
 function libGoFactory(){ STATE._cfPreselect=(LIB_F.model&&LIB_F.model!=='agency')?LIB_F.model:null; navigate('content-factory'); }
 
+// Sexting sets: tags carry "set:<id> clip:<n>/<total>". Newest set first, clips 1..n inside it.
+function libSetInfo(i){ var m=/set:(\S+)\s+clip:(\d+)\/(\d+)/.exec(i.tags||''); return m?{id:m[1],n:+m[2],of:+m[3]}:null; }
+function libSetSort(a,b){
+  var x=libSetInfo(a), y=libSetInfo(b);
+  if(x&&y&&x.id===y.id) return x.n-y.n;
+  return String(b.created_at||'').localeCompare(String(a.created_at||''));
+}
 // Everything matching the current filters (used by the list, select-all and bulk actions).
 function libFiltered(){
   var items=(STATE.library||[]);
@@ -4411,6 +4449,7 @@ function libFiltered(){
   if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
   if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
   if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
+  if(LIB_F.category==='sexting') items=items.slice().sort(libSetSort);
   var q=(LIB_F.q||'').toLowerCase().trim();
   if(q) items=items.filter(function(i){
     var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
@@ -4622,6 +4661,7 @@ async function libCardAction(id,sel){
   if(v.indexOf('state:')===0) return libSetState(id,v.slice(6));
   if(v.indexOf('also:')===0){
     var k=v.slice(5), it2=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it2) return;
+    if(libOfOnly(it2.category)&&!libOfOnly(k)&&!confirm('This is OnlyFans-only content. Adding it to '+LIB_CATEGORIES[k].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var list=(it2.categories||[]).slice(); var at=list.indexOf(k);
     if(at>=0) list.splice(at,1); else list.push(k);
     var r2=await sb.from('content_library').update({categories:list}).eq('id',id).select();
@@ -4633,6 +4673,8 @@ async function libCardAction(id,sel){
   if(v.indexOf('cat:')===0){
     var cat=v.slice(4);
     if(cat==='nsfw') return libMarkNsfw(id);
+    var cur0=(STATE.library||[]).find(function(x){return x.id===id;});
+    if(cur0&&libOfOnly(cur0.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var cur=(STATE.library||[]).find(function(x){return x.id===id;});
     if(cur&&cur.state==='needs_review') return libReview(id,cat);   // moving a held file also releases it
     var r=await sb.from('content_library').update({category:cat}).eq('id',id).select();
@@ -4661,6 +4703,8 @@ async function libBulkMove(what){
     if(cp===null) return;
     var ci=parseInt(cp,10)-1; if(!keys[ci]){ alert('No category '+cp); return; }
     patch={category:keys[ci]}; label=LIB_CATEGORIES[keys[ci]].label;
+    var ofSel=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]&&libOfOnly(i.category); }).length;
+    if(ofSel&&!libOfOnly(keys[ci])&&!confirm(ofSel+' of these are OnlyFans-only. Moving them to '+label+' means they can be posted publicly.\n\nOnly do this if they are definitely safe. Continue?')) return;
   } else if(what==='also'){
     var ak=Object.keys(LIB_CATEGORIES).filter(function(k){return k!=='nsfw';});
     var ao=ak.map(function(k,n){return (n+1)+' = '+LIB_CATEGORIES[k].label;}).join('\n');
@@ -4668,6 +4712,8 @@ async function libBulkMove(what){
     if(ap===null) return;
     var ai=parseInt(ap,10)-1; if(!ak[ai]){ alert('No category '+ap); return; }
     var addk=ak[ai], okn=0;
+    var ofSel2=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]&&libOfOnly(i.category); }).length;
+    if(ofSel2&&!libOfOnly(addk)&&!confirm(ofSel2+' of these are OnlyFans-only. Adding them to '+LIB_CATEGORIES[addk].label+' means they can be posted publicly.\n\nOnly do this if they are definitely safe. Continue?')) return;
     for(var x=0;x<ids.length;x++){
       var it=(STATE.library||[]).find(function(z){return z.id===ids[x];}); if(!it||it.category===addk) continue;
       var lst=(it.categories||[]).slice(); if(lst.indexOf(addk)<0) lst.push(addk);
@@ -4744,7 +4790,16 @@ async function renderModelUpload(){
   if(!STATE.library) await loadContentLibrary();
   const openOrders=(STATE.contentOrders||[]).filter(function(o){ return o.model_id===me.id && o.status!=='done'; });
   const mine=(STATE.library||[]).filter(function(i){ return i.model_id===me.id; }).slice(0,40);
-  const bigBtn=function(k){ const c=LIB_CATEGORIES[k]; return '<button class="btn" onclick="muUploadCategory(\''+k+'\')" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:left;margin-bottom:10px;"><span style="font-size:28px;">'+c.icon+'</span><span><span style="display:block;font-weight:800;font-size:15px;color:#fff;">'+c.label+'</span><span style="display:block;font-size:12px;color:var(--text2);margin-top:2px;">'+c.hint+'</span></span></button>'; };
+  const all=(STATE.library||[]).filter(function(i){ return i.model_id===me.id; });
+  const card=function(k){
+    const c=LIB_CATEGORIES[k], o=MU_MKT[k]||{}, label=o.label||c.label, hint=o.hint||c.hint, grad=o.grad||c.grad||'#6b8fff,#1e4fff';
+    const L=all.filter(function(i){ return i.category===k; });
+    let n='';
+    if(k==='sexting'){ const sets={}; L.forEach(function(i){ const s=libSetInfo(i); sets[s?s.id:i.id]=1; }); const c2=Object.keys(sets).length; n=c2?c2+' set'+(c2===1?'':'s'):''; }
+    else if(L.length){ const last=L.reduce(function(m,i){ return i.created_at>m?i.created_at:m; },''); const d=Math.floor((Date.now()-new Date(last))/86400000); n=L.length+' sent · latest '+(d<=0?'today':d===1?'yesterday':d+'d ago'); }
+    return '<div class="mu-card" style="--g:linear-gradient(135deg,'+grad+')" role="button" tabindex="0" onclick="muUploadCategory(\''+k+'\')">'
+      +'<div class="mu-ic">'+c.icon+'</div><div class="mu-t">'+escapeHtml(label)+'</div><div class="mu-d">'+escapeHtml(hint)+'</div><div class="mu-n">'+(n||'Nothing sent yet')+'</div></div>';
+  };
   const orderCard=function(o){
     const pl=o.platform==='instagram'?'IG':o.platform==='tiktok'?'TikTok':(o.platform||'');
     const thumb=o.thumbnail_url?'<img src="'+o.thumbnail_url+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--border);flex-shrink:0;">':'<div style="width:96px;height:96px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:11px;flex-shrink:0;">no preview</div>';
@@ -4768,21 +4823,87 @@ async function renderModelUpload(){
   };
   el.innerHTML=
      '<div id="mu-status" style="display:none;background:rgba(107,143,255,.12);border:1px solid rgba(107,143,255,.35);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>'
-    +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:4px 0 10px;">Send new content</div>'
-    +bigBtn('social')+bigBtn('reddit_x')+bigBtn('photos')
-    +'<div style="font-size:12px;color:var(--text2);margin:6px 0 18px;line-height:1.5;">📌 Always send the <b>original</b> from your camera roll — anything that went through WhatsApp or Messenger gets compressed and we can\'t use it. You can pick several at once.</div>'
+    +'<div class="mu-sec">🔒 For OnlyFans <span class="mu-pill" style="background:rgba(236,72,153,.15);color:#f472b6;">Private · never posted publicly</span></div>'
+    +'<div class="mu-grid">'+MU_CARDS.of.map(card).join('')+'</div>'
+    +'<div class="mu-sec">📣 For marketing <span class="mu-pill" style="background:rgba(34,197,94,.14);color:#4ade80;">Public · must be safe</span></div>'
+    +'<div class="mu-grid">'+MU_CARDS.mkt.map(card).join('')+'</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin:0 0 18px;line-height:1.5;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;">📌 Always send the <b>original</b> from your camera roll — anything that went through WhatsApp or Messenger gets compressed and we can\'t use it. You can pick several at once.</div>'
     +(openOrders.length?'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:4px 0 10px;">Your open orders ('+openOrders.length+')</div>'+openOrders.map(orderCard).join(''):'')
     +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px;">Recent uploads</div>'
     +(mine.length?'<div class="card" style="padding:4px 12px;">'+mine.map(histRow).join('')+'</div>':'<div style="font-size:12px;color:var(--text2);">Nothing yet.</div>');
 }
 function muStatus(text,show){ const s=document.getElementById('mu-status'); if(!s) return; s.style.display=show===false?'none':'block'; s.innerHTML=text; }
+// ── When was this filmed? ──────────────────────────────────────────────────
+// Reads the capture time straight out of the file so a sexting set lands in the order it
+// was shot, whatever order she tapped. Photos: EXIF DateTimeOriginal (JPEG). Videos: the
+// MP4/MOV 'mvhd' creation time. Returns ms or null -- iPhones sometimes re-save a file on
+// upload and drop this, which is why the caller has fallbacks.
+async function libCaptureTime(file){
+  try{
+    var okT=function(t){ return t&&t>Date.UTC(2012,0,1)&&t<Date.now()+864e5?t:null; };
+    var head=new Uint8Array(await file.slice(0,Math.min(file.size,1048576)).arrayBuffer());
+    if(head[0]===0xFF&&head[1]===0xD8) return okT(libExifTime(head));
+    var find=function(buf){ for(var i=0;i+12<buf.length;i++){ if(buf[i]===0x6D&&buf[i+1]===0x76&&buf[i+2]===0x68&&buf[i+3]===0x64){ var v=buf[i+4], dv=new DataView(buf.buffer,buf.byteOffset+i+8); var secs=v===1?Number(dv.getBigUint64(0)):dv.getUint32(0); return secs?(secs-2082844800)*1000:null; } } return null; };
+    var t=find(head);
+    if(t==null&&file.size>1048576){ var tail=new Uint8Array(await file.slice(Math.max(0,file.size-4194304)).arrayBuffer()); t=find(tail); }
+    return okT(t);
+  }catch(e){ return null; }
+}
+function libExifTime(b){
+  for(var i=2;i+4<b.length;){
+    if(b[i]!==0xFF) return null;
+    var mk=b[i+1], len=(b[i+2]<<8)|b[i+3];
+    if(mk===0xE1&&b[i+4]===0x45&&b[i+5]===0x78&&b[i+6]===0x69&&b[i+7]===0x66){
+      var T=i+10, le=b[T]===0x49, dv=new DataView(b.buffer,b.byteOffset);
+      var u16=function(o){return dv.getUint16(T+o,le);}, u32=function(o){return dv.getUint32(T+o,le);};
+      var str=function(o,n){ var r=''; for(var k=0;k<n;k++){ var c=b[T+o+k]; if(!c) break; r+=String.fromCharCode(c);} return r; };
+      var tagIn=function(ifd,tag){ var n=u16(ifd); for(var k=0;k<n;k++){ var e=ifd+2+k*12; if(u16(e)===tag) return {cnt:u32(e+4),val:u32(e+8)}; } return null; };
+      var ifd0=u32(4), dt=null, exif=tagIn(ifd0,0x8769);
+      if(exif){ var o=tagIn(exif.val,0x9003); if(o) dt=str(o.val,19); }
+      if(!dt){ var o2=tagIn(ifd0,0x0132); if(o2) dt=str(o2.val,19); }
+      var m=/^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/.exec(dt||'');
+      return m?new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime():null;
+    }
+    if(mk===0xDA) return null;
+    i+=2+len;
+  }
+  return null;
+}
+// Order a sexting set: by capture time if every file has one; else by the iPhone file number
+// (IMG_1234 -- numbered in shooting order); else the order she tapped them. Photos before
+// videos when two were captured in the same second.
+async function libOrderSet(files){
+  var info=[]; for(var i=0;i<files.length;i++){ var f=files[i]; var m=/(\d{3,})(?!.*\d)/.exec((f.name||'').replace(/\.[^.]*$/,'')); info.push({f:f,i:i,t:await libCaptureTime(f),num:m?+m[1]:null,img:/^image\//.test(f.type||'')}); }
+  var by;
+  if(info.every(function(x){return x.t!=null;})) by='filmed';
+  else if(info.every(function(x){return x.num!=null;})&&new Set(info.map(function(x){return x.num;})).size===info.length) by='number';
+  else by='tapped';
+  info.sort(function(a,b){
+    if(by==='filmed'&&a.t!==b.t) return a.t-b.t;
+    if(by==='number') return a.num-b.num;
+    if(by==='filmed'&&a.img!==b.img) return a.img?-1:1;
+    return a.i-b.i;
+  });
+  return {files:info.map(function(x){return x.f;}), by:by};
+}
 async function muUploadCategory(cat){
   const me=myOwnModel(); if(!me) return; const c=LIB_CATEGORIES[cat]; if(!c) return;
   const files=await libPickFiles(c.accept,true); if(!files.length) return;
   muStatus('Preparing…');
-  const res=await libUploadFiles(files,{modelId:me.id,ownerType:'model',category:cat,strictHd:true,onStatus:function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }});
+  // A sexting set is one upload: the picker returns files in the order she tapped them, which
+  // is the order chatters send them. Each clip is tagged with the set id + its position.
+  let perFile=null, orderNote='';
+  if(cat==='sexting'){
+    muStatus('Putting your set in order…');
+    const ord=await libOrderSet(files);
+    orderNote=ord.by==='filmed'?'Ordered by when you filmed them.':ord.by==='number'?'Ordered by your camera roll order.':'Kept in the order you tapped them.';
+    const setId=Date.now().toString(36), day=new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}), total=files.length;
+    const pos=new Map(); ord.files.forEach(function(f,i){ pos.set(f,i+1); });
+    perFile=function(f){ const n=pos.get(f); return {title:'Sexting set '+day+' — clip '+n+' of '+total, tags:'set:'+setId+' clip:'+n+'/'+total}; };
+  }
+  const res=await libUploadFiles(files,{modelId:me.id,ownerType:'model',category:cat,strictHd:true,perFile:perFile,onStatus:function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }});
   const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
-  muStatus((ok?'✅ '+ok+' file'+(ok===1?'':'s')+' received — thank you!':'')+(bad.length?'<div style="margin-top:6px;color:#e6b428;">'+bad.map(function(b){return '⚠ <b>'+escapeHtml(b.file.name)+'</b>: '+escapeHtml(b.error||b.skipped);}).join('<br>')+'</div>':''));
+  muStatus((ok?'✅ '+ok+' file'+(ok===1?'':'s')+' received — thank you!'+(orderNote?' <span style="color:var(--text2);">'+orderNote+'</span>':''):'')+(bad.length?'<div style="margin-top:6px;color:#e6b428;">'+bad.map(function(b){return '⚠ <b>'+escapeHtml(b.file.name)+'</b>: '+escapeHtml(b.error||b.skipped);}).join('<br>')+'</div>':''));
   renderModelUpload().then(function(){ muStatus(document.getElementById('mu-status')?document.getElementById('mu-status').innerHTML:'',true); });
 }
 // Upload against a content order: lands in the library (state fresh, linked to the order) and
