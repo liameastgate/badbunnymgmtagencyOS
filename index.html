@@ -179,6 +179,22 @@
   .contract-field.blank { color: var(--yellow); border-bottom-color: var(--yellow); font-weight: 700; }
   .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
   .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
+  .idea-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .idea-pill { background:var(--surface); border:1px solid var(--border); color:var(--text2); border-radius:20px; padding:6px 13px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .idea-pill span { opacity:.7; } .idea-pill.on { border-color:var(--accent); background:rgba(30,79,255,.14); color:#fff; }
+  .seg-toggle { display:inline-flex; background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px; }
+  .seg-toggle button { background:none; border:0; color:var(--text2); padding:7px 14px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .seg-toggle button.on { background:var(--accent); color:#fff; }
+  .idea-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  .idea-card { margin:0; padding:14px; display:flex; flex-direction:column; gap:6px; }
+  .idea-thumb { width:100%; max-height:180px; object-fit:cover; border-radius:10px; border:1px solid var(--border); }
+  .idea-meta { display:flex; justify-content:space-between; gap:6px; font-size:11px; color:var(--text2); font-weight:700; }
+  .idea-chip { color:var(--accent2); }
+  .idea-title { font-weight:700; font-size:14px; line-height:1.35; word-break:break-word; }
+  .idea-desc { font-size:12.5px; color:var(--text2); white-space:pre-wrap; }
+  .idea-link { font-size:12px; color:var(--accent2); }
+  .idea-foot { font-size:11px; color:#5b6382; }
+  .idea-actions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; border-top:1px solid var(--border); padding-top:10px; margin-top:4px; }
   .ex-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; align-items:stretch; }
   .ex-row { display:grid; grid-template-columns:14px 170px 130px 1fr; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
   .ex-row:last-child { border-bottom:0; }
@@ -674,7 +690,7 @@
           <div id="bulk-drop" class="dropzone" ondrop="handleBulkDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('bulk-file').click()" style="padding:18px;text-align:center;cursor:pointer;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
             <div style="font-size:30px;">📥</div>
             <div style="margin-top:6px;font-size:14px;font-weight:800;">Drop the exports here</div><div style="font-size:12px;color:var(--text2);">or tap to choose · any order · nothing saves until you press Import</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Creator Stats · Sales Record · Employee Performance</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Creator Stats · Sales Record · Employee Performance · Message Dashboard</div>
           </div>
           <input type="file" id="bulk-file" multiple accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleBulkFiles(this.files)">
           
@@ -936,29 +952,21 @@
     <!-- Content Ideas -->
     <div class="page" id="page-ideas">
       <div class="page-title">Content Ideas</div>
-      <div class="page-sub">Trending formats and hooks by niche — auto-refreshed weekly, source-linked</div>
-      <div id="ideas-admin-panel" style="display:none;">
-        <div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-primary" onclick="openIdeaModal()">➕ Add Idea</button></div>
-      </div>
-      <div class="card">
-        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
-          <select id="idea-filter-niche" onchange="filterContentIdeas()" style="width:180px;"><option value="">All Niches</option></select>
-          <select id="idea-filter-status" onchange="filterContentIdeas()" style="width:160px;">
-            <option value="">All Statuses</option>
-            <option value="new">New</option>
-            <option value="reviewed">Reviewed</option>
-            <option value="used">Used</option>
-            <option value="dismissed">Dismissed</option>
-          </select>
-          <select id="idea-sort" onchange="filterContentIdeas()" style="width:170px;">
-            <option value="date_desc">Newest first</option>
-            <option value="date_asc">Oldest first</option>
-            <option value="niche">Niche (A–Z)</option>
-          </select>
+      <div class="page-sub">Save ideas per model. Turn the good ones into orders in one click.</div>
+      <div class="idea-pills" id="idea-models"></div>
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input id="idea-input" placeholder="Paste a reel / TikTok link, or type an idea…" style="flex:2;min-width:220px;font-size:14px;padding:11px 13px;" onkeydown="if(event.key==='Enter')ideaAdd()">
+          <input id="idea-note" placeholder="Note (optional) — e.g. same angle, gym mirror" style="flex:1;min-width:180px;" onkeydown="if(event.key==='Enter')ideaAdd()">
+          <button class="btn btn-primary" id="idea-add-btn" onclick="ideaAdd()" style="padding:0 20px;">Add</button>
         </div>
-        <div id="ideas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
-        <div id="ideas-empty" class="empty" style="display:none;"><div class="empty-icon">💡</div><p>No content ideas yet — check back after the next weekly refresh, or add one manually</p></div>
+        <div id="idea-target" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
       </div>
+      <div class="seg-toggle" id="idea-view">
+        <button data-v="new" onclick="IDEA.view='new';renderIdeasPage()">💡 Open</button><button data-v="used" onclick="IDEA.view='used';renderIdeasPage()">✓ Used</button><button data-v="dismissed" onclick="IDEA.view='dismissed';renderIdeasPage()">✕ Skipped</button>
+      </div>
+      <div id="ideas-grid" class="idea-grid"></div>
+      <div id="ideas-empty" class="empty" style="display:none;"><div class="empty-icon">💡</div><p></p></div>
     </div>
 
     <!-- Content Scheduling -->
@@ -2834,26 +2842,6 @@
       <button class="btn btn-primary" onclick="saveModel()">💾 Save Model</button>
       <button class="btn btn-ghost" onclick="closeModal('model-modal')">Cancel</button>
     </div>
-  </div>
-</div>
-
-<!-- Content Idea Modal -->
-<div class="modal-overlay" id="idea-modal">
-  <div class="modal">
-    <div class="modal-title"><span>Add Content Idea</span><button class="modal-close" onclick="closeModal('idea-modal')">✕</button></div>
-    <div class="form-grid">
-      <div class="form-group"><label>Niche</label><input type="text" id="idea-niche" placeholder="e.g. Fitness" list="niche-suggestions"></div>
-      <div class="form-group"><label>Source</label><select id="idea-source"><option value="manual">Manual</option><option value="web_search">Web Search</option><option value="metricool_hashtag">Metricool — Hashtag</option><option value="metricool_top_post">Metricool — Top Post</option></select></div>
-      <div class="form-group full"><label>Title</label><input type="text" id="idea-title" placeholder="e.g. POV get-ready-with-me + trending audio"></div>
-      <div class="form-group full"><label>Description</label><textarea id="idea-desc" placeholder="Why it's working, format notes, hook..."></textarea></div>
-      <div class="form-group full"><label>Source Link (optional)</label><input type="url" id="idea-url" placeholder="https://..."></div>
-      <div class="form-group full"><label>Hashtags (optional)</label><input type="text" id="idea-hashtags" placeholder="#fitness, #gym"></div>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveContentIdea()">💾 Save Idea</button>
-      <button class="btn btn-ghost" onclick="closeModal('idea-modal')">Cancel</button>
-    </div>
-    <div id="idea-alert" class="alert"></div>
   </div>
 </div>
 
@@ -7879,30 +7867,46 @@ function exPlan(lastISO,today){
   const days=Math.round((Date.parse(lastSunday)-Date.parse(start))/864e5)+1;   // both UTC-parsed, so the gap is exact
   return {start:start,end:lastSunday,weeks:Math.round(days/7)};
 }
+// Message Dashboard: re-importing overlap is harmless, so start on the last day we have.
+function exPlanOverlap(lastISO,today){
+  const lastSunday=exAddDays(currentWeekMonday(today),-1);
+  if(!lastISO) return {start:null,end:lastSunday,weeks:null};
+  if(lastISO>=lastSunday) return {start:null,end:null,weeks:0};
+  const days=Math.round((Date.parse(lastSunday)-Date.parse(lastISO))/864e5);
+  return {start:lastISO,end:lastSunday,weeks:Math.ceil(days/7)};
+}
 function exShort(iso){ const[y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
 async function renderImportCoverage(){
   const body=document.getElementById('import-watch-body');
   if(!body) return;
-  const[wr,sr,cp]=await Promise.all([
+  const[wr,sr,cp,md,mdUp]=await Promise.all([
     sb.from('weekly_reports').select('week_of,week_end,created_at'),
     sb.from('sales_records').select('week_of,week_end,sale_date,created_at'),
-    sb.from('chatter_performance').select('week_of,week_end,created_at')
+    sb.from('chatter_performance').select('week_of,week_end,created_at'),
+    // fan_messages is ~50k rows: ask only for the newest message and newest import
+    sb.from('fan_messages').select('ts').order('ts',{ascending:false}).limit(1),
+    sb.from('fan_messages').select('created_at').order('created_at',{ascending:false}).limit(1)
   ]);
+  // Message timestamps are UTC; Infloww days are UTC+8, so shift before taking the date.
+  const mdLast=(md.data&&md.data[0])?new Date(new Date(md.data[0].ts).getTime()+8*3600e3).toISOString().slice(0,10):'';
   const maxOf=(rows,f)=>rows.reduce((m,r)=>{ const v=f(r); return v&&v>m?v:m; },'');
   const day=v=>v?String(v).slice(0,10):null;
   const feeds=[
     {label:'Creator Stats', rows:wr.data||[], last:maxOf(wr.data||[],r=>day(r.week_end))},
     {label:'Sales Record', rows:sr.data||[], last:maxOf(sr.data||[],r=>day(r.sale_date)||day(r.week_end))},
-    {label:'Employee Performance', rows:cp.data||[], last:maxOf(cp.data||[],r=>day(r.week_end))}
+    {label:'Employee Performance', rows:cp.data||[], last:maxOf(cp.data||[],r=>day(r.week_end))},
+    // Already-stored messages are skipped on import, so this one can overlap freely: the
+    // range starts ON the last day we have (no need to redo the whole week) and has no holes check.
+    {label:'Message Dashboard', rows:(mdUp.data||[]), last:mdLast, overlapSafe:true}
   ];
   const today=new Date();
   let lastUpload='';
   body.innerHTML='<div class="ex-rows">'+feeds.map(function(f){
     const lu=maxOf(f.rows,r=>r.created_at); if(lu>lastUpload) lastUpload=lu;
-    const p=exPlan(f.last||null,today);
+    const p=f.overlapSafe?exPlanOverlap(f.last||null,today):exPlan(f.last||null,today);
     // holes: whole weeks missing between the first upload and the last one
     const have=new Set(f.rows.map(r=>r.week_of));
-    const holes=f.last?computeImportCoverage({x:have},currentWeekMonday(today),12).filter(r=>r.missing&&r.week<String(f.last)&&(!p.start||r.week<p.start)).map(r=>r.week):[];
+    const holes=(f.last&&!f.overlapSafe)?computeImportCoverage({x:have},currentWeekMonday(today),12).filter(r=>r.missing&&r.week<String(f.last)&&(!p.start||r.week<p.start)).map(r=>r.week):[];
     const dot=p.weeks===0&&!holes.length?'#4ade80':(p.weeks===null||p.weeks>=2||holes.length)?'#ef4444':'#ffc83c';
     const need=p.weeks===0?'<span style="color:#4ade80;">Up to date ✓</span>'
       :p.start?'Export <b>'+exShort(p.start)+' → '+exShort(p.end)+'</b>'+(p.weeks>=2?' <span style="color:#ef4444;font-size:11.5px;">'+p.weeks+' weeks behind</span>':'')
@@ -12643,121 +12647,122 @@ async function updateSOPContent(id,val){await sb.from('sops').update({content:va
 async function deleteSOP(id){if(!confirm('Delete this SOP?'))return;await sb.from('sops').delete().eq('id',id);loadSOPs();}
 
 // ── Content Ideas ─────────────────────────────────────────────
-const IDEA_STATUS_BADGE={new:'pending',reviewed:'processing',used:'approved',dismissed:'rejected'};
-const IDEA_SOURCE_LABEL={web_search:'🔎 Web Search',metricool_hashtag:'📈 Metricool — Hashtag',metricool_top_post:'📈 Metricool — Top Post',manual:'✍️ Manual'};
-
+// ── Content Ideas: an ideas box per model ────────────────────────────────────
+// Paste a reel / TikTok link or just type an idea, file it under a model (or General),
+// and turn the good ones into a Content Order in one click. Nothing is scraped or automated --
+// the old "auto-refreshed weekly" web-search / Metricool sources were never built.
+// Models see their own ideas + General ones (enforced by RLS, not just here) and can add
+// ideas for themselves; staff see everything and make the orders.
+var IDEA={model:'',view:'new'};   // model: '' = all, 'general' = no model, else model id
+function ideaIsStaff(){ return ['admin','va'].includes(STATE.profile?.role); }
 async function loadContentIdeas(){
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  const panel=document.getElementById('ideas-admin-panel'); if(panel) panel.style.display=isAdmin?'block':'none';
   const{data,error}=await sb.from('content_ideas').select('*').order('created_at',{ascending:false});
-  if(error){console.error('loadContentIdeas',error);return;}
+  const grid=document.getElementById('ideas-grid');
+  if(error){ if(grid) grid.innerHTML='<div class="alert alert-error" style="display:block;">Could not load ideas — '+escapeHtml(error.message)+'</div>'; return; }
   STATE.contentIdeas=data||[];
-  populateIdeaNicheFilter();
-  filterContentIdeas();
+  if(!ideaIsStaff()){ const me=myOwnModel(); IDEA.model=me?me.id:'general'; }
+  renderIdeasPage();
 }
-
-function populateIdeaNicheFilter(){
-  const sel=document.getElementById('idea-filter-niche'); if(!sel)return;
-  const cur=sel.value;
-  // A model must never see other models' niches. Hide the niche filter for them entirely
-  // (they only have one niche anyway) so it can't reveal the roster of niches.
-  if(STATE.profile?.role==='model'){ sel.style.display='none'; sel.innerHTML='<option value="">All Niches</option>'; return; }
-  sel.style.display='';
-  const niches=[...new Set([
-    ...STATE.contentIdeas.map(i=>i.niche).filter(Boolean),
-    ...STATE.models.map(m=>m.niche).filter(Boolean)
-  ])].sort();
-  sel.innerHTML='<option value="">All Niches</option>'+niches.map(n=>`<option value="${n}">${n}</option>`).join('');
-  sel.value=cur;
+function ideaModelName(id){ const m=(STATE.models||[]).find(x=>x.id===id); return m?m.name:'General'; }
+function renderIdeasPage(){
+  const staff=ideaIsStaff(), all=STATE.contentIdeas||[];
+  const open=function(i){ return i.status==='new'||i.status==='reviewed'; };
+  // model pills (staff only)
+  const pills=document.getElementById('idea-models');
+  if(pills){
+    if(!staff){ pills.style.display='none'; }
+    else {
+      pills.style.display='flex';
+      const cnt=function(f){ return all.filter(function(i){ return open(i)&&f(i); }).length; };
+      const pill=function(val,label,n){ return '<button class="idea-pill'+(IDEA.model===val?' on':'')+'" onclick="IDEA.model=\''+val+'\';renderIdeasPage()">'+escapeHtml(label)+(n?' <span>'+n+'</span>':'')+'</button>'; };
+      pills.innerHTML=pill('','All',cnt(function(){return true;}))+pill('general','General',cnt(function(i){return !i.model_id;}))
+        +(STATE.models||[]).map(function(m){ return pill(m.id,m.name,cnt(function(i){return i.model_id===m.id;})); }).join('');
+    }
+  }
+  const target=document.getElementById('idea-target');
+  if(target) target.innerHTML=staff
+    ? (IDEA.model&&IDEA.model!=='general'?'Adding to <b>'+escapeHtml(ideaModelName(IDEA.model))+'</b>':IDEA.model==='general'?'Adding to <b>General</b> (any model)':'Adding to <b>General</b> — pick a model above to file it under them')
+    : 'Got an idea for your content? Paste the link or describe it — the team will see it.';
+  // view toggle
+  document.querySelectorAll('#idea-view button').forEach(function(b){ b.classList.toggle('on',b.dataset.v===IDEA.view); });
+  let rows=all.filter(function(i){
+    if(IDEA.model==='general') { if(i.model_id) return false; }
+    else if(IDEA.model) { if(i.model_id!==IDEA.model) return false; }
+    return IDEA.view==='new'?open(i):i.status===IDEA.view;
+  });
+  const grid=document.getElementById('ideas-grid'), empty=document.getElementById('ideas-empty');
+  if(!rows.length){ grid.innerHTML=''; empty.style.display='block';
+    empty.querySelector('p').textContent=IDEA.view==='new'?'No open ideas here yet. Paste a link or type one above.':'Nothing '+IDEA.view+' here.'; return; }
+  empty.style.display='none';
+  const ord=function(id){ const o=(STATE.contentOrders||[]).find(function(x){return x.id===id;}); return o&&o.order_number?'#'+String(o.order_number).padStart(3,'0'):''; };
+  grid.innerHTML=rows.map(function(i){
+    const thumb=i.thumbnail_url?'<img src="'+escapeHtml(i.thumbnail_url)+'" class="idea-thumb">':'';
+    const plat=i.platform==='instagram'?'📸 Instagram':i.platform==='tiktok'?'🎵 TikTok':i.source_url?'🔗 Link':'✍️ Idea';
+    return '<div class="card idea-card">'+thumb
+      +'<div class="idea-meta"><span>'+plat+'</span>'+(IDEA.model===''&&staff?'<span class="idea-chip">'+escapeHtml(ideaModelName(i.model_id))+'</span>':'')+'</div>'
+      +'<div class="idea-title">'+escapeHtml(i.title||'')+'</div>'
+      +(i.description?'<div class="idea-desc">'+escapeHtml(i.description)+'</div>':'')
+      +(i.source_url?'<a href="'+escapeHtml(i.source_url)+'" target="_blank" rel="noopener" class="idea-link">Watch it ↗</a>':'')
+      +'<div class="idea-foot">'+fmtDate(i.created_at)+(i.created_by?' · '+escapeHtml(String(i.created_by).split('@')[0]):'')+'</div>'
+      +(staff?'<div class="idea-actions">'
+        +(i.status==='used'&&i.order_id?'<span class="cscan cscan-green">🎯 Order '+ord(i.order_id)+' made</span>'
+          :(i.status==='new'||i.status==='reviewed')?'<button class="btn btn-sm btn-primary" onclick="ideaToOrder(\''+i.id+'\',this)">🎯 Make order</button>':'')
+        +((i.status==='new'||i.status==='reviewed')?'<button class="btn btn-sm btn-ghost" title="Done with it" onclick="ideaSetStatus(\''+i.id+'\',\'used\')">✓ Used</button><button class="btn btn-sm btn-ghost" title="Not doing it" onclick="ideaSetStatus(\''+i.id+'\',\'dismissed\')">✕ Skip</button>'
+          :'<button class="btn btn-sm btn-ghost" onclick="ideaSetStatus(\''+i.id+'\',\'new\')">↩ Reopen</button>')
+        +'<button class="btn btn-sm btn-ghost" title="Delete for good" style="margin-left:auto;" onclick="ideaDelete(\''+i.id+'\')">🗑</button>'
+      +'</div>':'')
+      +'</div>';
+  }).join('');
 }
-
-// Ideas a model is allowed to see: their own niche + untagged/general ideas. Never another
-// model's niche. Staff (admin/va) see everything.
-function ideasVisibleToMe(rows){
-  if(STATE.profile?.role!=='model') return rows;
-  const myNiche=(myOwnModel()?.niche||'').toLowerCase();
-  return rows.filter(i=>{ const n=(i.niche||'').toLowerCase(); return !n || n===myNiche; });
+async function ideaAdd(){
+  const inp=document.getElementById('idea-input'), note=document.getElementById('idea-note');
+  const raw=(inp.value||'').trim(), desc=(note.value||'').trim();
+  if(!raw) { inp.focus(); return; }
+  const urlM=raw.match(/https?:\/\/\S+/i), url=urlM?urlM[0]:null;
+  let title=url?raw.replace(url,'').trim():raw;
+  const row={title:title||'', description:desc||null, source:'manual', source_url:url, status:'new', created_by:STATE.profile?.email||null,
+    model_id:ideaIsStaff()?((IDEA.model&&IDEA.model!=='general')?IDEA.model:null):(myOwnModel()?.id||null),
+    platform:url?detectPlatformFromUrl(url):null};
+  const btn=document.getElementById('idea-add-btn'); btn.disabled=true; btn.textContent='Adding…';
+  if(url){ const o=await fetchOEmbed(url); if(o){ if(o.thumbnail_url) row.thumbnail_url=o.thumbnail_url; if(!row.title&&o.title) row.title=String(o.title).slice(0,140); } }
+  if(!row.title) row.title=url?(row.platform==='tiktok'?'TikTok':row.platform==='instagram'?'Instagram reel':'Link'):'Idea';
+  const m=(STATE.models||[]).find(function(x){return x.id===row.model_id;}); if(m&&m.niche) row.niche=m.niche;
+  const{data,error}=await sb.from('content_ideas').insert(row).select();
+  btn.disabled=false; btn.textContent='Add';
+  if(error||!data||!data.length){ alert('Could not save the idea — '+(error?error.message:'no permission')); return; }
+  STATE.contentIdeas.unshift(data[0]); inp.value=''; note.value=''; IDEA.view='new'; renderIdeasPage(); inp.focus();
 }
-
-function filterContentIdeas(){
-  const niche=document.getElementById('idea-filter-niche')?.value||'';
-  const status=document.getElementById('idea-filter-status')?.value||'';
-  const sort=document.getElementById('idea-sort')?.value||'date_desc';
-  let rows=ideasVisibleToMe(STATE.contentIdeas.slice());
-  if(niche) rows=rows.filter(i=>i.niche===niche);
-  if(status) rows=rows.filter(i=>i.status===status);
-  if(sort==='date_asc') rows.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-  else if(sort==='niche') rows.sort((a,b)=>(a.niche||'').localeCompare(b.niche||''));
-  else rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  renderContentIdeas(rows);
+async function ideaSetStatus(id,status){
+  const r=await sb.from('content_ideas').update({status:status}).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
+  const i=STATE.contentIdeas.find(function(x){return x.id===id;}); if(i) i.status=status; renderIdeasPage();
 }
-
-function renderContentIdeas(rows){
-  const grid=document.getElementById('ideas-grid'); const empty=document.getElementById('ideas-empty');
-  if(!grid)return;
-  const isAdmin=['admin','va'].includes(STATE.profile?.role);
-  if(!rows.length){grid.innerHTML='';if(empty)empty.style.display='block';return;} if(empty)empty.style.display='none';
-  grid.innerHTML=rows.map(i=>`
-    <div class="card" style="margin:0;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-        <span style="font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:0.04em;">${i.niche||'General'}</span>
-        <span class="badge ${IDEA_STATUS_BADGE[i.status]||'pending'}">${i.status}</span>
-      </div>
-      <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${i.title}</div>
-      ${i.description?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px;white-space:pre-wrap;">${i.description}</div>`:''}
-      ${i.hashtags?`<div style="font-size:11px;color:var(--accent);margin-bottom:10px;">${i.hashtags}</div>`:''}
-      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text2);margin-bottom:10px;">
-        <span>${IDEA_SOURCE_LABEL[i.source]||i.source||'—'}</span>
-        <span>${fmtDate(i.created_at)}</span>
-      </div>
-      ${i.source_url?`<a href="${i.source_url}" target="_blank" class="btn btn-sm btn-ghost" style="margin-bottom:10px;display:inline-block;">🔗 View Source</a>`:''}
-      ${isAdmin?`
-      <div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px;">
-        <select onchange="updateIdeaStatus('${i.id}',this.value)" style="flex:1;font-size:12px;">
-          <option value="new" ${i.status==='new'?'selected':''}>New</option>
-          <option value="reviewed" ${i.status==='reviewed'?'selected':''}>Reviewed</option>
-          <option value="used" ${i.status==='used'?'selected':''}>Used</option>
-          <option value="dismissed" ${i.status==='dismissed'?'selected':''}>Dismissed</option>
-        </select>
-        <button class="btn btn-sm btn-danger" onclick="deleteContentIdea('${i.id}')">✕</button>
-      </div>`:''}
-    </div>
-  `).join('');
+async function ideaDelete(id){
+  if(!confirm('Delete this idea for good?')) return;
+  const r=await sb.from('content_ideas').delete().eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  STATE.contentIdeas=STATE.contentIdeas.filter(function(x){return x.id!==id;}); renderIdeasPage();
 }
-
-function openIdeaModal(){
-  document.getElementById('idea-alert').textContent='';
-  document.getElementById('idea-niche').value='';
-  document.getElementById('idea-title').value='';
-  document.getElementById('idea-desc').value='';
-  document.getElementById('idea-url').value='';
-  document.getElementById('idea-hashtags').value='';
-  document.getElementById('idea-source').value='manual';
-  openModal('idea-modal');
-}
-
-async function saveContentIdea(){
-  const niche=document.getElementById('idea-niche').value.trim();
-  const title=document.getElementById('idea-title').value.trim();
-  if(!niche||!title){document.getElementById('idea-alert').textContent='Niche and title are required';return;}
-  const p={niche,title,description:document.getElementById('idea-desc').value.trim()||null,source:document.getElementById('idea-source').value,source_url:document.getElementById('idea-url').value.trim()||null,hashtags:document.getElementById('idea-hashtags').value.trim()||null,status:'new'};
-  const{data,error}=await sb.from('content_ideas').insert(p).select().single();
-  if(error){document.getElementById('idea-alert').textContent='Could not save — check permissions.';return;}
-  STATE.contentIdeas.unshift(data); populateIdeaNicheFilter(); filterContentIdeas(); closeModal('idea-modal');
-}
-
-async function updateIdeaStatus(id,status){
-  const{error}=await sb.from('content_ideas').update({status}).eq('id',id);
-  if(error){alert('Could not update status — you may be missing write permission.');return;}
-  const i=STATE.contentIdeas.findIndex(x=>x.id===id); if(i>-1) STATE.contentIdeas[i].status=status;
-  filterContentIdeas();
-}
-
-async function deleteContentIdea(id){
-  if(!confirm('Delete this content idea?'))return;
-  const{error,data}=await sb.from('content_ideas').delete().eq('id',id).select();
-  if(error||!data||!data.length){alert('Could not delete — you may be missing delete permission on the content_ideas table.');return;}
-  STATE.contentIdeas=STATE.contentIdeas.filter(x=>x.id!==id); filterContentIdeas();
+// One click: the idea becomes a pending Content Order for its model (asks which model if it's General).
+async function ideaToOrder(id,btn){
+  const i=STATE.contentIdeas.find(function(x){return x.id===id;}); if(!i) return;
+  let model=(STATE.models||[]).find(function(m){return m.id===i.model_id;});
+  if(!model){
+    const list=(STATE.models||[]).map(function(m,n){return (n+1)+' = '+m.name;}).join('\n');
+    const p=prompt('Which model is this order for?\n\n'+list,'1'); if(p===null) return;
+    model=(STATE.models||[])[parseInt(p,10)-1]; if(!model){ alert('No model '+p); return; }
+  }
+  if(i.source_url&&typeof findDuplicateOrders==='function'&&findDuplicateOrders(i.source_url,[model.id]).length&&!confirm('This link was already ordered for '+model.name+'. Make another order anyway?')) return;
+  if(btn){ btn.disabled=true; btn.textContent='Making…'; }
+  const notes=[i.source_url?null:i.title, i.description].filter(Boolean).join('\n')||(i.source_url&&i.title&&!/^(Instagram reel|TikTok|Link)$/.test(i.title)?i.title:null);
+  const{data,error}=await sb.from('content_orders').insert({model_id:model.id, model_name:model.name, model_email:model.email||null,
+    platform:i.platform||(i.source_url?detectPlatformFromUrl(i.source_url):'other'), url:i.source_url||null, notes:notes, thumbnail_url:i.thumbnail_url||null, status:'pending'}).select();
+  if(error||!data||!data.length){ if(btn){ btn.disabled=false; btn.textContent='🎯 Make order'; } alert('Could not make the order — '+(error?error.message:'no permission')); return; }
+  const o=data[0]; STATE.contentOrders=STATE.contentOrders||[]; STATE.contentOrders.unshift(o);
+  await sb.from('content_ideas').update({status:'used',order_id:o.id,model_id:model.id}).eq('id',id);
+  Object.assign(i,{status:'used',order_id:o.id,model_id:model.id});
+  renderIdeasPage();
+  const t=document.getElementById('idea-target'); if(t) t.innerHTML='✅ Order #'+String(o.order_number||'').padStart(3,'0')+' made for <b>'+escapeHtml(model.name)+'</b> — it\'s in Content Orders.';
 }
 
 // ── Content Scheduling ───────────────────────────────────────
