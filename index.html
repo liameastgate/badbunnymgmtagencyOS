@@ -179,6 +179,12 @@
   .contract-field.blank { color: var(--yellow); border-bottom-color: var(--yellow); font-weight: 700; }
   .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
   .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
+  .ex-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; align-items:stretch; }
+  .ex-row { display:grid; grid-template-columns:14px 170px 130px 1fr; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+  .ex-row:last-child { border-bottom:0; }
+  .ex-dot { width:10px; height:10px; border-radius:50%; display:inline-block; align-self:center; }
+  .ex-upto { color:var(--text2); font-size:12.5px; }
+  @media (max-width: 860px){ .ex-grid { grid-template-columns:1fr; } .ex-row { grid-template-columns:14px 1fr; } .ex-upto, .ex-need { grid-column:2; } }
   .ja-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   .ja-tab { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--text2); cursor:pointer; text-align:left; font-family:inherit; min-width:112px; }
   .ja-tab small { display:block; font-weight:500; font-size:11px; margin-top:3px; color:#6b7393; }
@@ -657,12 +663,28 @@
            them, so a week that was never uploaded is simply absent rather than flagged.
            Model invoices only generate on a Creator Stats upload, so a missed week is also
            a missed payout run. This makes the gap visible. -->
-      <div class="card" id="import-watch-card" style="margin:14px 0;display:none;">
+      <div class="card" id="import-watch-card" style="margin:14px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div class="card-title" style="margin-bottom:0;">Import Coverage</div>
-          <div id="import-watch-summary" style="font-size:11px;color:var(--text2);"></div>
+          <div class="card-title" style="margin-bottom:0;">📥 Infloww exports</div>
+          <div id="import-watch-summary" style="font-size:11px;color:var(--text2);">Weeks run Mon–Sun · UTC+8</div>
         </div>
-        <div id="import-watch-body"></div>
+        <div class="ex-grid">
+          <div id="import-watch-body"><div style="color:var(--text2);font-size:12px;">Checking…</div></div>
+          <div>
+          <div id="bulk-drop" class="dropzone" ondrop="handleBulkDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('bulk-file').click()" style="padding:18px;text-align:center;cursor:pointer;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:30px;">📥</div>
+            <div style="margin-top:6px;font-size:14px;font-weight:800;">Drop the exports here</div><div style="font-size:12px;color:var(--text2);">or tap to choose · any order · nothing saves until you press Import</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Creator Stats · Sales Record · Employee Performance</div>
+          </div>
+          <input type="file" id="bulk-file" multiple accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleBulkFiles(this.files)">
+          
+          
+          </div>
+        </div>
+        <div id="bulk-alert" class="alert" style="margin-top:12px;"></div>
+        <div id="bulk-list" style="margin-top:14px;"></div>
+        <div id="import-watch-recon"></div>
+        <div style="margin-top:10px;font-size:12px;"><a href="#" onclick="STATE._reportsTab='history';navigate('reports');return false;" style="color:var(--text2);">Fix or delete an upload →</a></div>
       </div>
 
       <!-- Quick earnings breakdown by day/week/month, sourced from Sales Records -->
@@ -694,6 +716,14 @@
             <tbody id="overview-top-chatters"></tbody>
           </table></div>
         </div>
+      </div>
+      <div class="card" style="margin:14px 0;">
+        <div class="card-title">💬 Chatter Performance</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Chatter</th><th>Models</th><th>Sales</th><th>DMs Sent</th><th>Fan CVR</th><th>Golden Ratio</th><th>Unlock Ratio</th><th>Sales/Hr</th></tr></thead>
+          <tbody id="dash-chatter-performance"></tbody>
+        </table></div>
+        <div id="dash-perf-empty" class="empty" style="display:none;"><div class="empty-icon">📈</div><p>No Employee Performance export covers this period yet</p></div>
       </div>
       <div id="overview-ticker" style="padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:14px;overflow:hidden;">
         <span style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--accent);flex-shrink:0;border-right:1px solid var(--border);padding-right:14px;">Feed</span>
@@ -1145,11 +1175,11 @@
 
     <!-- Weekly Reports -->
     <div class="page" id="page-reports">
-      <div class="page-title">Weekly Reports</div>
-      <div class="page-sub">Upload Infloww CSV to calculate earnings, splits and agency profit</div>
+      <div class="page-title">Report details</div>
+      <div class="page-sub"><a href="#" onclick="navigate('overview');return false;" style="color:var(--accent2);">← Back to Dashboard</a> · fix or delete an upload, or dig into one export</div>
       <div class="tabs">
-        <div class="tab active" onclick="switchReportTab('overview')">Overview</div>
-        <div class="tab" onclick="switchReportTab('bulk')">⬆️ Bulk Import</div>
+        <div class="tab" style="display:none;" onclick="switchReportTab('overview')">Overview</div>
+        <div class="tab" style="display:none;" onclick="switchReportTab('bulk')">⬆️ Bulk Import</div>
         <div class="tab" onclick="switchReportTab('upload')">Creator Stats</div>
         <div class="tab" onclick="switchReportTab('chatters')">Chatter Performance</div>
         <div class="tab" onclick="switchReportTab('sales')">Sales Records</div>
@@ -1201,14 +1231,7 @@
           <div class="card-title">⬆️ Drop this week's Infloww exports</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Drop all of them at once — each file is identified by its own column headers, so the order you drop them in doesn't matter. Nothing is saved until you press Import.</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:var(--surface);border-radius:6px;">Weeks run <strong style="color:var(--text);">Monday 00:00 to Sunday 23:59, UTC+8</strong> — the timezone your Infloww account exports in, and the one your chatters work to. One invoice per week. A wider export is split into calendar weeks automatically.</div>
-          <div id="bulk-drop" class="dropzone" ondrop="handleBulkDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('bulk-file').click()" style="padding:28px;text-align:center;cursor:pointer;">
-            <div style="font-size:30px;">📥</div>
-            <div style="margin-top:6px;font-size:13px;">Drop files here, or click to choose</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px;">Creator Stats · Sales Record · Employee Performance</div>
-          </div>
-          <input type="file" id="bulk-file" multiple accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleBulkFiles(this.files)">
-          <div id="bulk-alert" class="alert" style="margin-top:12px;"></div>
-          <div id="bulk-list" style="margin-top:14px;"></div>
+          <div style="font-size:13px;color:var(--text2);">Bulk import now lives on the Dashboard.</div>
         </div>
       </div>
 
@@ -3069,7 +3092,7 @@ var NAV = [
   { id: 'model-home', icon: '🏠', label: 'Overview',            roles: ['model'],                                  section: 'General' },
   { id: 'overview',   icon: '🏠', label: 'Dashboard',           roles: ['admin','va','traffic'],                   section: 'General' },
   { id: 'leaderboard',icon: '🏆', label: 'Leaderboard',         roles: ['admin','va','traffic'],                   section: 'General' },
-  { id: 'reports',    icon: '📊', label: 'Weekly Reports',      roles: ['admin','va'],                             section: 'General' },
+  { id: 'reports',    icon: '📊', label: 'Report details',      roles: ['admin','va'],                             section: 'General', hidden: true },
 
   { id: 'fans',       icon: '🧑‍💼', label: 'Fans',                roles: ['admin','va','chatter'],                   section: 'Chatting' },
   { id: 'chatters',   icon: '📅', label: 'Schedule',            roles: ['admin','va','chatter'],                   section: 'Chatting' },
@@ -3177,7 +3200,7 @@ function buildNav(role) {
   let lastSection = null;
   NAV.forEach(item => {
     const allowed = item.secret ? isOwner : (customPerms ? customPerms.includes(item.id) : item.roles.includes(role));
-    if (!allowed) return;
+    if (!allowed || item.hidden) return;   // hidden: reachable from links only, not the sidebar
     // Add section label if new section
     if (item.section && item.section !== lastSection) {
       const sec = document.createElement('div');
@@ -3435,7 +3458,7 @@ function navigate(page) {
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
   if (page === 'compliance') renderCompliance();
   if (page === 'compliance-hub') { loadContentLibrary().then(renderComplianceHub); loadContentScans(); }
-  if (page === 'reports') loadReportsOverview();
+  if (page === 'reports') switchReportTab(STATE._reportsTab||'history');
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
@@ -3488,7 +3511,7 @@ function renderModelHome(){
   // their custom Team Access permission overrides) actually grants, nothing hardcoded or
   // shared across accounts. Excludes this page itself (no point linking to where you are).
   const shortcuts=NAV.filter(item=>{
-    if(item.id==='model-home'||item.id==='overview') return false;
+    if(item.id==='model-home'||item.id==='overview'||item.hidden) return false;
     if(item.secret) return isOwner;
     return customPerms ? customPerms.includes(item.id) : item.roles.includes(role);
   }).map(item=>({id:item.id, icon:item.icon, label:item.label, desc:DESCS[item.id]||item.section}));
@@ -3641,6 +3664,10 @@ async function renderOverview() {
   }
 
   loadEarningsBreakdown();
+  sb.from('chatter_performance').select('*').then(function(cp){
+    const rows=(cp.data||[]).filter(r=>rangeStart?overlaps(r.week_of,r.week_end,rangeStart,rangeEnd):r.week_of===weeks[0]);
+    renderChatterPerfTable(rows,'dash-chatter-performance','dash-perf-empty');
+  });
 
   const tbody = document.getElementById('leaderboard-body'); tbody.innerHTML='';
   if (!sorted.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);">No data — upload a weekly report first</td></tr>'; return; }
@@ -6579,8 +6606,14 @@ async function loadReportsOverview(){
   // one row per chatter per day/session, so a single week can carry 10+ raw rows per chatter;
   // summing/averaging those into one row keeps this readable, matching how the Leaderboard and
   // Creator Earnings tables above are already aggregated rather than listing every raw row.
-  const perfBody=document.getElementById('wro-chatter-performance');
-  const perfEmpty=document.getElementById('wro-perf-empty');
+  renderChatterPerfTable(perfRows,'wro-chatter-performance','wro-perf-empty');
+}
+
+// Chatter Performance table: one row per chatter, summed/averaged over the range.
+// Shared by the Dashboard and the Report details page.
+function renderChatterPerfTable(perfRows,bodyId,emptyId){
+  const perfBody=document.getElementById(bodyId), perfEmpty=document.getElementById(emptyId);
+  if(!perfBody||!perfEmpty) return;
   const perfMap=new Map();
   perfRows.forEach(r=>{
     const key=r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
@@ -7832,42 +7865,75 @@ function computeImportCoverage(feeds, todayMonday, limit){
   return limit?rows.slice(0,limit):rows;
 }
 
+// One row per Infloww export: how far it's up to, and exactly which dates to export next.
+// Re-uploading a week replaces that week, so a part-covered week is re-exported whole --
+// the range always starts on a Monday and ends on the last finished Sunday.
+function exAddDays(iso,n){ const[y,m,d]=iso.split('-').map(Number); return toLocalISO(new Date(y,m-1,d+n)); }
+function exPlan(lastISO,today){
+  const lastSunday=exAddDays(currentWeekMonday(today),-1);
+  if(!lastISO) return {start:null,end:lastSunday,weeks:null};
+  const nextDay=exAddDays(lastISO,1);
+  const[y,m,d]=nextDay.split('-').map(Number);
+  const start=currentWeekMonday(new Date(y,m-1,d));
+  if(start>lastSunday) return {start:null,end:null,weeks:0};
+  const days=Math.round((Date.parse(lastSunday)-Date.parse(start))/864e5)+1;   // both UTC-parsed, so the gap is exact
+  return {start:start,end:lastSunday,weeks:Math.round(days/7)};
+}
+function exShort(iso){ const[y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
 async function renderImportCoverage(){
-  const card=document.getElementById('import-watch-card');
   const body=document.getElementById('import-watch-body');
-  if(!card||!body) return;
+  if(!body) return;
   const[wr,sr,cp]=await Promise.all([
-    sb.from('weekly_reports').select('week_of'),
-    sb.from('sales_records').select('week_of'),
-    sb.from('chatter_performance').select('week_of')
+    sb.from('weekly_reports').select('week_of,week_end,created_at'),
+    sb.from('sales_records').select('week_of,week_end,sale_date,created_at'),
+    sb.from('chatter_performance').select('week_of,week_end,created_at')
   ]);
-  const feeds={
-    'Creator stats': new Set((wr.data||[]).map(r=>r.week_of)),
-    'Sales record':  new Set((sr.data||[]).map(r=>r.week_of)),
-    'Employee perf': new Set((cp.data||[]).map(r=>r.week_of))
-  };
-  const labels=Object.keys(feeds);
-  const rows=computeImportCoverage(feeds, currentWeekMonday(new Date()), 10);
-  if(!rows.length){ card.style.display='none'; return; }
-  card.style.display='';
-
-  const incomplete=rows.filter(r=>r.missing>0).length;
-  const sum=document.getElementById('import-watch-summary');
-  if(sum) sum.innerHTML = incomplete
-    ? '<span style="color:var(--danger,#ff5c5c);font-weight:700;">'+incomplete+' of the last '+rows.length+' week'+(rows.length!==1?'s':'')+' incomplete</span>'
-    : '<span style="color:var(--accent2);">All '+rows.length+' recent weeks complete</span>';
-
-  const tick='<span style="color:var(--accent2);">&#10003;</span>';
-  const cross='<span style="color:var(--danger,#ff5c5c);font-weight:700;">&mdash;</span>';
-  body.innerHTML='<div class="table-wrap"><table><thead><tr><th>Week of</th>'+
-    labels.map(l=>'<th style="text-align:center;">'+l+'</th>').join('')+
-    '</tr></thead><tbody>'+
-    rows.map(function(r){
-      return '<tr'+(r.missing?' style="background:rgba(255,92,92,0.06);"':'')+'>'+
-        '<td style="white-space:nowrap;">'+fmtDate(r.week)+'</td>'+
-        labels.map(function(l){ return '<td style="text-align:center;">'+(r.present[l]?tick:cross)+'</td>'; }).join('')+
-      '</tr>';
-    }).join('')+'</tbody></table></div>';
+  const maxOf=(rows,f)=>rows.reduce((m,r)=>{ const v=f(r); return v&&v>m?v:m; },'');
+  const day=v=>v?String(v).slice(0,10):null;
+  const feeds=[
+    {label:'Creator Stats', rows:wr.data||[], last:maxOf(wr.data||[],r=>day(r.week_end))},
+    {label:'Sales Record', rows:sr.data||[], last:maxOf(sr.data||[],r=>day(r.sale_date)||day(r.week_end))},
+    {label:'Employee Performance', rows:cp.data||[], last:maxOf(cp.data||[],r=>day(r.week_end))}
+  ];
+  const today=new Date();
+  let lastUpload='';
+  body.innerHTML='<div class="ex-rows">'+feeds.map(function(f){
+    const lu=maxOf(f.rows,r=>r.created_at); if(lu>lastUpload) lastUpload=lu;
+    const p=exPlan(f.last||null,today);
+    // holes: whole weeks missing between the first upload and the last one
+    const have=new Set(f.rows.map(r=>r.week_of));
+    const holes=f.last?computeImportCoverage({x:have},currentWeekMonday(today),12).filter(r=>r.missing&&r.week<String(f.last)&&(!p.start||r.week<p.start)).map(r=>r.week):[];
+    const dot=p.weeks===0&&!holes.length?'#4ade80':(p.weeks===null||p.weeks>=2||holes.length)?'#ef4444':'#ffc83c';
+    const need=p.weeks===0?'<span style="color:#4ade80;">Up to date ✓</span>'
+      :p.start?'Export <b>'+exShort(p.start)+' → '+exShort(p.end)+'</b>'+(p.weeks>=2?' <span style="color:#ef4444;font-size:11.5px;">'+p.weeks+' weeks behind</span>':'')
+      :'Never uploaded';
+    return '<div class="ex-row"><span class="ex-dot" style="background:'+dot+'"></span><b class="ex-name">'+f.label+'</b>'
+      +'<span class="ex-upto">'+(f.last?'up to '+exShort(String(f.last)):'—')+'</span><span class="ex-need">'+need
+      +(holes.length?'<div style="color:#ef4444;font-size:11.5px;margin-top:2px;">Also missing: '+holes.slice(0,3).map(w=>'week of '+exShort(w)).join(', ')+(holes.length>3?' +'+(holes.length-3)+' more':'')+'</div>':'')+'</span></div>';
+  }).join('')+'</div>'
+  +'<div style="font-size:11.5px;color:var(--text2);margin-top:10px;">🟢 up to date · 🟡 1 week behind · 🔴 2+ weeks behind or a gap'+(lastUpload?' · last upload '+exShort(String(lastUpload).slice(0,10)):'')+'</div>';
+  renderReconWarning(sr.data,cp.data).catch(function(){});
+}
+// Reconcile, in the background: for the newest week that has BOTH Sales Records and
+// Employee Performance, compare each chatter's self-reported sales against the records.
+// Shows nothing unless a chatter is off by more than $10 AND 5%.
+async function renderReconWarning(srWeeks,cpWeeks){
+  const el=document.getElementById('import-watch-recon'); if(!el) return;
+  const a=new Set((srWeeks||[]).map(r=>r.week_of)), common=[...new Set((cpWeeks||[]).map(r=>r.week_of))].filter(w=>a.has(w)).sort();
+  const wk=common[common.length-1]; if(!wk){ el.innerHTML=''; return; }
+  const[{data:perf},{data:sales}]=await Promise.all([
+    sb.from('chatter_performance').select('chatter_id,chatter_name,sales').eq('week_of',wk),
+    sb.from('sales_records').select('chatter_id,chatter_name,earnings').eq('week_of',wk)
+  ]);
+  const keyOf=r=>r.chatter_id||('raw:'+normalizeName(r.chatter_name||''));
+  const m=new Map();
+  (perf||[]).forEach(r=>{ if(!r.chatter_name) return; const k=keyOf(r); if(!m.has(k)) m.set(k,{name:r.chatter_name,claimed:0,real:0,p:false,s:false}); const g=m.get(k); g.claimed+=cleanAmount(r.sales); g.p=true; });
+  (sales||[]).forEach(r=>{ if(!r.chatter_name) return; const k=keyOf(r); if(!m.has(k)) m.set(k,{name:r.chatter_name,claimed:0,real:0,p:false,s:false}); const g=m.get(k); g.real+=parseFloat(r.earnings||0); g.s=true; });
+  const bad=[...m.values()].filter(g=>g.p&&g.s&&Math.abs(g.claimed-g.real)>10&&Math.abs(g.claimed-g.real)>0.05*Math.max(g.real,1));
+  el.innerHTML=bad.length?'<div style="margin-top:12px;padding:10px 12px;border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.07);border-radius:10px;font-size:13px;">'
+    +'⚠ <b>'+bad.length+' chatter'+(bad.length===1?'\'s':'s\'')+' claimed sales don\'t match the records</b> for the week of '+exShort(wk)+': '
+    +bad.slice(0,3).map(g=>escapeHtml(g.name)+' (claimed $'+fmt(g.claimed)+', records $'+fmt(g.real)+')').join(' · ')
+    +' <a href="#" onclick="STATE._reportsTab=\'reconcile\';navigate(\'reports\');return false;" style="color:var(--accent2);margin-left:6px;">Details →</a></div>':'';
 }
 
 async function loadReportHistory(){
