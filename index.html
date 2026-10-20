@@ -972,74 +972,95 @@
     <!-- Content Scheduling -->
 <!-- CONTENT FACTORY -->
     <div class="page" id="page-content-factory">
-      <div class="page-title">Content Factory <button class="btn btn-sm btn-ghost" style="margin-left:10px;vertical-align:middle;" onclick="navigate('content-upload')" title="Every upload, with its lifecycle state">📁 Content Library ↗</button></div>
-      <div class="page-sub">Photos and sounds come from the model's Content Library; finished reels go back into it, ready for the phones. Rendering runs on a server — nothing needs to be open on anyone's computer.</div>
+      <style>
+        #page-content-factory .cfx-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;}
+        #page-content-factory .cfx-kick{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:4px;}
+        #page-content-factory .cfx-h1{font-size:28px;font-weight:800;letter-spacing:-.02em;}
+        #page-content-factory .cfx-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;}
+        #page-content-factory .cfx-ctl label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2);}
+        #page-content-factory .cfx-sel{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;min-width:150px;}
+        #page-content-factory .cfx-btn{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;}
+        #page-content-factory .cfx-btn:hover{border-color:var(--accent2);}
+        #page-content-factory .cfx-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px;}
+        #page-content-factory .cfx-stat{background:var(--surface);padding:14px 16px;}
+        #page-content-factory .cfx-stat b{display:block;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;}
+        #page-content-factory .cfx-stat span{font-size:12px;color:var(--text2);}
+        #page-content-factory .cfx-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px;}
+        #page-content-factory .cfx-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:16px;}
+        #page-content-factory .cfx-card h2{font-size:19px;font-weight:700;margin-top:4px;}
+        #page-content-factory .cfx-card p{font-size:12.5px;line-height:1.5;color:var(--text2);margin-top:4px;}
+        #page-content-factory .cfx-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+        #page-content-factory .cfx-count{font-size:12.5px;color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums;}
+        #page-content-factory .cfx-src{border:1px dashed var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+        #page-content-factory .cfx-src-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+        #page-content-factory .cfx-src-row .cfx-sel{min-width:0;padding:7px 10px;font-size:13px;}
+        #page-content-factory .cfx-hint{font-size:11.5px;color:var(--text2);}
+        #page-content-factory .cfx-feat{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:11px 0;color:var(--text);text-align:left;cursor:pointer;font-size:14px;font-weight:600;}
+        #page-content-factory .cfx-feat small{display:block;font-size:11.5px;font-weight:400;color:var(--text2);margin-top:2px;}
+        #page-content-factory .cfx-sw{flex:none;width:38px;height:22px;border-radius:99px;padding:3px;display:flex;background:#2a2f45;transition:background .15s;}
+        #page-content-factory .cfx-sw i{width:16px;height:16px;border-radius:50%;background:#fff;}
+        #page-content-factory .cfx-feat[aria-pressed="true"] .cfx-sw{background:var(--tint,var(--accent));justify-content:flex-end;}
+        #page-content-factory .cfx-run{margin-top:auto;border:0;border-radius:12px;padding:12px 14px;font-size:14px;font-weight:700;cursor:pointer;color:#0b0d10;background:var(--tint,var(--accent));}
+        #page-content-factory .cfx-run:disabled{opacity:.45;cursor:not-allowed;}
+        #page-content-factory .cfx-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:16px;}
+        #page-content-factory .cfx-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;}
+        #page-content-factory .cfx-panel{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;min-width:0;}
+        #page-content-factory .cfx-panel-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+        #page-content-factory .cfx-panel-h h3{font-size:15px;font-weight:700;}
+        #page-content-factory .cfx-chip{border:1px solid var(--border);background:var(--surface2);color:var(--text2);border-radius:99px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;}
+        #page-content-factory .cfx-chip.on{border-color:var(--accent);background:rgba(30,79,255,.16);color:#fff;}
+        #page-content-factory .cfx-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+        #page-content-factory .cfx-tag{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap;}
+        #page-content-factory .cfx-list{max-height:520px;overflow:auto;}
+        @media (max-width:640px){ #page-content-factory .cfx-two{grid-template-columns:1fr;} #page-content-factory .cfx-cards{grid-template-columns:1fr;} }
+      </style>
 
-      <div class="card">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-          <div class="form-group" style="margin:0;min-width:170px;">
-            <label>Model</label>
-            <select id="cf-model" onchange="cfModelChanged()"></select>
-          </div>
-          <div class="form-group" style="margin:0;min-width:130px;">
-            <label>How many</label>
-            <select id="cf-qty">
-              <option value="0">Everything</option>
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Add photos</label>
-            <input type="file" id="cf-up-raw" multiple accept="image/*" onchange="cfUploadLib('photos', this)">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Add sounds</label>
-            <input type="file" id="cf-up-audio" multiple accept="audio/*" onchange="cfUploadLib('sounds', this)">
-          </div>
+      <div class="cfx-top">
+        <div><div class="cfx-kick">Tools</div><div class="cfx-h1">Content Factory</div></div>
+        <div class="cfx-ctl">
+          <label>Model<select id="cf-model" class="cfx-sel" onchange="cfModelChanged()"></select></label>
+          <button class="cfx-btn" style="padding:9px 14px;font-size:13.5px;" onclick="navigate('content-upload')" title="Every upload, with its lifecycle state">Content Library</button>
         </div>
-        <div id="cf-alert" class="alert"></div>
       </div>
+      <div id="cf-alert" class="alert" style="margin-bottom:14px;"></div>
 
-      <div class="card">
-        <div class="card-title">What this model has</div>
-        <div class="stats-grid" id="cf-counts"></div>
-      </div>
+      <div class="cfx-stats" id="cf-counts" aria-label="What this model has"></div>
 
-      <div class="card">
-        <div class="card-title">Make something</div>
-        <div class="page-sub" style="margin-top:-4px;">Source clips are a library — each button makes a <b>new</b> version from them, it never replaces what you already made.</div>
-        <div class="btn-row" style="flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="cfSubmit('photo2video')">1 · Photos &rarr; source clips</button>
-          <button class="btn btn-primary" onclick="cfSubmit('captionaudio')">2 · Add caption + sound</button>
-          <button class="btn btn-ghost"   onclick="cfSubmit('caption')">Caption only</button>
-          <button class="btn btn-ghost"   onclick="cfSubmit('audioonly')">Sound only</button>
-          <button class="btn btn-primary" onclick="cfSubmit('prep')">3 · Prep for posting</button>
+      <div class="cfx-cards" id="cf-cards"></div>
+
+      <div class="cfx-bar">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c59bff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          <b style="font-size:14px;">Sound bank</b>
+          <span class="cfx-hint" id="cf-sound-note">laid under captioned clips</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="cfx-btn" onclick="cfOpenLib('sounds')">Open sounds</button>
+          <label class="cfx-btn" style="display:inline-flex;align-items:center;">Add sounds<input type="file" id="cf-up-audio" multiple accept="audio/*" style="display:none;" onchange="cfUploadLib('sounds', this)"></label>
         </div>
       </div>
 
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          <div class="card-title" style="margin:0;">Ready to post</div>
-          <button class="btn btn-sm btn-ghost" onclick="cfLoadReady()">Refresh</button>
+      <div class="cfx-two">
+        <div class="cfx-panel">
+          <div class="cfx-panel-h">
+            <h3>Ready to post</h3>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <span id="cf-ready-filters" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+              <button class="cfx-btn" onclick="cfLoadReady()">Refresh</button>
+            </div>
+          </div>
+          <div id="cf-ready" class="cfx-list"></div>
+          <div id="cf-ready-empty" class="empty" style="display:none;"><div class="empty-icon">🎬</div><p>Nothing finished yet — run one of the cards above</p></div>
         </div>
-        <div id="cf-ready"></div>
-        <div id="cf-ready-empty" class="empty" style="display:none;"><div class="empty-icon">🎬</div><p>Nothing finished yet — run the three steps above</p></div>
+        <div class="cfx-panel">
+          <div class="cfx-panel-h"><h3>Jobs</h3><span class="cfx-hint">updates every few seconds</span></div>
+          <div id="cf-jobs" class="cfx-list"></div>
+          <div id="cf-jobs-empty" class="empty" style="display:none;"><div class="empty-icon">⏳</div><p>No jobs yet</p></div>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Jobs</div>
-        <div id="cf-jobs"></div>
-        <div id="cf-jobs-empty" class="empty" style="display:none;"><div class="empty-icon">⏳</div><p>No jobs yet</p></div>
-      </div>
-
-      <div class="card" id="cf-log-card" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
-          <div class="card-title" style="margin:0;">Job output</div>
-          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('cf-log-card').style.display='none'">Close</button>
-        </div>
+      <div class="cfx-panel" id="cf-log-card" style="display:none;margin-top:16px;">
+        <div class="cfx-panel-h"><h3>Job output</h3><button class="cfx-btn" onclick="document.getElementById('cf-log-card').style.display='none'">Close</button></div>
         <pre id="cf-log" style="max-height:320px;overflow:auto;white-space:pre-wrap;font-size:12px;line-height:1.5;margin:0;"></pre>
       </div>
     </div>
@@ -3208,13 +3229,53 @@ function buildNav(role) {
 
 /* ---------------------------------------------------------------------------
    CONTENT FACTORY
-   Photos in, posting-ready reels out. The browser only ever moves files and
-   writes a job row -- the actual ffmpeg work happens on the render worker,
-   because a render takes minutes and a page can't hold that open.
+   Three cards, one per kind of content:
+     Photo reels            photos   -> clips -> caption/sound -> prep
+     Raw reels              raw clips -> caption/sound -> prep
+     Repurpose/Trial reels  finished reels -> fresh metadata
+   Each card auto-picks its inputs at random from the model's Library (the
+   worker's "How many": Everything / 5 / 10 / 25 / 50), so a run needs no
+   hand-picking and can be automated. Ticking steps queues one render job per
+   step, in order; the worker runs them one after another. The browser only
+   moves files and writes job rows -- ffmpeg runs on the render worker.
 --------------------------------------------------------------------------- */
 const CF_RAW='content-raw', CF_SOURCE='content-source',
       CF_AUDIO='content-audio', CF_OUT='content-output';
-let CF_TIMER=null, CF_JOBS=[];
+let CF_TIMER=null, CF_JOBS=[], CF_READY=[], CF_READY_F='';
+
+// Which cards the render worker can already run. Raw reels and Repurpose/Trial
+// reels need the worker to read params.source ('raw' / 'repurpose'); until it
+// does, their Run buttons stay off so nothing gets queued that would misfire.
+const CF_WORKER={photo:true, raw:true, repurpose:true};
+
+const CFX_KIND={
+  photo:    {label:'Photo reels',           tint:'#5b8cff', tagBg:'rgba(91,140,255,.16)', tagFg:'#b9ccff'},
+  raw:      {label:'Raw reels',             tint:'#3dd68c', tagBg:'rgba(61,214,140,.15)', tagFg:'#8ee6bd'},
+  repurpose:{label:'Repurpose/Trial reels', tint:'#f5b544', tagBg:'rgba(245,181,68,.15)', tagFg:'#f6cf84'}
+};
+const CF_CARDS=[
+  {key:'photo', kicker:'Photos in', cat:'photos', accept:'image/*', unit:'photos',
+   blurb:'Stills become motion clips, then get a caption, a sound and posting prep.',
+   feats:[['clips','Make source clips','Photos → short motion clips'],
+          ['caption','Add caption','From the caption bank'],
+          ['sound','Add sound','From the sound bank'],
+          ['prep','Prep for posting','Fresh metadata, into the phone pool']]},
+  {key:'raw', kicker:'Raw clips in', cat:'raw', accept:'video/*', unit:'raw clips',
+   blurb:'Filmed clips with no text or audio yet. Add what is missing, then prep.',
+   feats:[['caption','Add caption','Burned-in text from the caption bank'],
+          ['sound','Add sound','From the sound bank'],
+          ['keep','Keep original audio','Skips the sound step'],
+          ['prep','Prep for posting','Fresh metadata, into the phone pool']]},
+  {key:'repurpose', kicker:'Finished reels in', cat:'repurpose', accept:'video/*', unit:'reels',
+   blurb:'Already captioned with audio. Never re-captioned, only refreshed for reposting.',
+   feats:[['prep','Fresh metadata','New file fingerprint for each repost'],
+          ['trial','Trial reels only','Mark this batch for trial-reel tests']]}
+];
+const CF_DEFAULT_ON={photo:{clips:true,caption:true,sound:true,prep:true},
+                     raw:{caption:true,sound:true,keep:false,prep:true},
+                     repurpose:{prep:true,trial:false}};
+let CF_ON=(function(){ try{ return Object.assign({},CF_DEFAULT_ON,JSON.parse(localStorage.getItem('cf_on')||'{}')); }catch(e){ return JSON.parse(JSON.stringify(CF_DEFAULT_ON)); } })();
+let CF_COUNTS={};
 
 function cfAlert(msg, kind){
   const el=document.getElementById('cf-alert');
@@ -3239,6 +3300,7 @@ function renderContentFactory(){
   }
   if(sel && STATE._cfPreselect && Array.from(sel.options).some(o=>o.value===STATE._cfPreselect)){ sel.value=STATE._cfPreselect; }
   STATE._cfPreselect=null;
+  cfRenderCards();
   cfModelChanged();
   // Poll while the tab is open; a render is minutes long so there is no point
   // hammering it, and the interval is cleared as soon as you navigate away.
@@ -3257,6 +3319,79 @@ function cfModelChanged(){
   cfLoadCounts(); cfLoadJobs(); cfLoadReady();
 }
 
+/* ---- the three cards ---- */
+function cfQty(key){ try{ return localStorage.getItem('cf_qty_'+key)||'0'; }catch(e){ return '0'; } }
+function cfSetQty(key,v){ try{ localStorage.setItem('cf_qty_'+key,v); }catch(e){} cfRenderCards(); }
+function cfSteps(key){
+  // The job rows a card's ticks turn into, in the order the worker must run them.
+  const on=CF_ON[key]||{}, s=[];
+  if(key==='photo' && on.clips) s.push('photo2video');
+  if(key==='photo' || key==='raw'){
+    const cap=!!on.caption, snd=!!on.sound && !(key==='raw' && on.keep);
+    if(cap&&snd) s.push('captionaudio'); else if(cap) s.push('caption'); else if(snd) s.push('audioonly');
+  }
+  if(on.prep) s.push('prep');
+  return s;
+}
+function cfxToggle(key,f){
+  CF_ON[key]=Object.assign({},CF_ON[key]); CF_ON[key][f]=!CF_ON[key][f];
+  if(key==='raw' && f==='keep' && CF_ON.raw.keep) CF_ON.raw.sound=false;   // keeping the original audio means no new sound
+  if(key==='raw' && f==='sound' && CF_ON.raw.sound) CF_ON.raw.keep=false;
+  try{ localStorage.setItem('cf_on',JSON.stringify(CF_ON)); }catch(e){}
+  cfRenderCards();
+}
+function cfRenderCards(){
+  const box=document.getElementById('cf-cards'); if(!box) return;
+  const qtyOpts=[['0','Everything'],['5','5'],['10','10'],['25','25'],['50','50']];
+  box.innerHTML=CF_CARDS.map(function(c){
+    const k=CFX_KIND[c.key], on=CF_ON[c.key]||{}, steps=cfSteps(c.key), q=cfQty(c.key), ready=CF_WORKER[c.key];
+    const n=CF_COUNTS[c.key];
+    const feats=c.feats.map(function(f){
+      return `<button class="cfx-feat" aria-pressed="${on[f[0]]?'true':'false'}" onclick="cfxToggle('${c.key}','${f[0]}')"><span>${f[1]}<small>${f[2]}</small></span><span class="cfx-sw"><i></i></span></button>`;
+    }).join('');
+    const runLabel=!ready ? 'Needs a render worker update' : !steps.length ? 'Tick at least one step'
+                 : 'Run '+steps.length+' step'+(steps.length>1?'s':'')+' · '+(q==='0'?'everything':q+' at random');
+    return `<article class="cfx-card" style="--tint:${k.tint};">
+      <div class="cfx-head"><div><div class="cfx-kick" style="color:${k.tint};margin:0;">${c.kicker}</div><h2>${k.label}</h2><p>${c.blurb}</p></div>
+        <div class="cfx-count">${n==null?'…':n+' '+c.unit}</div></div>
+      <div class="cfx-src">
+        <div class="cfx-src-row"><span style="font-size:13px;font-weight:600;">Auto-pick at random</span>
+          <select class="cfx-sel" aria-label="How many ${k.label}" onchange="cfSetQty('${c.key}',this.value)">${qtyOpts.map(o=>`<option value="${o[0]}"${o[0]===q?' selected':''}>${o[1]}</option>`).join('')}</select></div>
+        <div class="cfx-src-row">
+          <span class="cfx-hint">From this model's Library · ${LIB_CATEGORIES[c.cat]?LIB_CATEGORIES[c.cat].label:c.cat}</span>
+          <span style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label class="cfx-btn" style="display:inline-flex;align-items:center;">Upload<input type="file" multiple accept="${c.accept}" style="display:none;" onchange="cfUploadLib('${c.cat}', this)"></label>
+            <button class="cfx-btn" onclick="cfOpenLib('${c.cat}')">Open in Library</button>
+          </span></div>
+      </div>
+      <div>${feats}</div>
+      <button class="cfx-run" ${(!ready||!steps.length)?'disabled':''} onclick="cfRunCard('${c.key}')">${runLabel}</button>
+    </article>`;
+  }).join('');
+}
+function cfOpenLib(cat){
+  LIB_F.model=cfModelId(); LIB_F.category=cat; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q='';
+  navigate('content-upload');
+}
+async function cfRunCard(key){
+  const id=cfModelId();
+  if(!id){ cfAlert('Pick a model first.','error'); return; }
+  if(!CF_WORKER[key]){ cfAlert('The render worker cannot run '+CFX_KIND[key].label+' yet.','error'); return; }
+  const steps=cfSteps(key); if(!steps.length){ cfAlert('Tick at least one step.','error'); return; }
+  const qty=parseInt(cfQty(key)||'0',10), batch=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
+  const extra=key==='repurpose'?{trial:!!(CF_ON.repurpose||{}).trial}:{};
+  // One row per step, inserted one at a time so created_at keeps them in order.
+  for(let i=0;i<steps.length;i++){
+    const {error}=await sb.from('render_jobs').insert({
+      model_id:id, job_type:steps[i], quantity:qty, created_by:STATE.profile?.id||null,
+      params:Object.assign({kind:key, source:key, batch:batch, step:i+1, of:steps.length},extra)
+    });
+    if(error){ cfAlert('Could not queue step '+(i+1)+': '+error.message,'error'); cfLoadJobs(); return; }
+  }
+  cfAlert(CFX_KIND[key].label+': '+steps.length+' step'+(steps.length>1?'s':'')+' queued. They run in order — watch Jobs below.','success');
+  cfLoadJobs();
+}
+
 async function cfCount(bucket, prefix){
   try{
     const {data,error}=await sb.storage.from(bucket).list(prefix,{limit:1000});
@@ -3265,9 +3400,9 @@ async function cfCount(bucket, prefix){
   }catch(e){ return 0; }
 }
 
-// The Library is the one door now: photos and sounds are Library rows for the
-// model; clips the worker made are render_assets; finished reels are Library
-// rows the worker wrote (render_job_id set), which the phones can post.
+// The Library is the one door: photos, raw clips, repurpose reels and sounds
+// are Library rows for the model; clips the worker made are render_assets;
+// finished reels are Library rows the worker wrote (render_job_id set).
 async function cfLoadCounts(){
   const id=cfModelId(); const box=document.getElementById('cf-counts');
   if(!id||!box) return;
@@ -3278,20 +3413,26 @@ async function cfLoadCounts(){
   const L=lib.data||[], A=assets.data||[];
   const isImg=function(x){ return /^image\//.test(x.content_type||'')||/\.(jpe?g|png|webp)$/i.test(x.r2_key||''); };
   const photos=L.filter(function(x){ return isImg(x)&&['photos','social'].includes(x.category)&&x.review_status!=='rejected'; }).length;
+  const raw=L.filter(function(x){ return x.category==='raw'&&x.review_status!=='rejected'; }).length;
+  const rep=L.filter(function(x){ return x.category==='repurpose'&&!x.render_job_id; }).length;
   const sounds=L.filter(function(x){ return x.category==='sounds'; }).length;
   const clips=A.filter(function(x){ return x.kind==='source'; }).length;
   const staged=A.filter(function(x){ return x.kind==='staged'; }).length;
   const ready=L.filter(function(x){ return !!x.render_job_id; }).length;
-  const tile=(n,l,sub)=>`<div class="stat-card"><div class="stat-value">${n}</div><div class="stat-label">${l}</div>${sub?'<div class="stat-label" style="font-size:10.5px;opacity:.7;">'+sub+'</div>':''}</div>`;
-  box.innerHTML=tile(photos,'Photos','from the Library')+tile(clips,'Source clips')+tile(sounds,'Sounds','Library · Sounds')
-               +tile(staged,'Made')+tile(ready,'Ready to post','in the Library');
+  CF_COUNTS={photo:photos, raw:raw, repurpose:rep};
+  const tile=(n,l)=>`<div class="cfx-stat"><b>${n}</b><span>${l}</span></div>`;
+  box.innerHTML=tile(photos,'Photos')+tile(raw,'Raw reels')+tile(rep,'Repurpose/Trial reels')+tile(clips,'Source clips')
+               +tile(sounds,'Sounds')+tile(staged,'Made')+tile(ready,'Ready to post');
+  const sn=document.getElementById('cf-sound-note'); if(sn) sn.textContent=sounds+' sound'+(sounds===1?'':'s')+' · laid under captioned clips';
+  cfRenderCards();
 }
 
 async function cfUploadLib(category, input){
   const id=cfModelId();
   if(!id){ cfAlert('Pick a model first.','error'); input.value=''; return; }
   const files=[...(input.files||[])]; if(!files.length) return;
-  cfAlert(`Uploading ${files.length} file(s) to the Library (${category})…`);
+  const nice=(LIB_CATEGORIES[category]||{}).label||category;
+  cfAlert(`Uploading ${files.length} file(s) to the Library (${nice})…`);
   const res=await libUploadFiles(files,{modelId:id,ownerType:'model',category:category,onStatus:function(label,msg){ cfAlert(label+' · '+msg); }});
   input.value='';
   const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
@@ -3307,8 +3448,6 @@ async function cfUpload(bucket, input){
   cfAlert(`Uploading ${files.length} file(s)...`);
   let ok=0, failed=[];
   for(const f of files){
-    // Spaces and odd characters in filenames break storage paths, so flatten
-    // them here rather than discovering it halfway through a render.
     const safe=f.name.replace(/[^A-Za-z0-9._-]/g,'_');
     const {error}=await sb.storage.from(bucket).upload(`${id}/${safe}`, f, {upsert:true});
     if(error) failed.push(f.name+': '+error.message); else ok++;
@@ -3319,10 +3458,11 @@ async function cfUpload(bucket, input){
   cfLoadCounts();
 }
 
+// Single-step queue, kept for anything that still calls it directly.
 async function cfSubmit(jobType){
   const id=cfModelId();
   if(!id){ cfAlert('Pick a model first.','error'); return; }
-  const qty=parseInt(document.getElementById('cf-qty').value||'0',10);
+  const qty=parseInt(cfQty('photo')||'0',10);
   const {error}=await sb.from('render_jobs').insert({
     model_id:id, job_type:jobType, quantity:qty,
     created_by:STATE.profile?.id || null
@@ -3337,6 +3477,8 @@ const CF_LABEL={photo2video:'Photos → source clips', caption:'Caption only',
                 prep:'Prep for posting'};
 const CF_DOT={queued:'#9aa3ad', running:'#2f7fe0', done:'#1f9d55',
               failed:'#c0392b', cancelled:'#9aa3ad'};
+function cfKindOf(params){ const k=params&&params.kind; return CFX_KIND[k]?k:'photo'; }
+function cfTag(kind){ const k=CFX_KIND[kind]||CFX_KIND.photo; return `<span class="cfx-tag" style="background:${k.tagBg};color:${k.tagFg};">${k.label}</span>`; }
 
 // Queued: cancelled at once. Running: the worker sees the new status between
 // steps (before each script and before upload) and stops without uploading.
@@ -3351,7 +3493,7 @@ async function cfLoadJobs(){
   const id=cfModelId(); const box=document.getElementById('cf-jobs');
   if(!id||!box) return;
   const {data,error}=await sb.from('render_jobs').select('*')
-    .eq('model_id',id).order('created_at',{ascending:false}).limit(12);
+    .eq('model_id',id).order('created_at',{ascending:false}).limit(20);
   if(error) return;
   CF_JOBS=data||[];
   document.getElementById('cf-jobs-empty').style.display=CF_JOBS.length?'none':'block';
@@ -3360,14 +3502,15 @@ async function cfLoadJobs(){
     const extra = j.status==='done' ? `${j.outputs_count} file(s)`
                 : j.status==='failed' ? (j.error||'failed')
                 : j.status==='running' ? 'working...' : j.status==='cancelled' ? 'cancelled' : 'waiting';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(128,128,128,.18);">
+    const p=j.params||{}, step=p.of>1?` · step ${p.step} of ${p.of}`:'';
+    return `<div class="cfx-row">
       <span style="width:9px;height:9px;border-radius:50%;background:${CF_DOT[j.status]||'#888'};flex:none;"></span>
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;">${CF_LABEL[j.job_type]||j.job_type}</div>
-        <div class="stat-label" style="font-size:11.5px;">${when} · ${extra}</div>
+        <div style="font-weight:600;font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${CF_LABEL[j.job_type]||j.job_type}${cfTag(cfKindOf(p))}</div>
+        <div class="cfx-hint">${when}${step} · ${escapeHtml(String(extra))}</div>
       </div>
-      ${(j.status==='queued'||j.status==='running')?`<button class="btn btn-sm btn-ghost" style="color:var(--red);" onclick="cfCancelJob('${j.id}','${j.status}')">✕ Cancel</button>`:''}
-      <button class="btn btn-sm btn-ghost" onclick="cfShowLog('${j.id}')">Output</button>
+      ${(j.status==='queued'||j.status==='running')?`<button class="cfx-btn" style="color:var(--red);" onclick="cfCancelJob('${j.id}','${j.status}')">Cancel</button>`:''}
+      <button class="cfx-btn" onclick="cfShowLog('${j.id}')">Output</button>
     </div>`;
   }).join('');
   // A finished render means new files, so refresh what's downloadable.
@@ -3384,20 +3527,48 @@ function cfShowLog(jobId){
   document.getElementById('cf-log-card').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+// Ready to post = reels the factory finished (tagged by the card that made them)
+// plus the Repurpose bank, which is post-ready as it stands.
 async function cfLoadReady(){
   const id=cfModelId(); const box=document.getElementById('cf-ready');
   if(!id||!box) return;
-  const {data,error}=await sb.from('content_library').select('id,title,r2_key,created_at,state,derived_from')
-    .eq('model_id',id).not('render_job_id','is',null).order('created_at',{ascending:false}).limit(100);
-  const files=data||[];
-  document.getElementById('cf-ready-empty').style.display=files.length?'none':'block';
-  if(error||!files.length){ box.innerHTML=''; return; }
-  box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.18);">
-      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.title||f.r2_key)} <span class="stat-label" style="font-size:11px;">· ${escapeHtml(f.state||'')} · ${escapeHtml(new Date(f.created_at).toLocaleString('en-AU',{timeZone:'Australia/Sydney',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</span></div>
-      <button class="btn btn-sm btn-ghost" onclick="cfPreview('${accEscapeAttr(f.r2_key)}','${accEscapeAttr(f.title||'')}')">▶ Preview</button>
-      <button class="btn btn-sm btn-ghost" onclick="cfDownload('${accEscapeAttr(f.r2_key)}')">Download</button>
+  const [made,rep]=await Promise.all([
+    sb.from('content_library').select('id,title,r2_key,created_at,state,derived_from,render_job_id')
+      .eq('model_id',id).not('render_job_id','is',null).order('created_at',{ascending:false}).limit(150),
+    sb.from('content_library').select('id,title,r2_key,created_at,state')
+      .eq('model_id',id).eq('category','repurpose').is('render_job_id',null).order('created_at',{ascending:false}).limit(150)
+  ]);
+  const files=made.data||[];
+  const jobIds=[...new Set(files.map(f=>f.render_job_id))];
+  let kinds={};
+  if(jobIds.length){
+    const jr=await sb.from('render_jobs').select('id,params').in('id',jobIds.slice(0,300));
+    (jr.data||[]).forEach(function(r){ kinds[r.id]=cfKindOf(r.params); });
+  }
+  CF_READY=files.map(f=>Object.assign({},f,{kind:kinds[f.render_job_id]||'photo'}))
+    .concat((rep.data||[]).map(f=>Object.assign({},f,{kind:'repurpose'})))
+    .sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  cfRenderReady();
+}
+function cfSetReadyFilter(k){ CF_READY_F=k; cfRenderReady(); }
+function cfRenderReady(){
+  const box=document.getElementById('cf-ready'), fb=document.getElementById('cf-ready-filters');
+  if(!box) return;
+  const n=k=>CF_READY.filter(f=>f.kind===k).length;
+  if(fb) fb.innerHTML=[['','All',CF_READY.length]].concat(Object.keys(CFX_KIND).map(k=>[k,CFX_KIND[k].label,n(k)]))
+    .map(o=>`<button class="cfx-chip${CF_READY_F===o[0]?' on':''}" onclick="cfSetReadyFilter('${o[0]}')">${o[1]} ${o[2]}</button>`).join('');
+  const list=CF_READY.filter(f=>!CF_READY_F||f.kind===CF_READY_F);
+  document.getElementById('cf-ready-empty').style.display=list.length?'none':'block';
+  box.innerHTML=list.slice(0,150).map(f=>`<div class="cfx-row">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;">${escapeHtml(f.title||f.r2_key)}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${cfTag(f.kind)}<span class="cfx-hint">${escapeHtml(f.state||'')} · ${escapeHtml(new Date(f.created_at).toLocaleString('en-AU',{timeZone:'Australia/Sydney',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</span></div>
+      </div>
+      <button class="cfx-btn" onclick="cfPreview('${accEscapeAttr(f.r2_key)}','${accEscapeAttr(f.title||'')}')">Preview</button>
+      <button class="cfx-btn" onclick="cfDownload('${accEscapeAttr(f.r2_key)}')">Download</button>
     </div>`).join('');
 }
+
 // Play the finished file exactly as the phone will post it (signed URL, ~1 min).
 async function cfPreview(path,title){
   try{
@@ -3941,6 +4112,7 @@ var LIB_CATEGORIES={
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
   stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
   repurpose:{label:'Repurpose bank',    short:'Repurpose',icon:'♻️', accept:'video/*',        hint:'Talking heads and clips that already have their audio + caption — reposted as-is with fresh metadata, never re-captioned. Proven performers for trial reels.'},
+  raw:     {label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Filmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
   sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
   // ── OnlyFans-only (ofOnly) ── never public. Nothing that posts to phones / the Content
   // Factory reads these keys, and they skip the Instagram compliance scanner (it would only
