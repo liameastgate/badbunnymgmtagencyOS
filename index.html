@@ -179,6 +179,38 @@
   .contract-field.blank { color: var(--yellow); border-bottom-color: var(--yellow); font-weight: 700; }
   .contract-doc .cd-sign-block { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
   .contract-doc .cd-sign-block img { max-height: 70px; background: #fff; border-radius: 4px; padding: 4px; }
+  .ja-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .ja-tab { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--text2); cursor:pointer; text-align:left; font-family:inherit; min-width:112px; }
+  .ja-tab small { display:block; font-weight:500; font-size:11px; margin-top:3px; color:#6b7393; }
+  .ja-tab.on { border-color:var(--accent); background:rgba(30,79,255,.14); color:#fff; }
+  .ja-tab.ja-add { min-width:52px; text-align:center; font-size:18px; }
+  .ja-grid { display:grid; grid-template-columns:1fr 320px; gap:14px; align-items:start; }
+  .ja-main { min-width:0; }
+  .ja-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .ja-title { font-size:16px; font-weight:800; flex:1; }
+  .ja-saved { font-size:11.5px; color:var(--text2); }
+  .ja-pad { width:100%; min-height:62vh; resize:vertical; background:#0b0b17; border:1px solid var(--border); border-radius:14px; padding:18px 20px; font-size:15.5px; line-height:1.75; color:#e4e8f6; font-family:'Iowan Old Style',Georgia,serif; }
+  .ja-pad:focus { border-color:#2c3a80; outline:none; }
+  .ja-side { position:sticky; top:12px; padding:14px 14px 10px; }
+  .ja-ct { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); margin-bottom:8px; }
+  .ja-job { display:flex; gap:9px; align-items:flex-start; padding:7px 0; border-bottom:1px solid var(--border); }
+  .ja-box { width:20px; height:20px; flex:0 0 20px; border-radius:6px; border:2px solid #3a4070; background:none; cursor:pointer; margin-top:1px; position:relative; padding:0; }
+  .ja-box.on { background:#4ade80; border-color:#4ade80; }
+  .ja-box.on::after { content:'✓'; position:absolute; top:-2px; left:3px; font-size:12px; color:#03140a; font-weight:900; }
+  .ja-jt { flex:1; font-size:14px; line-height:1.4; outline:none; min-width:0; word-break:break-word; }
+  .ja-jt:focus { background:var(--surface2); border-radius:5px; }
+  .ja-job.done .ja-jt { color:var(--text2); text-decoration:line-through; }
+  .ja-x { background:none; border:0; color:#4c5370; cursor:pointer; font-size:12px; padding:2px 4px; opacity:0; transition:opacity .15s; font-family:inherit; }
+  .ja-job:hover .ja-x, .ja-head .ja-x { opacity:1; }
+  @media (hover:none){ .ja-x { opacity:.7; } }
+  .ja-tag { font-size:12px; }
+  .ja-addjob { margin-top:10px; border:1px dashed #2a2f55 !important; background:transparent !important; }
+  .ja-more { background:none; border:0; color:var(--accent2); font-size:12px; cursor:pointer; padding:10px 0 4px; font-family:inherit; }
+  .ja-empty { font-size:13px; color:var(--text2); padding:6px 0 4px; }
+  .ja-group { margin-bottom:14px; }
+  .ja-gt { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--accent2); cursor:pointer; margin-bottom:2px; }
+  .ja-gt span { color:var(--text2); }
+  @media (max-width: 860px){ .ja-grid { grid-template-columns:1fr; } .ja-side { position:static; } .ja-pad { min-height:42vh; font-size:16px; } .ja-tabs { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -12px 12px; padding:0 12px 4px; scrollbar-width:none; } .ja-tabs::-webkit-scrollbar { display:none; } .ja-tab { min-width:0; flex:0 0 auto; padding:9px 12px; } }
   .mu-sec { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); margin:6px 0 10px; }
   .mu-pill { letter-spacing:.04em; text-transform:none; font-weight:700; font-size:10.5px; padding:2px 8px; border-radius:20px; }
   .mu-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
@@ -2738,25 +2770,10 @@
          items, nothing hidden in folders, and no red overdue shaming. -->
     <div class="page" id="page-management">
       <div class="page-title">Journal</div>
-      <div class="page-sub">Jobs, ideas, goals — everything out of your head</div>
+      <div class="page-sub">Just type. Everything saves itself.</div>
       <div id="jn-body"></div>
     </div>
 
-  </div>
-</div>
-
-<div class="modal-overlay" id="jn-job-modal">
-  <div class="modal" style="max-width:460px;">
-    <div class="modal-title"><span id="jn-job-modal-title">New job</span><button class="modal-close" onclick="closeModal('jn-job-modal')">✕</button></div>
-    <div class="form-group"><label>Job</label><input id="jn-job-title" placeholder="e.g. Check the sub queue" onkeydown="if(event.key==='Enter')jnSaveJob()"></div>
-    <div class="form-group"><label>How often</label><select id="jn-job-cad">
-      <option value="daily">🔁 Every day</option><option value="weekly">🗓 Every week (resets Monday)</option><option value="monthly">📆 Every month (resets on the 1st)</option>
-    </select></div>
-    <div class="form-group"><label>Notes (optional)</label><input id="jn-job-notes" placeholder="Anything you'll forget"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="jnSaveJob()">💾 Save</button>
-      <button class="btn btn-danger" id="jn-job-delete" onclick="jnDeleteJob()">Delete</button>
-    </div>
   </div>
 </div>
 
@@ -14458,471 +14475,180 @@ async function saveContentPerfRows(){
   }
 }
 
-// ── Journal ──────────────────────────────────────────────────────────────────
-// Replaces the old Drawing Board. Three jobs to do, in priority order:
-//   1. Recurring jobs (daily / weekly / monthly) you tick off and can un-tick.
-//   2. Somewhere to put a thought in under two seconds so it leaves your head.
-//   3. Somewhere to think — ideas, goals, brain dump.
-//
-// Design notes (deliberate, don't "tidy" these away):
-//   - A tick is a row in journal_job_done keyed to the PERIOD it belongs to, so a new
-//     day/week/month shows everything unticked with no reset job running anywhere, and
-//     un-ticking is just a delete. History is a free side-effect.
-//   - Today shows a hard maximum of three focus items. A list of forty is a list of none.
-//   - Nothing is red. Overdue reads "3 days ago" in amber at worst — guilt causes
-//     avoidance, avoidance kills the tool.
-//   - All dates are LOCAL. toISOString() would shift the day backwards for UTC+10 and
-//     silently tick the wrong period (this bug has bitten this codebase before).
-
-var JN = { tab:'today', jobCad:'daily', items:[], jobs:[], done:[], editing:null, timer:null, collapsed:{} };
-try{ JN.collapsed=JSON.parse(localStorage.getItem('jn_collapsed')||'{}'); }catch(e){ JN.collapsed={}; }
-function jnSaveCollapsed(){ try{ localStorage.setItem('jn_collapsed',JSON.stringify(JN.collapsed)); }catch(e){} }
-function jnToggleCol(k){ JN.collapsed[k]=!JN.collapsed[k]; jnSaveCollapsed(); jnPaint(); }
-function jnAllCols(){ return (JN.tab==='today'?['t3','due','daily','donetoday']:JN.tab==='jobs'?['daily','weekly','monthly']:JN.tab==='ideas'?['goals','inbox','week','someday']:[]); }
-function jnSetAll(v){ jnAllCols().forEach(function(k){ JN.collapsed[k]=v; }); jnSaveCollapsed(); jnPaint(); }
-// A column: header stays visible when collapsed so nothing disappears from view.
-function jnCol(key,icon,title,count,body,accent){
-  var open=!JN.collapsed[key];
-  return '<div class="card" style="margin:0;display:flex;flex-direction:column;'+(accent?'border-top:2px solid '+accent+';':'')+'">'
-    +'<div onclick="jnToggleCol(\''+key+'\')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:'+(open?'10px':'0')+';">'
-    +'<span style="font-size:11px;color:var(--text2);width:10px;">'+(open?'▾':'▸')+'</span>'
-    +'<span style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text2);flex:1;">'+icon+' '+title+'</span>'
-    +(count!==null&&count!==undefined?'<span style="font-size:11px;font-weight:700;color:var(--text2);">'+count+'</span>':'')
-    +'</div>'
-    +(open?'<div style="flex:1;">'+body+'</div>':'')+'</div>';
-}
-function jnGrid(cols,min){ return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax('+(min||300)+'px,1fr));gap:14px;align-items:start;">'+cols.join('')+'</div>'; }
-function jnEmpty(msg){ return '<div style="font-size:12.5px;color:var(--text2);padding:4px 2px;line-height:1.5;">'+msg+'</div>'; }
-
-function jnLocalISO(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function jnMonday(d){ d=new Date(d||new Date()); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d; }
-function jnIsoWeek(d){
-  // ISO-8601 week number, Monday-based. Kept explicit rather than clever.
-  var t=new Date(d||new Date()); t.setHours(0,0,0,0);
-  t.setDate(t.getDate()+3-((t.getDay()+6)%7));               // nearest Thursday
-  var week1=new Date(t.getFullYear(),0,4);
-  var n=1+Math.round(((t-week1)/86400000-3+((week1.getDay()+6)%7))/7);
-  return t.getFullYear()+'-W'+String(n).padStart(2,'0');
-}
-// The period a tick belongs to, for each cadence.
-function jnPeriodKey(cad,d){
-  d=d||new Date();
-  if(cad==='daily')  return jnLocalISO(d);
-  if(cad==='weekly') return jnIsoWeek(d);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-}
-function jnPeriodLabel(cad){
-  var d=new Date();
-  if(cad==='daily')  return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-  if(cad==='weekly'){ var m=jnMonday(d), s=new Date(m); s.setDate(s.getDate()+6);
-    return 'Week of '+m.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+s.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
-  return d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-}
-// Relative time. "in 2 days" / "3 days ago" lands; "17/09" does not.
-function jnWhen(dateStr){
-  if(!dateStr) return '';
-  var due=new Date(dateStr+'T00:00:00'), today=new Date(); today.setHours(0,0,0,0);
-  var n=Math.round((due-today)/86400000);
-  if(n===0) return 'today'; if(n===1) return 'tomorrow'; if(n===-1) return 'yesterday';
-  if(n>1&&n<7) return 'in '+n+' days'; if(n<-1&&n>-14) return Math.abs(n)+' days ago';
-  return due.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-}
-function jnAge(ts){
-  if(!ts) return '';
-  var n=Math.floor((Date.now()-new Date(ts))/86400000);
-  return n<1?'today':n===1?'1 day':n+' days';
-}
-function jnMe(){ return (STATE.profile&&STATE.profile.email)||''; }
-function jnShortName(email){ return (email||'').split('@')[0]; }
-
-// ── Data ────────────────────────────────────────────────────────────────────
-async function jnLoad(){
-  // Brain dump lives in journal_notes (owner-only), not agency_settings.
-  if(JN.dumpText===undefined){
-    var d=await sb.from('journal_notes').select('text').eq('key','dump').maybeSingle();
-    JN.dumpText=(d.data&&d.data.text)||'';
-  }
-  var r = await Promise.all([
-    sb.from('journal_jobs').select('*').eq('active',true).order('cadence').order('sort_order'),
-    sb.from('journal_items').select('*').order('created_at',{ascending:false}),
-    sb.from('journal_job_done').select('*').in('period_key',[jnPeriodKey('daily'),jnPeriodKey('weekly'),jnPeriodKey('monthly')])
+// ── Journal: "Life areas" ────────────────────────────────────────────────────
+// One free notepad + one jobs list per area of the business. Deliberately dumb:
+//   - type anything, it saves itself (no Save button, no tags, no parsing)
+//   - jobs: type + Enter to add, tick to finish, untick to bring back
+//   - finished jobs stay visible (struck through) for the day you did them, then fold
+//     away under "Done" so the list only shows what's still open
+//   - "All jobs" is every open job across every area in one list
+// Storage: areas list + each notepad in journal_notes (keys 'areas', 'area:<id>'),
+// jobs in journal_items (area column). All owner-only via is_private_owner() RLS.
+var JA={areas:[],notes:{},items:[],tab:null,timers:{},showDone:{},loaded:false};
+var JA_DEFAULT=[{id:'inbox',name:'Inbox',icon:'📥'},{id:'models',name:'Models',icon:'🎬'},{id:'chatting',name:'Chatting',icon:'💬'},{id:'traffic',name:'Traffic',icon:'🔗'},{id:'personal',name:'Personal',icon:'🌴'}];
+function jaLocalDay(d){ d=d?new Date(d):new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function jaArea(id){ return JA.areas.find(function(a){return a.id===id;}); }
+function jaIsOpen(i){ return i.status!=='done'&&i.status!=='archived'; }
+function jaOpen(areaId){ return JA.items.filter(function(i){ return jaIsOpen(i) && (!areaId||(i.area||'inbox')===areaId); }); }
+async function jaLoad(){
+  var r=await Promise.all([
+    sb.from('journal_notes').select('key,text,updated_at'),
+    sb.from('journal_items').select('*').order('created_at',{ascending:true})
   ]);
-  JN.jobs=r[0].data||[]; JN.items=r[1].data||[]; JN.done=r[2].data||[];
+  if(r[0].error||r[1].error){ throw new Error((r[0].error||r[1].error).message); }
+  JA.notes={}; var areasRow=null;
+  (r[0].data||[]).forEach(function(n){ if(n.key==='areas') areasRow=n; else if(n.key.indexOf('area:')===0) JA.notes[n.key.slice(5)]=n; });
+  try{ JA.areas=areasRow?JSON.parse(areasRow.text):null; }catch(e){ JA.areas=null; }
+  if(!Array.isArray(JA.areas)||!JA.areas.length){ JA.areas=JA_DEFAULT.slice(); await jaSaveAreas(); }
+  JA.items=r[1].data||[];
+  JA.loaded=true;
 }
-function jnDoneRow(job){ return JN.done.find(function(d){ return d.job_id===job.id && d.period_key===jnPeriodKey(job.cadence); }); }
-
-async function jnToggleJob(id){
-  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
-  var key=jnPeriodKey(job.cadence), row=jnDoneRow(job);
-  if(row){
-    var r=await sb.from('journal_job_done').delete().eq('id',row.id).select();
-    if(r.error||!r.data||!r.data.length){ alert('Could not un-tick — '+(r.error?r.error.message:'no permission')); return; }
-    JN.done=JN.done.filter(function(d){return d.id!==row.id;});
-  } else {
-    var ins=await sb.from('journal_job_done').insert({job_id:id,period_key:key,done_by:jnMe()}).select();
-    if(ins.error||!ins.data||!ins.data.length){ alert('Could not tick — '+(ins.error?ins.error.message:'no permission')); return; }
-    JN.done.push(ins.data[0]);
-    jnCelebrate();
-  }
-  jnPaint();
+async function jaSaveAreas(){
+  var r=await sb.from('journal_notes').upsert({key:'areas',text:JSON.stringify(JA.areas),updated_at:new Date().toISOString()}).select();
+  if(r.error) alert('Could not save areas — '+r.error.message);
 }
-async function jnSaveJob(){
-  var title=(document.getElementById('jn-job-title').value||'').trim(); if(!title) return;
-  var cad=document.getElementById('jn-job-cad').value;
-  var notes=(document.getElementById('jn-job-notes').value||'').trim()||null;
-  var res;
-  if(JN.editing){ res=await sb.from('journal_jobs').update({title:title,cadence:cad,notes:notes}).eq('id',JN.editing).select(); }
-  else { var max=Math.max(0,...JN.jobs.filter(function(j){return j.cadence===cad;}).map(function(j){return j.sort_order||0;}));
-         res=await sb.from('journal_jobs').insert({title:title,cadence:cad,notes:notes,sort_order:max+1,created_by:jnMe()}).select(); }
-  if(res.error||!res.data||!res.data.length){ alert('Could not save — '+(res.error?res.error.message:'no permission')); return; }
-  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
-}
-function jnOpenJob(id){
-  JN.editing=id||null;
-  var j=id?JN.jobs.find(function(x){return x.id===id;}):null;
-  document.getElementById('jn-job-modal-title').textContent=j?'Edit job':'New job';
-  document.getElementById('jn-job-title').value=j?j.title:'';
-  document.getElementById('jn-job-cad').value=j?j.cadence:JN.jobCad;
-  document.getElementById('jn-job-notes').value=(j&&j.notes)||'';
-  document.getElementById('jn-job-delete').style.display=j?'':'none';
-  openModal('jn-job-modal');
-  setTimeout(function(){ var el=document.getElementById('jn-job-title'); if(el) el.focus(); },50);
-}
-async function jnDeleteJob(){
-  if(!JN.editing) return;
-  if(!confirm('Delete this job? Its tick history goes too.')) return;
-  var r=await sb.from('journal_jobs').delete().eq('id',JN.editing).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
-  JN.editing=null; closeModal('jn-job-modal'); await jnLoad(); jnPaint();
-}
-async function jnMoveJob(id,dir){
-  var job=JN.jobs.find(function(j){return j.id===id;}); if(!job) return;
-  var list=JN.jobs.filter(function(j){return j.cadence===job.cadence;});
-  var i=list.findIndex(function(j){return j.id===id;}), k=i+dir;
-  if(k<0||k>=list.length) return;
-  var a=list[i], b=list[k];
-  await Promise.all([
-    sb.from('journal_jobs').update({sort_order:b.sort_order||k}).eq('id',a.id),
-    sb.from('journal_jobs').update({sort_order:a.sort_order||i}).eq('id',b.id)
-  ]);
-  await jnLoad(); jnPaint();
-}
-
-// ── Capture ─────────────────────────────────────────────────────────────────
-// Under two seconds or it never gets captured. Type, Enter, gone. The prefixes are
-// optional sugar, not a syntax anyone has to learn.
-function jnParse(raw){
-  var t=raw.trim(), out={kind:'task',text:t,urgent:false,due_at:null,tags:null,status:'inbox'};
-  if(/^!!/.test(t)){ out.urgent=true; t=t.replace(/^!!\s*/,''); }
-  else if(/^!/.test(t)){ out.urgent=true; t=t.replace(/^!\s*/,''); }
-  if(/^\?/.test(t)){ out.kind='idea'; t=t.replace(/^\?\s*/,''); }
-  if(/^\*/.test(t)){ out.kind='goal'; t=t.replace(/^\*\s*/,''); }
-  var tags=t.match(/#[\w-]+/g);
-  if(tags){ out.tags=tags.map(function(s){return s.slice(1);}).join(','); t=t.replace(/#[\w-]+/g,'').trim(); }
-  var d=new Date(), hit=null;
-  if(/\btoday\b/i.test(t)){ hit=new Date(d); t=t.replace(/\btoday\b/i,''); }
-  else if(/\btomorrow\b/i.test(t)){ hit=new Date(d); hit.setDate(hit.getDate()+1); t=t.replace(/\btomorrow\b/i,''); }
-  else {
-    var days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-    for(var i=0;i<7;i++){
-      var re=new RegExp('\\b(next\\s+)?'+days[i]+'\\b','i'), m=t.match(re);
-      if(m){ hit=new Date(d); var delta=(i-hit.getDay()+7)%7; if(delta===0||m[1]) delta=delta||7; hit.setDate(hit.getDate()+delta); t=t.replace(re,''); break; }
-    }
-  }
-  if(hit){ out.due_at=jnLocalISO(hit); out.status='today'; }
-  out.text=t.replace(/\s{2,}/g,' ').trim()||raw.trim();
-  return out;
-}
-async function jnCapture(ev){
-  if(ev && ev.key!=='Enter') return;
-  var el=document.getElementById('jn-capture'); var raw=(el.value||'').trim(); if(!raw) return;
-  el.value='';
-  var row=jnParse(raw); row.created_by=jnMe();
-  var r=await sb.from('journal_items').insert(row).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not save — '+(r.error?r.error.message:'no permission')); el.value=raw; return; }
-  JN.items.unshift(r.data[0]);
-  jnFlash('Captured ✓');
-  jnPaint();
-}
-function jnFlash(msg){
-  var b=document.getElementById('jn-flash'); if(!b) return;
-  b.textContent=msg; b.style.opacity='1';
-  clearTimeout(JN._flash); JN._flash=setTimeout(function(){ b.style.opacity='0'; },1400);
-}
-function jnCelebrate(){ jnFlash('Nice ✓'); }
-
-async function jnUpdate(id,patch){
-  patch.updated_at=new Date().toISOString();
-  var r=await sb.from('journal_items').update(patch).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
-  var i=JN.items.findIndex(function(x){return x.id===id;}); if(i>=0) JN.items[i]=r.data[0];
-  jnPaint();
-}
-async function jnComplete(id){
-  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
-  if(it.status==='done'){ await jnUpdate(id,{status:'inbox',done_at:null,slot:null}); return; }
-  await jnUpdate(id,{status:'done',done_at:new Date().toISOString(),slot:null});
-  jnCelebrate();
-}
-async function jnDeleteItem(id){
-  var r=await sb.from('journal_items').delete().eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
-  JN.items=JN.items.filter(function(x){return x.id!==id;}); jnPaint();
-}
-// Click the text, type, Enter. Saves in place and never repaints the view, so your
-// scroll position and the rest of the page stay exactly where they were.
-function jnEditItem(id){ var el=document.getElementById('jn-txt-'+id); if(el) jnInline(el,id); }
-function jnInline(el,id){
-  if(el.dataset.editing==='1') return;
-  var it=JN.items.find(function(x){return x.id===id;}); if(!it||it.status==='done') return;
-  el.dataset.editing='1';
-  var before=el.innerHTML, inp=document.createElement('input');
-  inp.value=it.text;
-  inp.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--accent);border-radius:7px;color:var(--text);padding:6px 9px;font-size:14px;font-family:inherit;';
-  el.innerHTML=''; el.appendChild(inp); inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);
-  var closed=false;
-  function done(save){
-    if(closed) return; closed=true;
-    var v=inp.value.trim();
-    el.dataset.editing='';
-    if(save && v && v!==it.text){
-      it.text=v;                                   // optimistic: update in place
-      el.innerHTML=jnTextHtml(it);
-      sb.from('journal_items').update({text:v,updated_at:new Date().toISOString()}).eq('id',id).select()
-        .then(function(r){ if(r.error||!r.data||!r.data.length){ jnFlash('Not saved'); } else { jnFlash('Saved ✓'); } });
-    } else { el.innerHTML=before; }
-  }
-  inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); done(true); } else if(e.key==='Escape'){ done(false); } };
-  inp.onblur=function(){ done(true); };
-}
-// Due date still needs a picker; changing it does repaint because it can move the item.
-function jnEditDue(id){
-  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
-  var d=prompt('Due date (YYYY-MM-DD, blank to clear):',it.due_at||''); if(d===null) return;
-  jnUpdate(id,{due_at:(d||'').trim()||null});
-}
-function jnTextHtml(it){
-  var done=it.status==='done', kindIcon={task:'',idea:'💡',goal:'🎯',note:'📝'}[it.kind]||'';
-  return (it.urgent&&!done?'<span style="color:#ffc83c;font-weight:900;">! </span>':'')+(kindIcon?kindIcon+' ':'')+escapeHtml(it.text);
-}
-// Today holds three. Asking for a fourth tells you to finish or bump one.
-async function jnToSlot(id){
-  var used=JN.items.filter(function(x){return x.status==='today'&&x.slot;});
-  var free=[1,2,3].find(function(n){ return !used.some(function(x){return x.slot===n;}); });
-  if(!free){ jnFlash('Today is full — finish or bump one first'); return; }
-  await jnUpdate(id,{status:'today',slot:free});
-}
-
-// ── Focus timer ─────────────────────────────────────────────────────────────
-// Starting is the hard part, not finishing. A countdown gives it a ritual.
-function jnFocus(id,mins){
-  var it=JN.items.find(function(x){return x.id===id;}); if(!it) return;
-  if(JN.timer){ clearInterval(JN.timer.h); JN.timer=null; }
-  JN.timer={id:id, left:(mins||25)*60, total:(mins||25)*60};
-  JN.timer.h=setInterval(function(){
-    JN.timer.left--;
-    if(JN.timer.left<=0){
-      clearInterval(JN.timer.h);
-      sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+JN.timer.total}).eq('id',id).then(function(){});
-      JN.timer=null; jnFlash('Time — take a break'); jnLoad().then(jnPaint); return;
-    }
-    jnPaintTimer();
-  },1000);
-  jnPaint();
-}
-function jnStopFocus(save){
-  if(!JN.timer) return;
-  var spent=JN.timer.total-JN.timer.left, id=JN.timer.id;
-  clearInterval(JN.timer.h);
-  var it=JN.items.find(function(x){return x.id===id;});
-  if(save&&spent>30&&it) sb.from('journal_items').update({focus_seconds:(it.focus_seconds||0)+spent}).eq('id',id).then(function(){ jnLoad().then(jnPaint); });
-  JN.timer=null; jnPaint();
-}
-function jnPaintTimer(){
-  var el=document.getElementById('jn-timer-clock'); if(!el||!JN.timer) return;
-  var m=Math.floor(JN.timer.left/60), s=JN.timer.left%60;
-  el.textContent=m+':'+String(s).padStart(2,'0');
-  var bar=document.getElementById('jn-timer-bar');
-  if(bar) bar.style.width=(100-(JN.timer.left/JN.timer.total*100))+'%';
-}
-
-// ── Render ──────────────────────────────────────────────────────────────────
-function jnTab(t){ JN.tab=t; jnPaint(); try{ localStorage.setItem('jn_tab',t); }catch(e){} }
-function jnCadTab(c){ JN.jobCad=c; jnPaint(); }
-
 async function renderJournal(){
   var el=document.getElementById('jn-body'); if(!el) return;
-  el.innerHTML='<div style="color:var(--text2);padding:14px;">Loading…</div>';
-  try{ JN.tab=localStorage.getItem('jn_tab')||'today'; }catch(e){}
-  await jnLoad(); jnPaint();
+  if(!JA.loaded){ el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:12px;">Loading…</div>';
+    try{ await jaLoad(); }catch(e){ el.innerHTML='<div class="alert alert-error" style="display:block;">Could not load the journal — '+escapeHtml(e.message)+'</div>'; return; } }
+  if(!JA.tab){ try{ JA.tab=localStorage.getItem('ja_tab'); }catch(e){} }
+  if(!JA.tab||(JA.tab!=='all'&&!jaArea(JA.tab))) JA.tab=(JA.areas[0]||{}).id||'all';
+  jaPaint();
 }
-
-function jnPaint(){
+function jaTab(id){ jaFlushAll(); JA.tab=id; try{ localStorage.setItem('ja_tab',id); }catch(e){} jaPaint(); }
+function jaPaint(){
   var el=document.getElementById('jn-body'); if(!el) return;
-  var tabs=[['today','☀️','Today'],['jobs','🔁','Jobs'],['ideas','💡','Ideas & goals'],['dump','🧠','Brain dump']];
-  var head='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">'
-    +'<input id="jn-capture" placeholder="Capture anything — type it and hit Enter" onkeydown="jnCapture(event)" '
-    +'style="flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:15px;color:var(--text);">'
-    +'<span id="jn-flash" style="font-size:12px;font-weight:700;color:#4ade80;opacity:0;transition:opacity .3s;min-width:70px;"></span></div>'
-    +'<div style="font-size:11px;color:var(--text3,var(--text2));margin-bottom:16px;">'
-    +'<b>tomorrow</b> / <b>friday</b> sets a date · <b>!</b> urgent · <b>?</b> idea · <b>*</b> goal · <b>#alex</b> tags a model</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">'
-    +tabs.map(function(t){ var on=JN.tab===t[0];
-      return '<button onclick="jnTab(\''+t[0]+'\')" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:10px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;">'+t[1]+' '+t[2]+'</button>';
-    }).join('')
-    +(jnAllCols().length?'<span style="margin-left:auto;display:flex;gap:6px;">'
-      +'<button onclick="jnSetAll(true)" title="Collapse every column" style="border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">⌃ Collapse all</button>'
-      +'<button onclick="jnSetAll(false)" title="Expand every column" style="border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">⌄ Expand all</button></span>':'')
+  var tabs='<div class="ja-tabs">'
+    +'<button class="ja-tab'+(JA.tab==='all'?' on':'')+'" onclick="jaTab(\'all\')">✅ All jobs<small>'+jaOpen().length+' open</small></button>'
+    +JA.areas.map(function(a){ var n=jaOpen(a.id).length;
+      return '<button class="ja-tab'+(JA.tab===a.id?' on':'')+'" onclick="jaTab(\''+a.id+'\')">'+escapeHtml(a.icon+' '+a.name)+'<small>'+(n?n+' job'+(n===1?'':'s'):'no jobs')+'</small></button>'; }).join('')
+    +'<button class="ja-tab ja-add" onclick="jaNewArea()" title="Add an area">＋</button></div>';
+  var body = JA.tab==='all' ? jaAllHtml() : jaAreaHtml(jaArea(JA.tab));
+  el.innerHTML=tabs+body;
+  var ta=document.getElementById('ja-pad'); if(ta&&!('ontouchstart' in window)) { ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); }
+}
+function jaJobRow(i,showArea){
+  var done=i.status==='done', a=showArea?jaArea(i.area||'inbox'):null;
+  return '<div class="ja-job'+(done?' done':'')+'">'
+    +'<button class="ja-box'+(done?' on':'')+'" onclick="jaToggle(\''+i.id+'\')" aria-label="'+(done?'Mark not done':'Mark done')+'"></button>'
+    +'<div class="ja-jt" contenteditable="true" spellcheck="true" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" onblur="jaEditJob(\''+i.id+'\',this.innerText)">'+escapeHtml(i.text||'')+'</div>'
+    +(a?'<span class="ja-tag">'+escapeHtml(a.icon)+'</span>':'')
+    +'<button class="ja-x" title="Move to another area" onclick="jaMoveJob(\''+i.id+'\')">↪</button>'
+    +'<button class="ja-x" title="Delete" onclick="jaDelJob(\''+i.id+'\')">✕</button></div>';
+}
+function jaJobsCard(areaId){
+  var today=jaLocalDay();
+  var open=jaOpen(areaId);
+  var doneAll=JA.items.filter(function(i){ return i.status==='done'&&(i.area||'inbox')===areaId; }).sort(function(x,y){ return String(y.done_at||'').localeCompare(String(x.done_at||'')); });
+  var doneToday=doneAll.filter(function(i){ return i.done_at&&jaLocalDay(i.done_at)===today; });
+  var older=doneAll.filter(function(i){ return !(i.done_at&&jaLocalDay(i.done_at)===today); });
+  var a=jaArea(areaId);
+  return '<div class="ja-side card"><div class="ja-ct">'+escapeHtml(a?a.name:'')+' jobs</div>'
+    +(open.length?open.map(function(i){return jaJobRow(i,false);}).join(''):'<div class="ja-empty">Nothing open here 🎉</div>')
+    +doneToday.map(function(i){return jaJobRow(i,false);}).join('')
+    +'<input class="ja-addjob" id="ja-new" placeholder="Type a job, press Enter…" onkeydown="if(event.key===\'Enter\'){jaAddJob(\''+areaId+'\',this.value);}">'
+    +(older.length?'<button class="ja-more" onclick="JA.showDone[\''+areaId+'\']=!JA.showDone[\''+areaId+'\'];jaPaint();">'+(JA.showDone[areaId]?'Hide':'Show')+' '+older.length+' finished earlier</button>'
+      +(JA.showDone[areaId]?older.map(function(i){return jaJobRow(i,false);}).join(''):''):'')
     +'</div>';
-  var sc=window.scrollY;                        // keep the page where it was
-  el.innerHTML=head+(JN.tab==='today'?jnToday():JN.tab==='jobs'?jnJobs():JN.tab==='ideas'?jnIdeas():jnDump())+jnTimerBar();
-  window.scrollTo(0,sc);
-  if(JN.timer) jnPaintTimer();
-  var c=document.getElementById('jn-capture'); if(c&&JN.tab!=='dump') c.focus();
 }
-
-function jnTimerBar(){
-  if(!JN.timer) return '';
-  var it=JN.items.find(function(x){return x.id===JN.timer.id;});
-  return '<div style="position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--surface);border-top:1px solid var(--accent);padding:12px 20px;display:flex;align-items:center;gap:16px;">'
-    +'<div id="jn-timer-clock" style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent2);min-width:82px;">--:--</div>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(it?it.text:'')+'</div>'
-    +'<div style="background:var(--border);height:4px;border-radius:3px;margin-top:6px;"><div id="jn-timer-bar" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 1s linear;"></div></div></div>'
-    +'<button class="btn btn-sm btn-green" onclick="jnComplete(\''+(it?it.id:'')+'\');jnStopFocus(true)">✓ Done</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="jnStopFocus(true)">Stop</button></div>';
+function jaAreaHtml(a){
+  if(!a) return '';
+  var n=JA.notes[a.id], when=n&&n.updated_at?new Date(n.updated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
+  return '<div class="ja-grid"><div class="ja-main">'
+    +'<div class="ja-head"><span class="ja-title">'+escapeHtml(a.icon+' '+a.name)+'</span><span id="ja-saved" class="ja-saved">'+(when?'Saved '+when:'')+'</span>'
+    +'<button class="ja-x" onclick="jaRenameArea(\''+a.id+'\')" title="Rename">✎</button><button class="ja-x" onclick="jaDeleteArea(\''+a.id+'\')" title="Delete area">🗑</button></div>'
+    +'<textarea id="ja-pad" class="ja-pad" placeholder="Just type…" oninput="jaNoteChanged(\''+a.id+'\',this.value)" onblur="jaFlush(\''+a.id+'\')">'+escapeHtml((n&&n.text)||'')+'</textarea>'
+    +'</div>'+jaJobsCard(a.id)+'</div>';
 }
-
-function jnItemRow(it,opts){
-  opts=opts||{};
-  var done=it.status==='done';
-  var due=it.due_at?jnWhen(it.due_at):'';
-  var overdue=it.due_at && new Date(it.due_at+'T00:00:00')<new Date(new Date().toDateString());
-  var tags=(it.tags||'').split(',').filter(Boolean).map(function(t){return '<span class="cscan cscan-grey">#'+escapeHtml(t)+'</span>';}).join(' ');
-  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--border);">'
-    +'<div onclick="jnComplete(\''+it.id+'\')" title="'+(done?'Put it back':'Done')+'" style="width:20px;height:20px;flex-shrink:0;margin-top:2px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
-    +'<div style="flex:1;min-width:0;">'
-    +'<div id="jn-txt-'+it.id+'" '+(done?'':'onclick="jnInline(this,\''+it.id+'\')" title="Click to edit"')+' style="font-size:13.5px;line-height:1.45;word-break:break-word;'+(done?'opacity:.5;text-decoration:line-through;':'cursor:text;')+'">'+jnTextHtml(it)+'</div>'
-    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--text2);">'
-    +(due?'<span onclick="jnEditDue(\''+it.id+'\')" style="cursor:pointer;color:'+(overdue&&!done?'#ffc83c':'var(--text2)')+';">'+(overdue&&!done?'⏳ ':'📅 ')+due+'</span>':(done?'':'<span onclick="jnEditDue(\''+it.id+'\')" style="cursor:pointer;opacity:.5;">+ date</span>'))
-    +(it.focus_seconds?'<span>⏱ '+Math.round(it.focus_seconds/60)+'m</span>':'')
-    +(!done&&!due?'<span>· sat '+jnAge(it.created_at)+'</span>':'')
-    +tags+'</div></div>'
-    +'<div style="display:flex;gap:2px;flex-shrink:0;">'
-    +(!done&&opts.focus?'<button class="btn btn-sm btn-ghost" title="Focus 25 min" onclick="jnFocus(\''+it.id+'\',25)">⏱</button>':'')
-    +(!done&&opts.promote?'<button class="btn btn-sm btn-ghost" title="Move to Today" onclick="jnToSlot(\''+it.id+'\')">☀️</button>':'')
-    +(!done&&opts.bump?'<button class="btn btn-sm btn-ghost" title="Back to inbox" onclick="jnUpdate(\''+it.id+'\',{status:\'inbox\',slot:null})">↩</button>':'')
-    +(!done&&opts.later?'<button class="btn btn-sm btn-ghost" title="Someday" onclick="jnUpdate(\''+it.id+'\',{status:\'someday\',slot:null})">💤</button>':'')
-    +'<button class="btn btn-sm btn-danger" title="Delete" onclick="jnDeleteItem(\''+it.id+'\')">✕</button>'
+function jaAllHtml(){
+  var today=jaLocalDay();
+  var groups=JA.areas.map(function(a){ var L=jaOpen(a.id); return L.length?'<div class="ja-group"><div class="ja-gt" onclick="jaTab(\''+a.id+'\')">'+escapeHtml(a.icon+' '+a.name)+' <span>'+L.length+'</span></div>'+L.map(function(i){return jaJobRow(i,false);}).join('')+'</div>':''; }).join('');
+  var orphan=JA.items.filter(function(i){ return jaIsOpen(i)&&!jaArea(i.area||'inbox'); });
+  var doneToday=JA.items.filter(function(i){ return i.status==='done'&&i.done_at&&jaLocalDay(i.done_at)===today; });
+  return '<div class="ja-grid"><div class="ja-main card" style="padding:16px 18px;">'
+    +'<div class="ja-head"><span class="ja-title">Everything still open</span></div>'
+    +(groups||orphan.length?groups+(orphan.length?'<div class="ja-group"><div class="ja-gt">No area</div>'+orphan.map(function(i){return jaJobRow(i,false);}).join('')+'</div>':''):'<div class="ja-empty" style="padding:30px 0;font-size:15px;">Nothing open anywhere. Nice. 🎉</div>')
+    +'</div><div class="ja-side card"><div class="ja-ct">Done today · '+doneToday.length+'</div>'
+    +(doneToday.length?doneToday.map(function(i){return jaJobRow(i,true);}).join(''):'<div class="ja-empty">Tick something off and it shows up here.</div>')
     +'</div></div>';
 }
-
-function jnToday(){
-  var slots=JN.items.filter(function(x){return x.status==='today'&&x.slot;}).sort(function(a,b){return a.slot-b.slot;});
-  var dueNow=JN.items.filter(function(x){return x.status!=='done'&&x.status!=='archived'&&!x.slot&&x.due_at&&x.due_at<=jnLocalISO();});
-  var daily=JN.jobs.filter(function(j){return j.cadence==='daily';});
-  var doneToday=JN.items.filter(function(x){return x.done_at&&x.done_at.slice(0,10)===jnLocalISO();});
-
-  var three='';
-  for(var n=1;n<=3;n++){
-    var it=slots.find(function(x){return x.slot===n;});
-    three += it ? jnItemRow(it,{focus:true,bump:true})
-      : '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px dashed var(--border);color:var(--text2);font-size:12.5px;opacity:.7;">'
-        +'<div style="width:20px;height:20px;border-radius:7px;border:2px dashed var(--border);flex-shrink:0;"></div>Empty — pull one from Ideas</div>';
-  }
-  var dailyDone=daily.filter(function(j){return jnDoneRow(j);}).length;
-  return jnGrid([
-    jnCol('t3','☀️',"Today's three",null,'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Three. Not thirty.</div>'+three,'var(--accent)'),
-    jnCol('due','📅','Due',dueNow.length, dueNow.length?dueNow.map(function(x){return jnItemRow(x,{focus:true,promote:true,later:true});}).join(''):jnEmpty('Nothing due.')),
-    jnCol('daily','🔁','Daily jobs',daily.length?dailyDone+'/'+daily.length:null,
-      daily.length?daily.map(jnJobRow).join('')+(dailyDone===daily.length?'<div style="text-align:center;padding:10px;color:#4ade80;font-size:12.5px;font-weight:700;">All done ✓</div>':'')
-        :jnEmpty('None yet — add them in <b>Jobs</b>.'), dailyDone&&dailyDone===daily.length?'#4ade80':null),
-    jnCol('donetoday','✅','Done today',doneToday.length,
-      doneToday.length?doneToday.map(function(x){return jnItemRow(x,{});}).join(''):jnEmpty('Nothing yet. Tick one thing.'))
-  ],290);
+// ── notepad autosave ──
+function jaNoteChanged(id,v){
+  JA.notes[id]=Object.assign(JA.notes[id]||{},{text:v,_dirty:true});
+  var s=document.getElementById('ja-saved'); if(s) s.textContent='Saving…';
+  clearTimeout(JA.timers[id]); JA.timers[id]=setTimeout(function(){ jaFlush(id); },700);
 }
-
-function jnJobRow(j){
-  var row=jnDoneRow(j), done=!!row;
-  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--border);">'
-    +'<div onclick="jnToggleJob(\''+j.id+'\')" title="'+(done?'Un-tick (not done properly)':'Tick off')+'" style="width:20px;height:20px;flex-shrink:0;margin-top:2px;border-radius:7px;border:2px solid '+(done?'#4ade80':'var(--border)')+';background:'+(done?'#4ade80':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#06210f;font-weight:900;">'+(done?'✓':'')+'</div>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13.5px;line-height:1.45;word-break:break-word;'+(done?'opacity:.5;text-decoration:line-through;':'')+'">'+escapeHtml(j.title)+'</div>'
-    +(j.notes?'<div style="font-size:11.5px;color:var(--text2);margin-top:2px;">'+escapeHtml(j.notes)+'</div>':'')
-    +(done&&row.done_at?'<div style="font-size:11px;color:#4ade80;margin-top:2px;">ticked '+new Date(row.done_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div>':'')+'</div>'
-    +'<div style="display:flex;gap:2px;flex-shrink:0;">'
-    +'<button class="btn btn-sm btn-ghost" title="Move up" onclick="jnMoveJob(\''+j.id+'\',-1)">↑</button>'
-    +'<button class="btn btn-sm btn-ghost" title="Move down" onclick="jnMoveJob(\''+j.id+'\',1)">↓</button>'
-    +'<button class="btn btn-sm btn-ghost" title="Edit" onclick="jnOpenJob(\''+j.id+'\')">✏</button>'
-    +'</div></div>';
+async function jaFlush(id){
+  clearTimeout(JA.timers[id]); var n=JA.notes[id]; if(!n||!n._dirty) return;
+  n._dirty=false; var now=new Date().toISOString();
+  var r=await sb.from('journal_notes').upsert({key:'area:'+id,text:n.text,updated_at:now}).select();
+  var s=document.getElementById('ja-saved');
+  if(r.error){ n._dirty=true; if(s) s.textContent='⚠ Not saved — '+r.error.message; return; }
+  n.updated_at=now; if(s&&JA.tab===id) s.textContent='Saved ✓';
 }
-
-function jnJobs(){
-  var cads=[['daily','🔁','Daily','day'],['weekly','🗓','Weekly','week'],['monthly','📆','Monthly','month']];
-  var cols=cads.map(function(c){
-    var list=JN.jobs.filter(function(j){return j.cadence===c[0];});
-    var d=list.filter(function(j){return jnDoneRow(j);}).length;
-    var pct=list.length?Math.round(d/list.length*100):0;
-    var body='<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">'+jnPeriodLabel(c[0])+'</div>'
-      +'<div style="background:var(--border);height:5px;border-radius:3px;margin-bottom:10px;"><div style="height:100%;width:'+pct+'%;background:'+(pct===100&&list.length?'#4ade80':'var(--accent)')+';border-radius:3px;transition:width .3s;"></div></div>'
-      +(list.length?list.map(jnJobRow).join(''):jnEmpty('Nothing yet. Add what you do every '+c[3]+' and stop holding it in your head.'))
-      +'<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:10px;" onclick="jnOpenJobFor(\''+c[0]+'\')">+ Add '+c[2].toLowerCase()+' job</button>';
-    return jnCol(c[0],c[1],c[2],list.length?d+'/'+list.length:'0', body, list.length&&d===list.length?'#4ade80':null);
-  });
-  return jnGrid(cols,290)
-    +'<div style="font-size:12px;color:var(--text2);padding:12px 4px 0;">Ticks reset on their own — daily at midnight, weekly on Monday, monthly on the 1st. Un-tick anything that wasn\'t done properly.</div>';
+function jaFlushAll(){ Object.keys(JA.notes).forEach(function(id){ if(JA.notes[id]._dirty) jaFlush(id); }); }
+window.addEventListener('beforeunload',jaFlushAll);
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') jaFlushAll(); });
+// ── jobs ──
+async function jaAddJob(areaId,text){
+  text=(text||'').trim(); if(!text) return;
+  var inp=document.getElementById('ja-new'); if(inp){ inp.value=''; inp.disabled=true; }
+  var r=await sb.from('journal_items').insert({text:text,area:areaId,status:'inbox',kind:'task',created_by:STATE.profile?.email||null}).select();
+  if(inp) inp.disabled=false;
+  if(r.error){ alert('Could not add — '+r.error.message); if(inp) inp.value=text; return; }
+  JA.items.push(r.data[0]); jaPaint();
+  var again=document.getElementById('ja-new'); if(again) again.focus();
 }
-function jnOpenJobFor(cad){ JN.jobCad=cad; jnOpenJob(); }
-
-function jnIdeas(){
-  var inbox=JN.items.filter(function(x){return x.status==='inbox';});
-  var week=JN.items.filter(function(x){return x.status==='week';});
-  var someday=JN.items.filter(function(x){return x.status==='someday';});
-  var goals=JN.items.filter(function(x){return x.kind==='goal'&&x.status!=='done';});
-  var stale=inbox.filter(function(x){ return (Date.now()-new Date(x.created_at))/86400000>14; });
-
-  var h='';
-  if(stale.length>=3) h+='<div class="card" style="border:1px solid rgba(230,180,40,.35);background:rgba(230,180,40,.06);margin-bottom:14px;">'
-    +'<div style="font-size:13px;color:#e6b428;font-weight:700;margin-bottom:3px;">'+stale.length+' things have sat here over two weeks</div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:9px;">No judgement — they were worth writing down. Clear them out or pick one.</div>'
-    +'<button class="btn btn-sm btn-ghost" onclick="jnArchiveStale()">💤 Move them all to Someday</button></div>';
-
-  return h+jnGrid([
-    jnCol('goals','🎯','Goals',goals.length, goals.length?goals.map(function(x){return jnItemRow(x,{promote:true});}).join(''):jnEmpty('None set. Capture one with <b>*</b> in front.')),
-    jnCol('inbox','📥','Inbox',inbox.length, inbox.length?inbox.map(function(x){return jnItemRow(x,{promote:true,later:true,focus:true});}).join(''):jnEmpty('Empty. Capture anything up top — sort it later.'),'var(--accent)'),
-    jnCol('week','🗓','This week',week.length, week.length?week.map(function(x){return jnItemRow(x,{promote:true,later:true});}).join(''):jnEmpty('Nothing queued for this week.')),
-    jnCol('someday','💤','Someday',someday.length, someday.length?someday.map(function(x){return jnItemRow(x,{promote:true});}).join(''):jnEmpty('Nothing parked.'))
-  ],290);
+async function jaToggle(id){
+  var it=JA.items.find(function(x){return x.id===id;}); if(!it) return;
+  var patch=it.status==='done'?{status:'inbox',done_at:null}:{status:'done',done_at:new Date().toISOString()};
+  Object.assign(it,patch); jaPaint();
+  var r=await sb.from('journal_items').update(patch).eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not save that tick — '+(r.error?r.error.message:'no permission')); JA.loaded=false; renderJournal(); }
 }
-async function jnArchiveStale(){
-  var stale=JN.items.filter(function(x){return x.status==='inbox'&&(Date.now()-new Date(x.created_at))/86400000>14;});
-  await Promise.all(stale.map(function(x){ return sb.from('journal_items').update({status:'someday'}).eq('id',x.id); }));
-  await jnLoad(); jnPaint(); jnFlash('Parked '+stale.length);
+async function jaEditJob(id,text){
+  var it=JA.items.find(function(x){return x.id===id;}); if(!it) return;
+  text=(text||'').trim(); if(text===(it.text||'')) return;
+  if(!text){ return jaDelJob(id,true); }
+  it.text=text; var r=await sb.from('journal_items').update({text:text,updated_at:new Date().toISOString()}).eq('id',id).select();
+  if(r.error) alert('Could not save — '+r.error.message);
 }
-
-function jnDump(){
-  return '<div class="card"><div class="card-title">🧠 Brain dump</div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">No structure, no rules. Get it out of your head first — turn it into tasks after.</div>'
-    +'<textarea id="jn-dump" placeholder="Everything that\'s rattling around…" style="width:100%;min-height:340px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:14px;font-size:14px;line-height:1.7;resize:vertical;">'+escapeHtml(JN.dumpText||'')+'</textarea>'
-    +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'
-    +'<button class="btn btn-primary" onclick="jnSaveDump()">💾 Save</button>'
-    +'<button class="btn btn-ghost" onclick="jnExtract()">✨ Turn each line into a task</button>'
-    +'<span id="jn-dump-note" style="font-size:12px;color:var(--text2);align-self:center;"></span></div></div>';
+async function jaDelJob(id,noAsk){
+  if(!noAsk&&!confirm('Delete this job?')) return;
+  var r=await sb.from('journal_items').delete().eq('id',id).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not delete — '+(r.error?r.error.message:'no permission')); return; }
+  JA.items=JA.items.filter(function(x){return x.id!==id;}); jaPaint();
 }
-async function jnSaveDump(){
-  var t=(document.getElementById('jn-dump')||{}).value||'';
-  JN.dumpText=t;
-  var r=await sb.from('journal_notes').upsert({key:'dump',text:t,updated_at:new Date().toISOString()},{onConflict:'key'});
-  if(r.error){ alert('Could not save — '+r.error.message); return; }
-  var n=document.getElementById('jn-dump-note'); if(n){ n.textContent='Saved ✓'; setTimeout(function(){ n.textContent=''; },1600); }
+async function jaMoveJob(id){
+  var opts=JA.areas.map(function(a,n){return (n+1)+' = '+a.icon+' '+a.name;}).join('\n');
+  var p=prompt('Move this job to which area?\n\n'+opts,'1'); if(p===null) return;
+  var a=JA.areas[parseInt(p,10)-1]; if(!a){ alert('No area '+p); return; }
+  var r=await sb.from('journal_items').update({area:a.id}).eq('id',id).select();
+  if(r.error){ alert('Could not move — '+r.error.message); return; }
+  var it=JA.items.find(function(x){return x.id===id;}); if(it) it.area=a.id; jaPaint();
 }
-async function jnExtract(){
-  var t=(document.getElementById('jn-dump')||{}).value||'';
-  var lines=t.split('\n').map(function(s){return s.replace(/^[-*•\s]+/,'').trim();}).filter(function(s){return s.length>2;});
-  if(!lines.length){ jnFlash('Nothing to pull out'); return; }
-  if(!confirm('Create '+lines.length+' item'+(lines.length===1?'':'s')+' in your Inbox?\n\nThe dump text stays as it is.')) return;
-  var rows=lines.map(function(l){ var p=jnParse(l); p.created_by=jnMe(); p.status='inbox'; p.slot=null; return p; });
-  var r=await sb.from('journal_items').insert(rows).select();
-  if(r.error){ alert('Could not create — '+r.error.message); return; }
-  await jnLoad(); JN.tab='ideas'; jnPaint(); jnFlash('Added '+lines.length);
+// ── areas ──
+async function jaNewArea(){
+  var name=prompt('Name the new area (e.g. "Moxie onboarding", "Bali life"):'); if(!name||!name.trim()) return;
+  var icon=prompt('Pick an emoji for it (or leave blank):','🗂')||'🗂';
+  var id='a'+Date.now().toString(36);
+  JA.areas.push({id:id,name:name.trim(),icon:icon.trim()||'🗂'}); await jaSaveAreas(); jaTab(id);
+}
+async function jaRenameArea(id){
+  var a=jaArea(id); if(!a) return;
+  var name=prompt('Rename this area:',a.name); if(name===null||!name.trim()) return;
+  var icon=prompt('Emoji:',a.icon); a.name=name.trim(); if(icon!==null&&icon.trim()) a.icon=icon.trim();
+  await jaSaveAreas(); jaPaint();
+}
+async function jaDeleteArea(id){
+  var a=jaArea(id); if(!a) return;
+  if(JA.areas.length<=1){ alert('Keep at least one area.'); return; }
+  var open=jaOpen(id).length, hasNote=!!(JA.notes[id]&&JA.notes[id].text);
+  var target=JA.areas.find(function(x){return x.id!==id;});
+  if(!confirm('Delete "'+a.name+'"?'+(open?'\n\nIts '+open+' open job'+(open===1?'':'s')+' move to '+target.name+'.':'')+(hasNote?'\nIts notepad text is kept and added to the end of '+target.name+'\'s notepad.':''))) return;
+  if(open){ var r=await sb.from('journal_items').update({area:target.id}).eq('area',id).select(); if(r.error){ alert('Could not move its jobs — '+r.error.message); return; } JA.items.forEach(function(i){ if((i.area||'inbox')===id) i.area=target.id; }); }
+  if(hasNote){ var t=JA.notes[target.id]||{text:''}; JA.notes[target.id]=Object.assign(t,{text:(t.text?t.text+'\n\n':'')+'— from '+a.name+' —\n'+JA.notes[id].text,_dirty:true}); await jaFlush(target.id); }
+  JA.areas=JA.areas.filter(function(x){return x.id!==id;}); await jaSaveAreas(); jaTab(target.id);
 }
 
 // ── Utils ────────────────────────────────────────────────────
