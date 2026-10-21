@@ -2235,6 +2235,25 @@
       <div class="page-title">🛰️ Proxy Checker</div>
       <div class="page-sub">Paste proxies, get a scored table, copy what you need. Screens exit IPs for proxy flags, connection type (CGNAT/mobile vs wireline) and fraud score relative to the carrier.</div>
       <div id="px-status" style="margin-bottom:14px;"></div>
+      <div class="card" id="px-live-card" style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <div class="card-title" style="margin:0;">📡 Live IPs — cloud phones</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:3px;">The IP each GeeLark phone is on right now. Checked automatically every 15 min and before every bot run; anything off T-Mobile is moved to a clean T-Mobile IP before the phone boots.</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <select id="pxl-group" onchange="pxLiveRender()" style="width:auto;"><option value="">All models</option></select>
+            <button class="btn btn-sm btn-ghost" onclick="pxLiveLoad()">↻ Refresh</button>
+            <button class="btn btn-sm btn-primary" id="pxl-checkall" onclick="pxLiveCheckAll()">Check all now</button>
+          </div>
+        </div>
+        <div id="pxl-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
+        <div style="overflow-x:auto;"><table class="data-table" style="width:100%;font-size:12.5px;">
+          <thead><tr><th>Phone</th><th>Device</th><th>IP</th><th>Carrier</th><th>Location</th><th>Risk</th><th>Status</th><th>Checked</th><th></th></tr></thead>
+          <tbody id="pxl-rows"><tr><td colspan="9" style="color:var(--text2);">Loading…</td></tr></tbody>
+        </table></div>
+        <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:13px;font-weight:600;">Swap log</summary><div id="pxl-swaps" style="margin-top:8px;"></div></details>
+      </div>
       <div class="two-col-wide">
         <div class="card" style="max-width:560px;">
           <div class="card-title">Check a batch</div>
@@ -13717,7 +13736,80 @@ async function sdSet(id,status,captcha){
 async function renderProxyChecker(){
   if(PX_POLL){clearInterval(PX_POLL);PX_POLL=null;}
   var b=document.getElementById('px-batch'); if(b)b.innerHTML='';
-  pxLoadProviders(); pxHealth(); loadProxyHistory(); loadProxyCredits();
+  pxLoadProviders(); pxHealth(); loadProxyHistory(); loadProxyCredits(); pxLiveLoad();
+}
+// ── Live IPs (proxy-guard) ──────────────────────────────────
+// proxy_live is written by the proxy-guard edge function (pg_cron every 15 min,
+// and the phone service's pre-flight before every run). "Check" re-reads one or
+// all phones live; "Fix now" runs the same pre-flight swap the bot runs.
+var PXL_ROWS=[], PXL_TIMER=null, PXL_TOKEN=null;
+function pxlAgo(t){ if(!t) return '—'; var s=Math.round((Date.now()-new Date(t).getTime())/1000); if(s<60) return s+'s ago'; if(s<3600) return Math.round(s/60)+'m ago'; if(s<86400) return Math.round(s/3600)+'h ago'; return Math.round(s/86400)+'d ago'; }
+async function pxlToken(){ if(PXL_TOKEN) return PXL_TOKEN; var r=await sb.from('phone_settings').select('value').eq('key','proxy_guard').maybeSingle(); PXL_TOKEN=(r.data&&r.data.value&&r.data.value.token)||''; return PXL_TOKEN; }
+async function pxLiveLoad(){
+  var r=await sb.from('proxy_live').select('*').order('name');
+  PXL_ROWS=r.data||[];
+  var sel=document.getElementById('pxl-group');
+  if(sel){ var cur=sel.value, gs=[...new Set(PXL_ROWS.map(function(x){return x.grp;}).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">All models</option>'+gs.map(function(g){return '<option'+(g===cur?' selected':'')+'>'+escapeHtml(g)+'</option>';}).join(''); }
+  pxLiveRender();
+  var s=await sb.from('proxy_swaps').select('*').order('created_at',{ascending:false}).limit(25);
+  var box=document.getElementById('pxl-swaps');
+  if(box) box.innerHTML=(s.data||[]).length?(s.data||[]).map(function(w){
+    return '<div style="font-size:12px;padding:5px 0;border-top:1px solid var(--border);"><b>'+escapeHtml(w.name||w.profile_id)+'</b> · '+pxlAgo(w.created_at)+' · '+escapeHtml(w.reason||'')+'<br><span style="color:var(--text2);">'+escapeHtml(w.old_ip||'—')+' ('+escapeHtml(w.old_isp||'?')+') → '+escapeHtml(w.new_ip||'—')+' ('+escapeHtml(w.new_isp||'?')+')</span></div>';
+  }).join(''):'<div style="font-size:12px;color:var(--text2);">No swaps yet.</div>';
+  if(PXL_TIMER) clearInterval(PXL_TIMER);
+  PXL_TIMER=setInterval(function(){
+    if(!document.getElementById('page-proxy-checker')?.classList.contains('active')){ clearInterval(PXL_TIMER); PXL_TIMER=null; return; }
+    sb.from('proxy_live').select('*').order('name').then(function(x){ if(x.data){ PXL_ROWS=x.data; pxLiveRender(); } });
+  },30000);
+}
+function pxLiveRender(){
+  var g=(document.getElementById('pxl-group')||{}).value||'';
+  var rows=PXL_ROWS.filter(function(r){ return !g||r.grp===g; });
+  var tm=rows.filter(function(r){return r.is_tmobile;}).length, bad=rows.length-tm;
+  var oldest=rows.reduce(function(a,r){ return (!a||(r.checked_at&&r.checked_at<a))?r.checked_at:a; },null);
+  var chip=function(t,bg,fg){ return '<span style="font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;background:'+bg+';color:'+fg+';">'+t+'</span>'; };
+  var sm=document.getElementById('pxl-summary');
+  if(sm) sm.innerHTML=chip('✓ '+tm+' on T-Mobile','rgba(61,214,140,.15)','#8ee6bd')+chip((bad?'✕ ':'')+bad+' not T-Mobile',bad?'rgba(239,68,68,.15)':'var(--surface2)',bad?'#fca5a5':'var(--text2)')+chip('oldest check '+pxlAgo(oldest),'var(--surface2)','var(--text2)');
+  var tb=document.getElementById('pxl-rows'); if(!tb) return;
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="9" style="color:var(--text2);">No data yet — click "Check all now".</td></tr>'; return; }
+  var st={ok:['✓ T-Mobile','#8ee6bd'],changed:['↺ IP changed (T-Mobile)','#f6cf84'],not_tmobile:['✕ Not T-Mobile','#fca5a5'],dead:['✕ Proxy dead','#fca5a5']};
+  tb.innerHTML=rows.map(function(r){
+    var s=st[r.status]||[r.status||'?','var(--text2)'];
+    var tzWarn=(r.tz&&r.phone_tz&&r.tz!==r.phone_tz)?' <span title="Phone time zone '+escapeHtml(r.phone_tz)+' vs IP '+escapeHtml(r.tz)+'" style="color:#f6cf84;">⚠ tz</span>':'';
+    return '<tr>'
+      +'<td><b>'+escapeHtml(r.name||'')+'</b><div style="font-size:11px;color:var(--text2);">'+escapeHtml(r.grp||'')+'</div></td>'
+      +'<td>'+escapeHtml(r.model||'')+'</td>'
+      +'<td style="font-family:ui-monospace,Menlo,monospace;">'+escapeHtml(r.ip||'—')+(r.first_ip&&r.ip&&r.first_ip!==r.ip?'<div style="font-size:10.5px;color:var(--text2);">first '+escapeHtml(r.first_ip)+'</div>':'')+'</td>'
+      +'<td>'+escapeHtml(r.isp||'—')+'</td>'
+      +'<td>'+escapeHtml([r.city,r.region].filter(Boolean).join(', ')||'—')+tzWarn+'</td>'
+      +'<td>'+(r.risk==null?'<span style="color:var(--text2);">—</span>':r.risk)+'</td>'
+      +'<td style="color:'+s[1]+';font-weight:700;white-space:nowrap;">'+s[0]+'</td>'
+      +'<td style="white-space:nowrap;color:var(--text2);">'+pxlAgo(r.checked_at)+'</td>'
+      +'<td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" onclick="pxLiveCheck(\''+r.profile_id+'\',this)">Check</button>'
+      +(r.is_tmobile?'':' <button class="btn btn-sm btn-primary" onclick="pxLiveFix(\''+r.profile_id+'\',this)">Fix now</button>')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+async function pxLiveCheck(pid,btn){
+  if(btn){ btn.disabled=true; btn.textContent='…'; }
+  try{ await sb.functions.invoke('proxy-guard',{body:{action:'check',profile_id:pid}}); }catch(e){}
+  await pxLiveLoad();
+}
+async function pxLiveCheckAll(){
+  var b=document.getElementById('pxl-checkall'); if(b){ b.disabled=true; b.textContent='Checking…'; }
+  try{ await sb.functions.invoke('proxy-guard',{body:{action:'check'}}); }catch(e){}
+  if(b){ b.disabled=false; b.textContent='Check all now'; }
+  await pxLiveLoad();
+}
+async function pxLiveFix(pid,btn){
+  if(!confirm('Move this phone to a clean T-Mobile IP now? If an Instagram account is logged in on it, its IP changes.')) return;
+  if(btn){ btn.disabled=true; btn.textContent='Fixing…'; }
+  var tok=await pxlToken();
+  var r=await sb.functions.invoke('proxy-guard',{body:{action:'ensure',profile_id:pid},headers:{'x-guard-token':tok}});
+  var d=r.data||{};
+  alert(d.swapped?('Moved to '+d.ip+' ('+d.isp+', '+(d.city||'')+')'):d.ok?('Already clean: '+d.ip+' ('+d.isp+')'):('Could not fix: '+(d.error||r.error||'unknown')));
+  await pxLiveLoad();
 }
 async function pxLoadProviders(){
   try{
