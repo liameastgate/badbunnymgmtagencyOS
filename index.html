@@ -906,7 +906,9 @@
         <div class="modal-title"><span>Upload content</span><button class="modal-close" onclick="closeModal('cl-upload-modal')">✕</button></div>
         <div class="form-group"><label>Model</label><select id="cl-up-model"></select></div>
         <div class="form-group"><label>Category</label><select id="cl-up-cat">
-          <option value="social">📱 IG / TikTok / Snap</option>
+          <option value="inbox">📥 New uploads (unedited — trim first)</option>
+          <option value="raw">🎞️ Raw reels (trimmed — Factory adds caption + audio)</option>
+          <option value="social">✅ Ready to post (finished — phones post these)</option>
           <option value="reddit_x">🔞 Reddit / X</option>
           <option value="photos">📸 Non-nude photos</option>
           <option value="stories">📖 Story CTA bank</option>
@@ -4126,7 +4128,10 @@ async function loadContentLibrary(){
   }
 }
 var LIB_CATEGORIES={
-  social:  {label:'IG / TikTok / Snap', short:'Social',  icon:'📱', accept:'video/*,image/*', hint:'Reels, stories, snaps — anything for the phone accounts'},
+  // Pipeline: New uploads (unedited, never posted) -> Raw reels (trimmed, Factory adds caption + audio)
+  // -> Ready to post (finished; the phones post from here + the Repurpose bank).
+  inbox:   {label:'New uploads',        short:'New',     icon:'📥', accept:'video/*,image/*', hint:'Straight from the models (app or Drive), unedited. Download, trim, then Move to → Raw reels or Ready to post. Never posted from here.'},
+  social:  {label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only — the phones post from here (and from the Repurpose bank)'},
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
   stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
@@ -4145,8 +4150,9 @@ var LIB_CATEGORIES={
   nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'⛔', accept:'video/*,image/*', ofOnly:true, hint:'Too explicit to promote anywhere — paid page only'}
 };
 // The six cards a model sees on the Upload page, in order.
-var MU_CARDS={of:['ppv','sexting','explicit','teasing'], mkt:['social','photos']};
-var MU_MKT={social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
+var MU_CARDS={of:['ppv','sexting','explicit','teasing'], mkt:['inbox','photos']};   // model uploads land in New uploads, never straight on the phones
+var MU_MKT={inbox:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
+            social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
             photos:{label:'Non-explicit photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
 function libOfOnly(k){ return !!(LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].ofOnly); }
 var LIB_STATES={
@@ -4480,7 +4486,7 @@ function editLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const title=prompt('Title:',it.title||''); if(title===null) return;
   const tags=prompt('Tags (comma separated — e.g. bedroom, tease, gym):',it.tags||''); if(tags===null) return;
-  const cat=prompt('Category — social / reddit_x / photos (blank = none):',it.category||''); if(cat===null) return;
+  const cat=prompt('Category — inbox (New uploads) / raw / social (Ready to post) / repurpose / photos / reddit_x (blank = none):',it.category||''); if(cat===null) return;
   const category=LIB_CATEGORIES[(cat||'').trim()]?(cat||'').trim():null;
   sb.from('content_library').update({title:title,tags:tags,category:category}).eq('id',id).select().then(function(r){
     if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
@@ -4798,7 +4804,7 @@ function renderLibraryList(){
   var bar=libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
     +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'category\')">🏷 Set category</button>'
+    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+Object.keys(LIB_CATEGORIES).map(function(k){ return '<option value="'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; }).join('')+'</select>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
     +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
     +'<button class="btn btn-sm '+(libIsPhone()?'btn-ghost':'btn-primary')+'" onclick="libBulkDownload()">⬇ Download</button>'
@@ -4960,6 +4966,26 @@ async function libBulkMove(what){
   LIB_SEL={}; renderLibraryList();
   var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
 }
+// One-step bulk "Move to" from the selection bar. Same guard as everywhere else:
+// OF-only files never go public without a confirm; moving a held file releases it.
+async function libBulkMoveTo(sel){
+  var cat=sel.value; sel.value=''; if(!cat||!LIB_CATEGORIES[cat]) return;
+  var ids=Object.keys(LIB_SEL); if(!ids.length) return;
+  var label=LIB_CATEGORIES[cat].label;
+  var picked=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]; });
+  var ofSel=picked.filter(function(i){ return libOfOnly(i.category); }).length;
+  if(ofSel&&!libOfOnly(cat)&&!confirm(ofSel+' of these are OnlyFans-only. Moving them to '+label+' means they can be posted publicly.\n\nOnly do this if they are definitely safe. Continue?')) return;
+  if(cat==='social'){
+    var unf=picked.filter(function(i){ return i.category==='inbox'; }).length;
+    if(unf&&!confirm(unf+' of these are still in New uploads (unedited). Ready to post means the phones can post them as they are.\n\nContinue?')) return;
+  }
+  var patch={category:cat};
+  var r=await sb.from('content_library').update(patch).in('id',ids).select();
+  if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
+  picked.forEach(function(i){ i.category=cat; });
+  LIB_SEL={}; renderLibraryList();
+  var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
+}
 async function libBulkDelete(){
   var ids=Object.keys(LIB_SEL); if(!ids.length) return;
   if(!confirm('Delete '+ids.length+' file'+(ids.length===1?'':'s')+' permanently? This cannot be undone.')) return;
@@ -4981,7 +5007,7 @@ function libOpenUpload(){
     sel.value=(LIB_F.model||'');
   }
   var c=document.getElementById('cl-up-cat');
-  if(c) c.value=(LIB_F.category&&LIB_F.category!=='none')?LIB_F.category:'social';
+  if(c) c.value=(LIB_F.category&&LIB_F.category!=='none')?LIB_F.category:'inbox';
   var a=document.getElementById('cl-up-alert'); if(a) a.textContent='';
   openModal('cl-upload-modal');
 }
@@ -5138,7 +5164,7 @@ async function muUploadForOrder(orderId){
   const btn=document.getElementById('mu-ord-'+orderId)||document.getElementById('co-up-'+orderId); const old=btn?btn.textContent:'';
   if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
   const statusFn=isModel?function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }:null;
-  const res=await libUploadFiles(files,{modelId:o.model_id,ownerType:'model',category:(o.platform==='instagram'||o.platform==='tiktok')?'social':null,sourceOrderId:orderId,strictHd:isModel,onStatus:statusFn});
+  const res=await libUploadFiles(files,{modelId:o.model_id,ownerType:'model',category:(o.platform==='instagram'||o.platform==='tiktok')?'inbox':null,sourceOrderId:orderId,strictHd:isModel,onStatus:statusFn});
   const r=res[0];
   if(r&&r.item){
     const vp='r2:'+r.key;
