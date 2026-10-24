@@ -2282,7 +2282,7 @@
     <!-- Proxy Checker -->
     <div class="page" id="page-proxy-checker">
       <div class="cc-tabs" data-cc-tabs="proxies"></div>
-      <div class="page-title">🛰️ Proxy Checker</div>
+      <div class="page-title">Proxies</div>
       <div class="page-sub">Paste proxies, get a scored table, copy what you need. Screens exit IPs for proxy flags, connection type (CGNAT/mobile vs wireline) and fraud score relative to the carrier.</div>
       <div id="px-status" style="margin-bottom:14px;"></div>
       <div class="card" id="px-live-card" style="margin-bottom:18px;">
@@ -2806,7 +2806,7 @@
     <div class="page" id="page-ig-views">
       <div class="cc-tabs" data-cc-tabs="views"></div>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-        <div><div class="page-title">📈 IG Views</div><div class="page-sub">Reel views, likes and followers for every phone account, pulled from Instagram once a day (Apify). Times in Bali time.</div></div>
+        <div><div class="page-title">Views</div><div class="page-sub">Reel views, likes and followers for every phone account, pulled from Instagram once a day (Apify). Times in Bali time.</div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="igv-model" onchange="igvRender()"><option value="">All models</option></select>
           <select id="igv-backend" onchange="igvRender()"><option value="">All phones</option><option value="multilogin">Multilogin</option><option value="geelark">GeeLark</option></select>
@@ -2822,8 +2822,9 @@
 
     <!-- Cloud Farm -->
     <div class="page" id="page-cloud-farm">
+      <div class="cc-tabs" data-cc-tabs="phones"></div>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-        <div><div class="page-title">☁️ Cloud Farm</div><div class="page-sub">Multilogin &amp; GeeLark phones, driven by the phone service on Railway. All times AEST.</div></div>
+        <div><div class="page-title">Phones</div><div class="page-sub">Multilogin &amp; GeeLark phones, driven by the phone service on the VPS. Run batches by hand here; the daily schedule lives in the Schedule tab. All times AEST.</div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span id="cf-pool" style="font-size:12px;color:var(--text2);"></span>
           <button class="btn btn-sm btn-ghost" onclick="phSync('multilogin').then(loadCloudFarm)">⟳ Multilogin</button>
@@ -3227,14 +3228,14 @@ var NAV = [
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
-  { id: 'command-center', icon: '🛰️', label: 'Command Center',   roles: ['admin','va'],                             section: 'Tools' },
-  { id: 'cloud-farm',  icon: '☁️', label: 'Cloud Farm',         roles: ['admin','va'],                             section: 'Tools' },
-  { id: 'ig-views',    icon: '📈', label: 'IG Views',           roles: ['admin','va','traffic'],                   section: 'Tools' },
+  { id: 'command-center', icon: '☁️', label: 'Cloud Automation', roles: ['admin','va','traffic'],                             section: 'Tools' },
+  { id: 'cloud-farm',  icon: '☁️', label: 'Cloud Farm',         roles: ['admin','va'], hidden: true,                             section: 'Tools' },
+  { id: 'ig-views',    icon: '📈', label: 'IG Views',           roles: ['admin','va','traffic'], hidden: true,                   section: 'Tools' },
   { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',   roles: ['admin','va'],                             section: 'Tools' },
   { id: 'trainer',     icon: '🎓', label: 'Scanner Trainer',    roles: ['admin'],                                  section: 'Tools' },
   { id: 'content-factory', icon: '🏭', label: 'Content Factory',   roles: ['admin','va'],                             section: 'Tools' },
   { id: 'chat-analyser', icon: '🧪', label: 'Chat Analyser',       roles: ['admin','va'],                             section: 'Tools' },
-  { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'],                   section: 'Tools' },
+  { id: 'proxy-checker', icon: '🛰️', label: 'Proxy Checker',     roles: ['admin','va','traffic'], hidden: true,                   section: 'Tools' },
   { id: 'signup-desk', icon: '🪪', label: 'Signup Desk',        roles: ['admin','va','traffic'],                   section: 'Tools' },
 
   { id: 'model-guides', icon: '📕', label: 'Guides',            roles: ['admin','va','model'],                     section: 'Models' },
@@ -3777,7 +3778,7 @@ function navigate(page) {
   // categories -- so map it back to page-sops while keeping its own nav-item highlighted.
   const pageDomId = (page === 'traffic-sops' || page === 'model-guides') ? 'sops' : page;
   const el = document.getElementById('page-' + pageDomId); if (el) el.classList.add('active');
-  const nav = document.getElementById('nav-' + page); if (nav) nav.classList.add('active');
+  const nav = document.getElementById('nav-' + (['cloud-farm','ig-views','proxy-checker'].indexOf(page) >= 0 ? 'command-center' : page)); if (nav) nav.classList.add('active');
   try{ localStorage.setItem('agencyos_page', page); }catch(e){}
   // On mobile, picking a page auto-closes the drawer so the content is visible.
   if(window.innerWidth<=768){ const sb2=document.getElementById('sidebar'); if(sb2 && !sb2.classList.contains('collapsed')) toggleSidebar(); }
@@ -3819,7 +3820,7 @@ function navigate(page) {
   if (page === 'trainer') renderTrainer();
   if (page === 'cloud-farm') loadCloudFarm();
   if (page === 'command-center') loadCommandCenter();
-  if (page === 'ig-views' || page === 'proxy-checker') ccDrawTabbars();
+  if (page === 'ig-views' || page === 'proxy-checker' || page === 'cloud-farm') ccDrawTabbars();
   if (page === 'ig-views') loadIgViews();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
@@ -9027,9 +9028,14 @@ function ccDayLabel(iso) {
   var d = new Date(iso + 'T12:00:00Z');
   return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() + ' ' + d.getUTCDate();
 }
+function ccTabsFor() {
+  var role = (STATE && STATE.profile && STATE.profile.role) || '';
+  var all = [['schedule', 'Schedule'], ['phones', 'Phones'], ['library', 'Library'], ['views', 'Views'], ['proxies', 'Proxies']];
+  return role === 'traffic' ? all.filter(function (t) { return t[0] === 'views' || t[0] === 'proxies'; }) : all;
+}
 function ccTabbarHtml(active) {
-  var tabs = [['schedule', 'Schedule'], ['library', 'Library'], ['views', 'Views'], ['proxies', 'Proxies']];
-  return '<div class="cc-tabbar"><span class="cc-title">🛰️ Command Center</span>' + tabs.map(function (t) {
+  var tabs = ccTabsFor();
+  return '<div class="cc-tabbar"><span class="cc-title">☁️ Cloud Automation</span>' + tabs.map(function (t) {
     return '<button class="cc-tab' + (t[0] === active ? ' on' : '') + '" onclick="ccGo(\'' + t[0] + '\')">' + t[1] + '</button>';
   }).join('') + '<div style="flex-grow:1;"></div><span id="cc-gl-wrap"></span></div>';
 }
@@ -9041,6 +9047,7 @@ async function ccDrawTabbars() {
 function ccGo(tab) {
   if (tab === 'views') { navigate('ig-views'); return; }
   if (tab === 'proxies') { navigate('proxy-checker'); return; }
+  if (tab === 'phones') { navigate('cloud-farm'); return; }
   if (!document.getElementById('page-command-center').classList.contains('active')) { CC.tab = tab; navigate('command-center'); return; }
   CC.tab = tab; ccShowTab();
 }
@@ -9069,6 +9076,7 @@ async function ccToggleGeelark() {
 }
 
 async function loadCommandCenter() {
+  if (ccTabsFor().length === 2) { navigate('ig-views'); return; }
   ccShowTab();
   var msg = document.getElementById('cc-msg'); msg.textContent = 'Loading…';
   CC.days = []; for (var i = 0; i < 7; i++) CC.days.push(ccEtDate(i));
