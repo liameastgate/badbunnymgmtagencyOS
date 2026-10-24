@@ -113,6 +113,41 @@
     .two-col, .two-col-wide { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Command Center */
+  .cc-tabbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .cc-tabbar .cc-title { font-size:22px; font-weight:800; margin-right:12px; }
+  .cc-tab { height:38px; padding:0 16px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; }
+  .cc-tab.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .cc-wrap { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+  .cc-rail { width:240px; flex:0 0 240px; display:flex; flex-direction:column; gap:10px; }
+  .cc-main { flex:999 1 560px; min-width:0; }
+  .cc-insp { width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:12px; }
+  .cc-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .cc-lbl { font-size:10px; letter-spacing:2px; color:var(--text2); font-weight:700; text-transform:uppercase; }
+  .cc-gridbox { border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow-x:auto; }
+  .cc-row { display:grid; grid-template-columns: 210px repeat(7, minmax(72px, 1fr)); border-bottom:1px solid #16182e; min-width:720px; }
+  .cc-row.head { font-size:10px; letter-spacing:1.5px; color:var(--text2); font-weight:700; border-bottom:1px solid var(--border); }
+  .cc-row.sel { background:#141433; }
+  .cc-row.grp { background:var(--surface2); font-size:11px; font-weight:800; letter-spacing:1px; color:var(--accent2); }
+  .cc-acct { padding:8px 12px; display:flex; align-items:center; gap:9px; min-width:0; cursor:pointer; }
+  .cc-acct b { font-size:13px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cc-acct small { font-size:11px; color:var(--text2); }
+  .cc-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .cc-cell { margin:5px; height:32px; border-radius:6px; border:2px solid transparent; font-size:12px; font-weight:800; cursor:pointer; color:#fff; background:var(--accent); }
+  .cc-cell.off { background:#16182e; color:var(--text2); }
+  .cc-cell.exp { background:var(--yellow); color:#08080f; }
+  .cc-cell.idle { background:transparent; border:1px dashed var(--border); color:var(--text2); }
+  .cc-cell.edited { box-shadow:inset 0 -3px 0 #4ade80; }
+  .cc-cell.sel { border-color:#fff; }
+  .cc-step { display:flex; align-items:center; gap:10px; }
+  .cc-step button { width:44px; height:44px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:#fff; font-size:20px; cursor:pointer; }
+  .cc-step .v { flex-grow:1; text-align:center; font-size:32px; font-weight:800; }
+  .cc-chipbtn { height:34px; padding:0 12px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
+  .cc-bar { height:8px; border-radius:4px; background:var(--border); overflow:hidden; }
+  .cc-bar > div { height:8px; }
+  .cc-lib { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:14px; }
+  @media (max-width: 900px) { .cc-rail, .cc-insp { flex:1 1 100%; width:auto; position:static; } }
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; border-top: 2px solid var(--border); }
   .stat-card.accent { border-top-color: var(--accent); }
   .stat-card.white { border-top-color: #ffffff; }
@@ -1038,8 +1073,20 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="cfx-btn" onclick="cfOpenLib('sounds')">Open sounds</button>
+          <button class="cfx-btn" onclick="sndPull()" title="Pull the soundtrack out of this model's videos for review">🎵 Pull sounds from clips</button>
+          <button class="cfx-btn" id="snd-review-btn" onclick="sndOpen()">Review sounds</button>
           <label class="cfx-btn" style="display:inline-flex;align-items:center;">Add sounds<input type="file" id="cf-up-audio" multiple accept="audio/*" style="display:none;" onchange="cfUploadLib('sounds', this)"></label>
         </div>
+      </div>
+
+      <div class="cfx-panel" id="snd-panel" style="display:none;margin-bottom:16px;">
+        <div class="cfx-panel-h"><h3>Sound candidates</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span id="snd-filters" style="display:flex;gap:6px;"></span>
+            <button class="cfx-btn" onclick="document.getElementById('snd-panel').style.display='none'">Close</button>
+          </div></div>
+        <div class="cfx-hint" style="margin-bottom:8px;">Pulled from this model's videos. Keep adds it to the Sound bank, which the factory lays under clips. Talking, room noise and duplicates are filtered out — switch the filter to check them.</div>
+        <div id="snd-list" class="cfx-list"></div>
       </div>
 
       <div class="cfx-two">
@@ -2234,6 +2281,7 @@
 
     <!-- Proxy Checker -->
     <div class="page" id="page-proxy-checker">
+      <div class="cc-tabs" data-cc-tabs="proxies"></div>
       <div class="page-title">🛰️ Proxy Checker</div>
       <div class="page-sub">Paste proxies, get a scored table, copy what you need. Screens exit IPs for proxy flags, connection type (CGNAT/mobile vs wireline) and fraud score relative to the carrier.</div>
       <div id="px-status" style="margin-bottom:14px;"></div>
@@ -2729,6 +2777,49 @@
 
     <!-- Management -->
     <!-- Accounts vault -->
+    <!-- Command Center -->
+    <div class="page" id="page-command-center">
+      <div id="cc-tabbar"></div>
+      <div id="cc-msg" style="font-size:12px;color:var(--text2);margin:6px 0 10px;"></div>
+      <div id="cc-tab-schedule">
+        <div class="cc-wrap">
+          <aside class="cc-rail" id="cc-runway"></aside>
+          <section class="cc-main">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+              <div style="font-size:20px;font-weight:800;">Next 7 days</div>
+              <span id="cc-week-sub" style="font-size:12px;color:var(--text2);"></span>
+              <div style="flex-grow:1;"></div>
+              <span id="cc-pending" style="font-size:12px;color:var(--yellow);"></span>
+              <button class="btn btn-sm btn-ghost" onclick="ccDiscard()">Undo changes</button>
+              <button class="btn btn-sm btn-primary" id="cc-save" onclick="ccSave()">Save schedule</button>
+            </div>
+            <div class="cc-gridbox" id="cc-grid"></div>
+            <div style="font-size:12px;color:var(--text2);margin-top:10px;">Blue = reels · Yellow = experiment account · Grey = off · Dashed = not posting (switched off, paused or its phone type isn't posting yet) · Dot = proxy · Click any cell to edit.</div>
+          </section>
+          <aside class="cc-insp" id="cc-insp"></aside>
+        </div>
+      </div>
+      <div id="cc-tab-library" style="display:none;"></div>
+    </div>
+
+    <!-- IG Views -->
+    <div class="page" id="page-ig-views">
+      <div class="cc-tabs" data-cc-tabs="views"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div><div class="page-title">📈 IG Views</div><div class="page-sub">Reel views, likes and followers for every phone account, pulled from Instagram once a day (Apify). Times in Bali time.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="igv-model" onchange="igvRender()"><option value="">All models</option></select>
+          <select id="igv-backend" onchange="igvRender()"><option value="">All phones</option><option value="multilogin">Multilogin</option><option value="geelark">GeeLark</option></select>
+          <select id="igv-days" onchange="igvRender()"><option value="7">Last 7 days</option><option value="3">Last 3 days</option><option value="1">Last 24 hours</option><option value="30">Last 30 days</option></select>
+          <button class="btn btn-sm btn-ghost" id="igv-refresh" onclick="igvRefresh()">⟳ Pull now</button>
+        </div>
+      </div>
+      <span id="igv-msg" style="font-size:12px;color:var(--text2);"></span>
+      <div id="igv-stats" class="stats-grid" style="margin:14px 0;"></div>
+      <div class="card" style="margin-bottom:12px;"><div style="font-weight:700;margin-bottom:8px;">Accounts</div><div style="overflow-x:auto;" id="igv-accts"></div></div>
+      <div class="card"><div style="font-weight:700;margin-bottom:8px;">Reels <span style="font-weight:400;font-size:12px;color:var(--text2);">— posted in the chosen period, most viewed first</span></div><div style="overflow-x:auto;" id="igv-reels"></div></div>
+    </div>
+
     <!-- Cloud Farm -->
     <div class="page" id="page-cloud-farm">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
@@ -3136,7 +3227,9 @@ var NAV = [
   { id: 'traffic',    icon: '🔗', label: 'Tracking Links',      roles: ['admin','va','traffic'],                   section: 'Traffic' },
   { id: 'traffic-sops', icon: '🚦', label: 'Traffic SOPs',       roles: ['admin','va','traffic'],                   section: 'Traffic' },
 
+  { id: 'command-center', icon: '🛰️', label: 'Command Center',   roles: ['admin','va'],                             section: 'Tools' },
   { id: 'cloud-farm',  icon: '☁️', label: 'Cloud Farm',         roles: ['admin','va'],                             section: 'Tools' },
+  { id: 'ig-views',    icon: '📈', label: 'IG Views',           roles: ['admin','va','traffic'],                   section: 'Tools' },
   { id: 'compliance-hub', icon: '🛡️', label: 'Content Scanner',   roles: ['admin','va'],                             section: 'Tools' },
   { id: 'trainer',     icon: '🎓', label: 'Scanner Trainer',    roles: ['admin'],                                  section: 'Tools' },
   { id: 'content-factory', icon: '🏭', label: 'Content Factory',   roles: ['admin','va'],                             section: 'Tools' },
@@ -3337,7 +3430,75 @@ function renderContentFactory(){
 function cfModelChanged(){
   try{ localStorage.setItem('cf_model', cfModelId()); }catch(e){}
   cfAlert('');
-  cfLoadCounts(); cfLoadJobs(); cfLoadReady();
+  cfLoadCounts(); cfLoadJobs(); cfLoadReady(); sndCount();
+  var sp=document.getElementById('snd-panel'); if(sp&&sp.style.display!=='none') sndLoad();
+}
+
+/* ---- Sound candidates: soundtracks pulled from library videos (worker job
+   'extract_sounds'), reviewed here, Keep -> content_library 'sounds' ---- */
+var SND={rows:[], filter:'music'};
+var SND_LABEL={music:'🎵 Music', talking:'🗣 Talking', silent:'🔇 Room noise / none', dup:'♊ Duplicates'};
+async function sndPull(){
+  const id=cfModelId(); if(!id){ cfAlert('Pick a model first.','error'); return; }
+  const {error}=await sb.from('render_jobs').insert({model_id:id, job_type:'extract_sounds', quantity:0, created_by:STATE.profile?.id||null, params:{kind:'sounds'}});
+  if(error){ cfAlert('Could not queue: '+error.message,'error'); return; }
+  cfAlert('Pulling sounds from this model\'s videos — each video is only ever done once. New ones appear under Review sounds as they finish.','success');
+  cfLoadJobs();
+}
+async function sndCount(){
+  const id=cfModelId(), b=document.getElementById('snd-review-btn'); if(!b) return;
+  if(!id){ b.textContent='Review sounds'; return; }
+  const r=await sb.from('sound_candidates').select('id',{count:'exact',head:true}).eq('model_id',id).eq('status','pending').eq('label','music');
+  const n=r.count||0; b.textContent='Review sounds'+(n?' ('+n+')':'');
+  b.style.borderColor=n?'#c59bff':'';
+}
+async function sndOpen(){
+  const p=document.getElementById('snd-panel'); if(!p) return;
+  p.style.display='block'; await sndLoad(); try{ p.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
+}
+async function sndLoad(){
+  const id=cfModelId(), list=document.getElementById('snd-list'); if(!list) return;
+  if(!id){ list.innerHTML='<div class="cfx-hint">Pick a model.</div>'; return; }
+  const r=await sb.from('sound_candidates').select('id,created_at,source_title,r2_key,duration,label,status,beat,vad,dup_of,library_id').eq('model_id',id).order('created_at',{ascending:false}).limit(500);
+  if(r.error){ list.innerHTML='<div class="cfx-hint">'+escapeHtml(r.error.message)+'</div>'; return; }
+  SND.rows=r.data||[];
+  const cnt={music:0,talking:0,silent:0,dup:0};
+  SND.rows.forEach(function(x){ if(x.status==='dup') cnt.dup++; else if(x.label==='music'&&x.status==='pending') cnt.music++; else if(x.label==='talking') cnt.talking++; else if(x.label==='silent'||x.label==='failed') cnt.silent++; });
+  document.getElementById('snd-filters').innerHTML=Object.keys(SND_LABEL).map(function(k){
+    return '<button class="cfx-chip'+(SND.filter===k?' on':'')+'" onclick="SND.filter=\''+k+'\';sndLoad()">'+SND_LABEL[k]+' '+cnt[k]+'</button>'; }).join('');
+  const rows=SND.rows.filter(function(x){
+    if(SND.filter==='dup') return x.status==='dup';
+    if(SND.filter==='music') return x.label==='music'&&x.status==='pending';
+    if(SND.filter==='silent') return x.label==='silent'||x.label==='failed';
+    return x.label===SND.filter; });
+  if(!rows.length){ list.innerHTML='<div class="cfx-hint" style="padding:10px 0;">'+(SND.filter==='music'?'Nothing waiting. Hit <b>🎵 Pull sounds from clips</b> to scan this model\'s videos.':'None.')+'</div>'; return; }
+  list.innerHTML=rows.map(function(x){
+    const playable=!!x.r2_key;
+    return '<div class="cfx-row" id="snd-'+x.id+'" style="flex-wrap:wrap;">'
+      +'<div style="flex:1;min-width:160px;"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(x.source_title||'clip')+'</div>'
+      +'<div class="cfx-hint">'+(x.duration?Number(x.duration).toFixed(1)+' s · ':'')+'beat '+(x.beat!=null?x.beat:'—')+' · pauses '+(x.vad!=null?x.vad:'—')+'</div></div>'
+      +(playable?'<audio controls preload="none" style="height:32px;max-width:260px;" data-key="'+escapeHtml(x.r2_key)+'" onplay="sndSrc(this)"></audio>':'<span class="cfx-hint">no file kept</span>')
+      +(x.status==='pending'&&playable?'<button class="cfx-btn" style="border-color:#4ade80;" onclick="sndKeep(\''+x.id+'\')">Keep</button><button class="cfx-btn" onclick="sndSkip(\''+x.id+'\')">Skip</button>'
+        :'<span class="cfx-tag" style="background:var(--surface2);">'+(x.status==='kept'?'✅ In Sound bank':x.status)+'</span>')
+      +'</div>';
+  }).join('');
+}
+async function sndSrc(el){
+  if(el.dataset.ready) return; el.pause();
+  try{ el.src=await r2SignedUrl(el.dataset.key,'GET'); el.dataset.ready='1'; el.play(); }catch(e){ cfAlert('Could not load that sound: '+(e.message||e),'error'); }
+}
+async function sndKeep(cid){
+  const x=SND.rows.find(function(r){ return r.id===cid; }); if(!x) return;
+  const row={model_id:cfModelId(), owner_type:'model', title:'♪ '+(x.source_title||'pulled sound'), r2_key:x.r2_key, content_type:'audio/mpeg',
+    uploaded_by_email:STATE.profile?.email||null, category:'sounds', state:'fresh', storage_bucket:'r2', duration_sec:x.duration||null, tags:'pulled'};
+  const ins=await sb.from('content_library').insert(row).select('id');
+  if(ins.error||!ins.data||!ins.data.length){ cfAlert('Could not add to the Sound bank: '+(ins.error?ins.error.message:'no permission'),'error'); return; }
+  await sb.from('sound_candidates').update({status:'kept', library_id:ins.data[0].id, reviewed_at:new Date().toISOString(), reviewed_by:STATE.profile?.email||null}).eq('id',cid);
+  STATE.library=null; sndLoad(); sndCount(); cfLoadCounts();
+}
+async function sndSkip(cid){
+  await sb.from('sound_candidates').update({status:'skipped', reviewed_at:new Date().toISOString(), reviewed_by:STATE.profile?.email||null}).eq('id',cid);
+  const el=document.getElementById('snd-'+cid); if(el) el.remove(); sndCount();
 }
 
 /* ---- the three cards ---- */
@@ -3494,7 +3655,7 @@ async function cfSubmit(jobType){
 }
 
 const CF_LABEL={photo2video:'Photos → source clips', caption:'Caption only',
-                captionaudio:'Caption + sound', audioonly:'Sound only',
+                captionaudio:'Caption + sound', audioonly:'Sound only', extract_sounds:'Pull sounds',
                 prep:'Prep for posting'};
 const CF_DOT={queued:'#9aa3ad', running:'#2f7fe0', done:'#1f9d55',
               failed:'#c0392b', cancelled:'#9aa3ad'};
@@ -3657,6 +3818,9 @@ function navigate(page) {
   if (page === 'signup-desk') renderSignupDesk();
   if (page === 'trainer') renderTrainer();
   if (page === 'cloud-farm') loadCloudFarm();
+  if (page === 'command-center') loadCommandCenter();
+  if (page === 'ig-views' || page === 'proxy-checker') ccDrawTabbars();
+  if (page === 'ig-views') loadIgViews();
   if (page === 'personal-dashboard') renderPersonalDashboard();
   if (page === 'personal-reports') loadPersonalReportsOverview();
   if (page === 'personal-contentperf') loadPersonalContentPerformance();
@@ -4701,6 +4865,34 @@ function libShowNeedsReview(){
   if(w&&w.scrollIntoView) try{ w.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
 }
 
+// ── Posting runway: how many days of unposted reels each model has left ─────
+// From content_runway(): for every enabled phone, the Ready-to-post + Repurpose
+// videos that phone has NOT posted yet. Days = worst phone's count / posts per day.
+var LIB_RUNWAY=null, LIB_RUNWAY_AT=0;
+async function libLoadRunway(){
+  if(LIB_RUNWAY&&Date.now()-LIB_RUNWAY_AT<60000) return;
+  try{
+    var r=await sb.rpc('content_runway');
+    if(r.error) return;
+    LIB_RUNWAY={}; (r.data||[]).forEach(function(x){ LIB_RUNWAY[String(x.model||'').toLowerCase()]=x; });
+    LIB_RUNWAY_AT=Date.now();
+    if(!LIB_F.model) renderLibraryList();
+  }catch(e){}
+}
+function libRunwayHtml(key){
+  if(!LIB_RUNWAY||key==='agency') return '';
+  var m=(STATE.models||[]).find(function(x){return x.id===key;}); if(!m) return '';
+  var x=LIB_RUNWAY[String(m.name||'').toLowerCase()];
+  if(!x) return '<div style="font-size:11.5px;color:var(--text2);margin-bottom:8px;">📅 No phones posting for this model</div>';
+  var ppd=x.ppd||3, days=Math.floor((x.worst_left||0)/ppd);
+  var col=days>=7?'#4ade80':(days>=3?'#e6b428':'var(--red)');
+  var label=days>=7?'covered':(days>=3?'top up soon':'top up now');
+  return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 10px;margin-bottom:8px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);" title="'
+    +x.accounts+' phone'+(x.accounts===1?'':'s')+' · '+x.ready+' ready-to-post videos · the phone with the least left has '+x.worst_left+' it has not posted · '+ppd+'/day'+(x.ppd?'':' (posting is off — shown at 3/day)')+'">'
+    +'<span>📅 <b style="color:'+col+';">'+days+' day'+(days===1?'':'s')+'</b> of posts left</span>'
+    +'<span style="color:'+col+';font-weight:700;">'+label+'</span></div>';
+}
+
 function renderLibraryList(){
   var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
   if(!wrap) return;
@@ -4715,6 +4907,7 @@ function renderLibraryList(){
       +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'
       +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
     if(pools) pools.innerHTML='';
+    libLoadRunway();
 
     var owners=[];
     (STATE.models||[]).forEach(function(m){ owners.push(m.id); });
@@ -4739,6 +4932,7 @@ function renderLibraryList(){
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
           +'<div style="font-size:15px;font-weight:800;">'+escapeHtml(libOwnerName(key))+'</div>'
           +'<div style="font-size:11px;color:var(--text2);">'+mine.length+' file'+(mine.length===1?'':'s')+'</div></div>'
+          +libRunwayHtml(key)
           +cats
           +(unfiled?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e6b428;"><span>⚠ Uncategorised</span><b>'+unfiled+'</b></div>':'')
           +(oc?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px;">'+oc+'</div>':'')
@@ -8813,6 +9007,366 @@ async function phEdit(id){
   const{error}=await sb.from('phone_accounts').update({handle:handle.replace(/^@/,'')||null,model:(model||'').toLowerCase()||null,followers:parseInt(fol,10)||0}).eq('id',id);
   if(error){ alert('Could not save: '+error.message); return; }
   await loadPhoneAccounts();
+}
+
+
+
+// ============================================================================
+// COMMAND CENTER — schedule (week grid) + library + views + proxies in one place.
+// Schedule: phone_schedule holds per-account, per-ET-day reel counts; when a day
+// has no row the account's plan.posts_per_day applies. plan_account_day() makes
+// the queue match (adds future slots / cancels planner-queued posts), and the
+// nightly plan_daily_posts() runs it for every account.
+// ============================================================================
+var CC = { tab: 'schedule', accts: [], live: {}, sched: {}, edits: {}, planEdits: {}, lib: [], views: {}, cfg: {}, days: [], sel: null, day: 0 };
+function ccEtDate(offset) {
+  var d = new Date(Date.now() + (offset || 0) * 864e5);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+function ccDayLabel(iso) {
+  var d = new Date(iso + 'T12:00:00Z');
+  return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() + ' ' + d.getUTCDate();
+}
+function ccTabbarHtml(active) {
+  var tabs = [['schedule', 'Schedule'], ['library', 'Library'], ['views', 'Views'], ['proxies', 'Proxies']];
+  return '<div class="cc-tabbar"><span class="cc-title">🛰️ Command Center</span>' + tabs.map(function (t) {
+    return '<button class="cc-tab' + (t[0] === active ? ' on' : '') + '" onclick="ccGo(\'' + t[0] + '\')">' + t[1] + '</button>';
+  }).join('') + '<div style="flex-grow:1;"></div><span id="cc-gl-wrap"></span></div>';
+}
+async function ccDrawTabbars() {
+  document.querySelectorAll('[data-cc-tabs]').forEach(function (el) { el.innerHTML = ccTabbarHtml(el.getAttribute('data-cc-tabs')); });
+  if (!CC.cfg.backends) { var r = await sb.from('phone_settings').select('value').eq('key', 'daily_posts').maybeSingle(); CC.cfg = (r.data && r.data.value) || {}; }
+  ccDrawGlToggle();
+}
+function ccGo(tab) {
+  if (tab === 'views') { navigate('ig-views'); return; }
+  if (tab === 'proxies') { navigate('proxy-checker'); return; }
+  if (!document.getElementById('page-command-center').classList.contains('active')) { CC.tab = tab; navigate('command-center'); return; }
+  CC.tab = tab; ccShowTab();
+}
+function ccShowTab() {
+  document.getElementById('cc-tabbar').innerHTML = ccTabbarHtml(CC.tab);
+  document.getElementById('cc-tab-schedule').style.display = CC.tab === 'schedule' ? '' : 'none';
+  document.getElementById('cc-tab-library').style.display = CC.tab === 'library' ? '' : 'none';
+  ccDrawGlToggle();
+  if (CC.tab === 'library') ccDrawLibrary();
+}
+function ccDrawGlToggle() {
+  var on = (CC.cfg.backends || ['multilogin']).indexOf('geelark') >= 0;
+  document.querySelectorAll('#cc-gl-wrap').forEach(function (el) {
+    el.innerHTML = '<button class="btn btn-sm btn-ghost" onclick="ccToggleGeelark()" title="Whether GeeLark phones are included when posts are queued">GeeLark posting: <b style="color:' + (on ? '#4ade80' : 'var(--text2)') + ';">' + (on ? 'On' : 'Off') + '</b></button>';
+  });
+}
+async function ccToggleGeelark() {
+  var on = (CC.cfg.backends || ['multilogin']).indexOf('geelark') >= 0;
+  if (!confirm(on ? 'Stop queuing posts for GeeLark phones? Posts already queued stay.' : 'Start queuing posts for GeeLark phones from the next plan (each account at its own reels/day)?')) return;
+  var b = on ? ['multilogin'] : ['multilogin', 'geelark'];
+  var r = await sb.from('phone_settings').select('value').eq('key', 'daily_posts').maybeSingle();
+  var v = Object.assign({}, (r.data && r.data.value) || {}, { backends: b });
+  var u = await sb.from('phone_settings').update({ value: v }).eq('key', 'daily_posts');
+  if (u.error) { alert(u.error.message); return; }
+  CC.cfg = v; ccDrawGlToggle(); ccDraw();
+}
+
+async function loadCommandCenter() {
+  ccShowTab();
+  var msg = document.getElementById('cc-msg'); msg.textContent = 'Loading…';
+  CC.days = []; for (var i = 0; i < 7; i++) CC.days.push(ccEtDate(i));
+  var since = new Date(Date.now() - 7 * 864e5).toISOString();
+  var res = await Promise.all([
+    sb.from('phone_accounts').select('id,profile_id,profile_name,handle,model,backend,enabled,posting_paused,health,plan').eq('enabled', true),
+    sb.from('proxy_live').select('profile_id,status,isp,city,is_tmobile'),
+    sb.from('phone_schedule').select('account_id,day,reels').gte('day', CC.days[0]).lte('day', CC.days[6]),
+    sb.from('phone_settings').select('value').eq('key', 'daily_posts').maybeSingle(),
+    sb.rpc('cc_library', { p_days: 30 }),
+    sb.from('ig_reel_latest').select('handle,views').gte('posted_at', since).limit(3000),
+    sb.from('phone_jobs').select('account_id,status,not_before').eq('kind', 'post').gte('not_before', new Date(Date.now() - 864e5).toISOString()).lte('not_before', new Date(Date.now() + 2 * 864e5).toISOString()).in('status', ['queued', 'claimed', 'running', 'done', 'failed'])
+  ]);
+  var err = res.find(function (r) { return r.error; });
+  if (err) { msg.innerHTML = '<span style="color:var(--red);">' + escapeHtml(err.error.message) + '</span>'; return; }
+  CC.accts = (res[0].data || []).sort(function (a, b) {
+    return (a.model || '').localeCompare(b.model || '') || (a.backend || '').localeCompare(b.backend || '') || (a.handle || a.profile_name).localeCompare(b.handle || b.profile_name);
+  });
+  CC.live = {}; (res[1].data || []).forEach(function (x) { CC.live[String(x.profile_id)] = x; });
+  CC.sched = {}; (res[2].data || []).forEach(function (x) { (CC.sched[x.account_id] = CC.sched[x.account_id] || {})[x.day] = x.reels; });
+  CC.cfg = (res[3].data && res[3].data.value) || {};
+  CC.lib = (res[4].data || []).filter(function (m) { return m.ready || m.posting_accounts || m.raw || m.inbox; });
+  CC.views = {}; (res[5].data || []).forEach(function (x) { var v = CC.views[x.handle] = CC.views[x.handle] || { n: 0, t: 0 }; v.n++; v.t += x.views || 0; });
+  CC.today = {}; var tday = CC.days[0];
+  (res[6].data || []).forEach(function (j) {
+    var d = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(j.not_before));
+    if (d !== tday) return;
+    var t = CC.today[j.account_id] = CC.today[j.account_id] || { done: 0, queued: 0, failed: 0 };
+    if (j.status === 'done') t.done++; else if (j.status === 'failed') t.failed++; else t.queued++;
+  });
+  if (!CC.sel && CC.accts.length) CC.sel = (CC.accts.find(function (a) { return ccEligible(a); }) || CC.accts[0]).id;
+  msg.textContent = '';
+  ccDrawGlToggle(); ccDraw();
+}
+function ccEligible(a) {
+  var bes = CC.cfg.backends || ['multilogin'], skip = CC.cfg.skip_models || [];
+  return a.enabled && !a.posting_paused && ['banned', 'locked', 'checkpoint', 'flagged'].indexOf(a.health || '') < 0
+    && bes.indexOf(a.backend) >= 0 && skip.indexOf(a.model || '') < 0;
+}
+function ccPlan(a) { return Object.assign({}, a.plan || {}, CC.planEdits[a.id] || {}); }
+function ccVal(a, day) {
+  var e = CC.edits[a.id]; if (e && e[day] != null) return e[day];
+  var s = CC.sched[a.id]; if (s && s[day] != null) return s[day];
+  return parseInt(ccPlan(a).posts_per_day || 0, 10);
+}
+function ccProxy(a) {
+  var p = CC.live[String(a.profile_id)];
+  if (!p) return { c: 'var(--text2)', t: 'not checked yet' };
+  if (p.status === 'dead') return { c: 'var(--red)', t: 'Proxy dead' };
+  if (p.is_tmobile) return { c: '#4ade80', t: 'T-Mobile · ' + (p.city || '') };
+  return { c: 'var(--yellow)', t: (p.isp || 'Not T-Mobile').replace(/,? (Inc|LLC)\.?/g, '') + ' · ' + (p.city || '') };
+}
+function ccPendingCount() {
+  var n = 0; Object.keys(CC.edits).forEach(function (k) { n += Object.keys(CC.edits[k]).length; });
+  return n + Object.keys(CC.planEdits).length;
+}
+
+function ccDraw() {
+  ccDrawRunway(); ccDrawGrid(); ccDrawInsp();
+  var n = ccPendingCount();
+  document.getElementById('cc-pending').textContent = n ? n + ' unsaved change' + (n > 1 ? 's' : '') : '';
+  var tot = 0; CC.accts.forEach(function (a) { if (ccEligible(a)) tot += ccVal(a, CC.days[0]); });
+  document.getElementById('cc-week-sub').textContent = 'US Eastern days · ' + tot + ' reels today across ' + CC.accts.filter(ccEligible).length + ' posting accounts';
+}
+function ccDrawRunway() {
+  var h = '<div class="cc-lbl">Content runway · 30 days</div>';
+  CC.lib.filter(function (m) { return m.posting_accounts > 0 || m.ready > 0; }).forEach(function (m) {
+    var perDay = m.planned / 30, days = perDay > 0 ? Math.floor(m.capacity / perDay) : null;
+    var col = days == null ? 'var(--text2)' : (days >= 30 ? '#4ade80' : (days >= 7 ? 'var(--yellow)' : 'var(--red)'));
+    var pct = days == null ? 0 : Math.min(100, Math.round(days / 30 * 100));
+    h += '<div class="cc-card" style="padding:12px;display:flex;flex-direction:column;gap:7px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;"><b style="font-size:14px;">' + escapeHtml(m.model.charAt(0).toUpperCase() + m.model.slice(1)) + '</b>'
+      + '<span style="font-size:12px;font-weight:700;color:' + col + ';">' + (days == null ? 'not posting' : (days >= 30 ? '30+ days' : days + ' days')) + '</span></div>'
+      + '<div class="cc-bar"><div style="width:' + pct + '%;background:' + col + ';"></div></div>'
+      + '<span style="font-size:12px;color:var(--text2);">' + m.ready + ' ready · ' + (m.to_upload ? '<b style="color:' + col + ';">+' + m.to_upload + ' to fill</b>' : 'covered') + '</span></div>';
+  });
+  h += '<button class="btn btn-sm btn-ghost" onclick="ccGo(\'library\')">Open library →</button>';
+  document.getElementById('cc-runway').innerHTML = h;
+}
+function ccDrawGrid() {
+  var h = '<div class="cc-row head"><div style="padding:11px 12px;">ACCOUNT</div>' + CC.days.map(function (d, i) {
+    return '<div style="padding:11px 6px;text-align:center;' + (i === CC.day ? 'color:#fff;' : '') + '">' + (i === 0 ? 'TODAY' : ccDayLabel(d)) + '</div>';
+  }).join('') + '</div>';
+  var lastModel = null;
+  CC.accts.forEach(function (a) {
+    if (a.model !== lastModel) { lastModel = a.model; h += '<div class="cc-row grp"><div style="padding:7px 12px;">' + escapeHtml((a.model || 'no model').toUpperCase()) + '</div></div>'; }
+    var el = ccEligible(a), pl = ccPlan(a), px = ccProxy(a), v = CC.views[a.handle];
+    var sub = (a.backend === 'geelark' ? 'GeeLark' : 'MLX') + (v && v.n ? ' · ' + (v.t / v.n >= 1000 ? (v.t / v.n / 1000).toFixed(1) + 'k' : Math.round(v.t / v.n)) + ' avg' : '')
+      + (a.posting_paused ? ' · paused' : '') + (a.health === 'flagged' ? ' · flagged' : '');
+    h += '<div class="cc-row' + (a.id === CC.sel ? ' sel' : '') + '"><div class="cc-acct" onclick="ccPick(\'' + a.id + '\',' + CC.day + ')" title="' + escapeHtml(px.t) + '">'
+      + '<span class="cc-dot" style="background:' + px.c + ';"></span><span style="min-width:0;"><b>' + escapeHtml(a.handle || a.profile_name) + '</b><small>' + escapeHtml(sub) + '</small></span></div>';
+    CC.days.forEach(function (d, i) {
+      var n = ccVal(a, d), edited = CC.edits[a.id] && CC.edits[a.id][d] != null;
+      var cls = 'cc-cell' + (!el ? ' idle' : (n === 0 ? ' off' : (pl.experiment ? ' exp' : ''))) + (edited ? ' edited' : '') + (a.id === CC.sel && i === CC.day ? ' sel' : '');
+      var lab = n === 0 ? 'Off' : n + (n === 1 ? ' reel' : ' reels');
+      if (i === 0 && el && CC.today[a.id]) { var t = CC.today[a.id]; lab = (t.done) + '/' + n; }
+      h += '<button class="' + cls + '" onclick="ccPick(\'' + a.id + '\',' + i + ')" aria-label="' + escapeHtml((a.handle || a.profile_name) + ' ' + d) + '" title="' + (i === 0 && CC.today[a.id] ? (CC.today[a.id].done + ' posted, ' + CC.today[a.id].queued + ' queued, ' + CC.today[a.id].failed + ' failed today') : '') + '">' + lab + '</button>';
+    });
+    h += '</div>';
+  });
+  document.getElementById('cc-grid').innerHTML = h;
+}
+function ccPick(id, day) { CC.sel = id; CC.day = day; ccDraw(); }
+function ccCur() { return CC.accts.find(function (a) { return a.id === CC.sel; }); }
+function ccSet(n, allWeek) {
+  var a = ccCur(); if (!a) return;
+  n = Math.max(0, Math.min(30, n));
+  var e = CC.edits[a.id] = CC.edits[a.id] || {};
+  (allWeek ? CC.days : [CC.days[CC.day]]).forEach(function (d) { e[d] = n; });
+  ccDraw();
+}
+function ccMakeDefault() {
+  var a = ccCur(); if (!a) return;
+  var n = ccVal(a, CC.days[CC.day]);
+  CC.planEdits[a.id] = Object.assign({}, CC.planEdits[a.id] || {}, { posts_per_day: n });
+  // the week follows the new default unless a day was set on purpose
+  ccDraw();
+}
+function ccToggleExp() {
+  var a = ccCur(); if (!a) return;
+  var p = ccPlan(a);
+  CC.planEdits[a.id] = Object.assign({}, CC.planEdits[a.id] || {}, { experiment: !p.experiment });
+  ccDraw();
+}
+function ccDrawInsp() {
+  var a = ccCur(), box = document.getElementById('cc-insp');
+  if (!a) { box.innerHTML = '<div class="cc-card">Pick an account.</div>'; return; }
+  var d = CC.days[CC.day], n = ccVal(a, d), pl = ccPlan(a), px = ccProxy(a), el = ccEligible(a);
+  var gap = n > 0 ? (n <= 3 ? null : Math.round(990 / Math.max(1, n - 1))) : null;
+  var when = n === 0 ? 'No reels this day.' : (n === 1 ? 'Posts around 7pm ET, the evening peak.' : n === 2 ? 'Posts around 4pm and 7pm ET.' : n === 3 ? 'Posts around 5:30am, 4pm and 7pm ET.' : 'Spread 5:30am–10pm ET, about ' + gap + ' min apart.');
+  var why = !el ? (!a.enabled ? 'This account is switched off.' : a.posting_paused ? 'Posting is paused for this account.' : a.health === 'flagged' ? 'Flagged (e.g. in appeal), so it is skipped.' : (CC.cfg.backends || ['multilogin']).indexOf(a.backend) < 0 ? 'GeeLark posting is off. Turn it on at the top to include this phone.' : 'This model is held.') : '';
+  var t = CC.today[a.id];
+  var h = '<div class="cc-lbl">Editing</div>'
+    + '<div><div style="font-size:20px;font-weight:800;">' + escapeHtml(a.handle || a.profile_name) + '</div><div style="font-size:12px;color:var(--text2);">' + escapeHtml((a.model || '') + ' · ' + (a.backend === 'geelark' ? 'GeeLark' : 'Multilogin') + ' · ' + a.profile_name) + '</div></div>'
+    + (why ? '<div class="cc-card" style="border-color:#5c4a10;background:#1a1505;color:#ffd76a;font-size:12px;">' + escapeHtml(why) + '</div>' : '')
+    + '<div class="cc-card" style="display:flex;flex-direction:column;gap:12px;' + (pl.experiment ? 'border-color:var(--yellow);' : '') + '">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:13px;">Reels on ' + (CC.day === 0 ? 'today' : ccDayLabel(d)) + '</b>' + (pl.experiment ? '<span style="font-size:10px;font-weight:800;background:var(--yellow);color:#08080f;padding:3px 7px;border-radius:4px;">EXPERIMENT</span>' : '') + '</div>'
+    + '<div class="cc-step"><button aria-label="Fewer reels" onclick="ccSet(' + (n - 1) + ')">−</button><span class="v">' + n + '</span><button aria-label="More reels" onclick="ccSet(' + (n + 1) + ')">+</button></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + [0, 1, 3, 5, 10, 20].map(function (q) { return '<button class="cc-chipbtn" onclick="ccSet(' + q + ')">' + (q === 0 ? 'Off' : q + '/day') + '</button>'; }).join('') + '</div>'
+    + '<div style="display:flex;gap:6px;"><button class="cc-chipbtn" style="flex-grow:1;" onclick="ccSet(' + n + ',true)">Apply to all 7 days</button><button class="cc-chipbtn" style="flex-grow:1;" onclick="ccMakeDefault()">Make ' + n + '/day the default</button></div>'
+    + '<button class="cc-chipbtn" style="background:' + (pl.experiment ? 'var(--yellow)' : 'var(--surface2)') + ';color:' + (pl.experiment ? '#08080f' : '#fff') + ';" onclick="ccToggleExp()">' + (pl.experiment ? 'In experiment (tap to remove)' : 'Mark as experiment') + '</button>'
+    + '<span style="font-size:12px;color:var(--text2);line-height:1.5;">' + when + ' Default: ' + (pl.posts_per_day || 0) + '/day.</span></div>'
+    + (CC.day === 0 && t ? '<div class="cc-card" style="font-size:13px;display:flex;justify-content:space-between;"><span style="color:var(--text2);">Today so far</span><span><b>' + t.done + '</b> posted · ' + t.queued + ' queued' + (t.failed ? ' · <span style="color:var(--red);">' + t.failed + ' failed</span>' : '') + '</span></div>' : '')
+    + '<div class="cc-card" style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;"><b style="font-size:13px;">Proxy</b><span style="font-size:12px;font-weight:700;color:' + px.c + ';">' + escapeHtml(px.t) + '</span></div><span style="font-size:12px;color:var(--text2);">Checked before every run. <a href="#" onclick="ccGo(\'proxies\');return false;">Proxy checker →</a></span></div>';
+  box.innerHTML = h;
+}
+function ccDiscard() { CC.edits = {}; CC.planEdits = {}; ccDraw(); }
+async function ccSave() {
+  var btn = document.getElementById('cc-save'), msg = document.getElementById('cc-msg');
+  if (!ccPendingCount()) { msg.textContent = 'Nothing to save.'; return; }
+  btn.disabled = true; msg.textContent = 'Saving…';
+  try {
+    var rows = [], touched = {};
+    Object.keys(CC.edits).forEach(function (id) {
+      Object.keys(CC.edits[id]).forEach(function (d) { rows.push({ account_id: id, day: d, reels: CC.edits[id][d], updated_at: new Date().toISOString() }); touched[id] = true; });
+    });
+    if (rows.length) { var r = await sb.from('phone_schedule').upsert(rows); if (r.error) throw r.error; }
+    for (var id in CC.planEdits) {
+      var a = CC.accts.find(function (x) { return x.id === id; });
+      var plan = Object.assign({}, a.plan || {}, CC.planEdits[id]);
+      var u = await sb.from('phone_accounts').update({ plan: plan }).eq('id', id); if (u.error) throw u.error;
+      a.plan = plan; touched[id] = true;
+    }
+    // bring today's queue in line for every account that changed
+    var added = 0, removed = 0;
+    for (var tid in touched) {
+      var q = await sb.rpc('plan_account_day', { p_account: tid, p_day: CC.days[0] });
+      if (q.error) throw q.error;
+      if (q.data > 0) added += q.data; else removed -= q.data;
+    }
+    CC.edits = {}; CC.planEdits = {};
+    await loadCommandCenter();
+    document.getElementById('cc-msg').innerHTML = '✅ Saved. Today: ' + added + ' post' + (added === 1 ? '' : 's') + ' added, ' + removed + ' removed. Later days are queued each afternoon (4:30pm Bali).';
+  } catch (e) {
+    msg.innerHTML = '<span style="color:var(--red);">Not saved: ' + escapeHtml(e.message || String(e)) + '</span>';
+  }
+  btn.disabled = false;
+}
+
+function ccDrawLibrary() {
+  var box = document.getElementById('cc-tab-library');
+  var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">Library</div><span style="font-size:12px;color:var(--text2);">What each model has, and what to upload to cover the next 30 days at the current schedule.</span><div style="flex-grow:1;"></div>'
+    + '<button class="btn btn-sm btn-ghost" onclick="navigate(\'content-factory\')">Content Factory →</button><button class="btn btn-sm btn-primary" onclick="navigate(\'content-upload\')">Open Content Library →</button></div><div class="cc-lib">';
+  CC.lib.forEach(function (m) {
+    var tot = Math.max(1, m.never_posted + m.used1 + m.used2 + m.used3);
+    var pc = function (x) { return (x / tot * 100).toFixed(1) + '%'; };
+    var col = m.posting_accounts === 0 ? 'var(--text2)' : (m.to_upload === 0 ? '#4ade80' : (m.capacity >= m.planned / 4 ? 'var(--yellow)' : 'var(--red)'));
+    var head = m.posting_accounts === 0 ? 'Not posting right now' : (m.to_upload === 0 ? 'Covered for 30 days' : 'Upload ' + m.to_upload + ' clips');
+    h += '<div class="cc-card" style="display:flex;flex-direction:column;gap:12px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;"><b style="font-size:17px;">' + escapeHtml(m.model.charAt(0).toUpperCase() + m.model.slice(1)) + '</b><b style="font-size:13px;color:' + col + ';">' + head + '</b></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;text-align:center;">'
+      + [['New', m.inbox], ['Raw reels', m.raw], ['Ready', m.ready], ['Sounds', m.sounds]].map(function (k) { return '<div style="background:var(--surface2);border-radius:8px;padding:8px 4px;"><div style="font-size:20px;font-weight:800;">' + k[1] + '</div><div style="font-size:11px;color:var(--text2);">' + k[0] + '</div></div>'; }).join('')
+      + '</div>'
+      + '<div><div class="cc-lbl" style="margin-bottom:6px;">Times each ready clip has been posted</div><div style="display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--border);">'
+      + '<span style="width:' + pc(m.never_posted) + ';background:#4ade80;"></span><span style="width:' + pc(m.used1) + ';background:#6b8fff;"></span><span style="width:' + pc(m.used2) + ';background:var(--yellow);"></span><span style="width:' + pc(m.used3) + ';background:var(--red);"></span></div>'
+      + '<div style="display:flex;gap:12px;font-size:11px;color:var(--text2);margin-top:6px;"><span>' + m.never_posted + ' never</span><span>' + m.used1 + ' once</span><span>' + m.used2 + ' twice</span><span>' + m.used3 + ' 3×+</span></div></div>'
+      + '<div style="font-size:12px;color:var(--text2);line-height:1.6;">Next 30 days: <b style="color:#fff;">' + m.planned + '</b> reels on ' + m.posting_accounts + ' posting account' + (m.posting_accounts === 1 ? '' : 's') + ' · room left in ready clips: <b style="color:#fff;">' + m.capacity + '</b>'
+      + (m.small_files ? '<br><span style="color:var(--yellow);">' + m.small_files + ' ready clips are small files (likely low quality) — originals post sharper.</span>' : '')
+      + (m.raw ? '<br>' + m.raw + ' raw reels can go through the Content Factory now.' : '') + '</div>'
+      + '</div>';
+  });
+  h += '</div><div style="font-size:12px;color:var(--text2);margin-top:12px;">A clip can go out once on each of a model\'s accounts (up to 3), varied each time. "Room left" counts the uses each ready clip still has.</div>';
+  box.innerHTML = h;
+}
+
+// ============================================================================
+// IG VIEWS — daily Instagram numbers per phone account (ig-stats-sync edge
+// function + Apify). ig_reel_latest = one row per reel with its newest numbers.
+// ============================================================================
+var IGV={reels:[],prof:{},prev:{},accts:[],deltas:{}};
+function igvFmt(n){ if(n==null) return '–'; n=+n; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M'; if(n>=1e4) return Math.round(n/1e3)+'k'; if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k'; return String(n); }
+function igvBali(ts){ if(!ts) return '–'; try{ return new Date(ts).toLocaleString('en-GB',{timeZone:'Asia/Makassar',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ts; } }
+async function loadIgViews(){
+  var msg=document.getElementById('igv-msg'); msg.textContent='Loading…';
+  var since=new Date(Date.now()-31*864e5).toISOString().slice(0,10);
+  var r1=await sb.from('ig_reel_latest').select('*').gte('posted_at',new Date(Date.now()-31*864e5).toISOString()).order('posted_at',{ascending:false}).limit(3000);
+  var r2=await sb.from('ig_profile_stats').select('*').gte('scraped_on',since).order('scraped_on',{ascending:true}).limit(5000);
+  var r3=await sb.from('phone_accounts').select('handle,profile_name,model,backend,enabled').not('handle','is',null);
+  var r4=await sb.from('ig_reel_stats').select('short_code,scraped_on,views').gte('scraped_on',new Date(Date.now()-3*864e5).toISOString().slice(0,10)).order('scraped_on',{ascending:true}).limit(10000);
+  var r5=await sb.from('ig_sync_runs').select('*').order('started_at',{ascending:false}).limit(4);
+  if(r1.error||r2.error||r3.error){ msg.innerHTML='<span style="color:var(--red);">'+escapeHtml((r1.error||r2.error||r3.error).message)+'</span>'; return; }
+  IGV.reels=r1.data||[];
+  IGV.prof={}; IGV.prev={};
+  (r2.data||[]).forEach(function(p){ var h=p.handle; if(!IGV.prev[h]) IGV.prev[h]=p; IGV.prof[h]=p; }); // prev = oldest in window, prof = newest
+  var seen={}; IGV.accts=(r3.data||[]).filter(function(a){ var h=String(a.handle).replace(/^@/,'').toLowerCase(); if(seen[h]) return false; seen[h]=1; a.h=h; return true; });
+  // views gained since the previous daily pull, per reel
+  IGV.deltas={}; var by={}; (r4.data||[]).forEach(function(x){ (by[x.short_code]=by[x.short_code]||[]).push(x); });
+  Object.keys(by).forEach(function(k){ var a=by[k]; if(a.length>1) IGV.deltas[k]=(a[a.length-1].views||0)-(a[a.length-2].views||0); });
+  var models=[...new Set(IGV.accts.map(function(a){return a.model;}).filter(Boolean))].sort();
+  var sel=document.getElementById('igv-model'), cur=sel.value;
+  sel.innerHTML='<option value="">All models</option>'+models.map(function(m){return '<option value="'+escapeHtml(m)+'"'+(m===cur?' selected':'')+'>'+escapeHtml(m.charAt(0).toUpperCase()+m.slice(1))+'</option>';}).join('');
+  var last=(r5.data||[]).find(function(x){return x.status==='done';}), run=(r5.data||[]).find(function(x){return x.status==='running';});
+  msg.innerHTML=(run?'⏳ Pulling fresh numbers from Instagram now (takes 5–15 min)… · ':'')+(last?'Last updated '+igvBali(last.finished_at)+' · ':'')+'Pulled automatically every day at 8pm Bali.';
+  igvRender();
+  if(run && document.getElementById('page-ig-views').classList.contains('active')){ clearTimeout(IGV._t); IGV._t=setTimeout(loadIgViews,60000); }
+}
+function igvRender(){
+  var model=document.getElementById('igv-model').value, be=document.getElementById('igv-backend').value, days=+document.getElementById('igv-days').value;
+  var cut=Date.now()-days*864e5;
+  var accts=IGV.accts.filter(function(a){ return (!model||a.model===model)&&(!be||a.backend===be); });
+  var hs={}; accts.forEach(function(a){ hs[a.h]=a; });
+  var reels=IGV.reels.filter(function(r){ return hs[r.handle] && new Date(r.posted_at).getTime()>=cut; });
+  var tot=0, best=null; reels.forEach(function(r){ tot+=(r.views||0); if(!best||(r.views||0)>(best.views||0)) best=r; });
+  var fol=0, folPrev=0; accts.forEach(function(a){ var p=IGV.prof[a.h]; if(p&&p.followers!=null){ fol+=p.followers; var q=IGV.prev[a.h]; folPrev+=(q&&q.followers!=null?q.followers:p.followers); } });
+  var dead=accts.filter(function(a){ var p=IGV.prof[a.h]; return p&&p.error; }).length;
+  document.getElementById('igv-stats').innerHTML=
+     '<div class="stat-card accent"><div class="stat-label">Views</div><div class="stat-value">'+igvFmt(tot)+'</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Reels posted</div><div class="stat-value">'+reels.length+'</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Avg views / reel</div><div class="stat-value">'+(reels.length?igvFmt(Math.round(tot/reels.length)):'–')+'</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Followers (all)</div><div class="stat-value">'+igvFmt(fol)+(fol-folPrev?' <span style="font-size:13px;color:'+(fol>=folPrev?'var(--green)':'var(--red)')+';">'+(fol>=folPrev?'+':'')+igvFmt(fol-folPrev)+'</span>':'')+'</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Best reel</div><div class="stat-value" style="font-size:18px;">'+(best?'<a href="'+escapeHtml(best.url||'#')+'" target="_blank" style="color:inherit;">'+igvFmt(best.views)+'</a> <span style="font-size:12px;color:var(--text2);">@'+escapeHtml(best.handle)+'</span>':'–')+'</div></div>'
+    +(dead?'<div class="stat-card" style="border-top-color:var(--red);"><div class="stat-label">⚠ Not found on IG</div><div class="stat-value" style="color:var(--red);">'+dead+'</div></div>':'');
+  // accounts
+  var rows=accts.map(function(a){
+    var mine=reels.filter(function(r){return r.handle===a.h;}), v=0, b=0, lastp=null;
+    mine.forEach(function(r){ v+=(r.views||0); b=Math.max(b,r.views||0); });
+    IGV.reels.forEach(function(r){ if(r.handle===a.h&&(!lastp||r.posted_at>lastp)) lastp=r.posted_at; });
+    var p=IGV.prof[a.h]||{}, q=IGV.prev[a.h]||{};
+    return {a:a,p:p,q:q,n:mine.length,v:v,b:b,avg:mine.length?Math.round(v/mine.length):0,last:lastp};
+  }).sort(function(x,y){ return y.v-x.v || (y.p.followers||0)-(x.p.followers||0); });
+  var h='<table class="data-table" style="width:100%;font-size:12.5px;"><tr><th style="text-align:left;">Account</th><th style="text-align:left;">Phone</th><th>Model</th><th>Followers</th><th>Reels</th><th>Views</th><th>Avg / reel</th><th>Best</th><th style="text-align:left;">Last reel</th></tr>';
+  rows.forEach(function(r){
+    var fd=(r.p.followers!=null&&r.q.followers!=null)?r.p.followers-r.q.followers:0;
+    h+='<tr'+(r.a.enabled?'':' style="opacity:.55;"')+'><td style="text-align:left;"><a href="https://www.instagram.com/'+encodeURIComponent(r.a.h)+'/" target="_blank">@'+escapeHtml(r.a.h)+'</a>'+(r.p.error?' <span style="color:var(--red);font-size:11px;" title="'+escapeHtml(r.p.error)+'">not found</span>':'')+'</td>'
+      +'<td style="text-align:left;color:var(--text2);">'+escapeHtml(r.a.profile_name||'')+' <span style="font-size:10px;">'+escapeHtml(r.a.backend||'')+'</span></td>'
+      +'<td>'+escapeHtml(r.a.model||'')+'</td>'
+      +'<td>'+igvFmt(r.p.followers)+(fd?' <span style="font-size:11px;color:'+(fd>0?'var(--green)':'var(--red)')+';">'+(fd>0?'+':'')+fd+'</span>':'')+'</td>'
+      +'<td>'+r.n+'</td><td style="font-weight:700;">'+igvFmt(r.v)+'</td><td>'+(r.n?igvFmt(r.avg):'–')+'</td><td>'+(r.n?igvFmt(r.b):'–')+'</td>'
+      +'<td style="text-align:left;color:var(--text2);">'+igvBali(r.last)+'</td></tr>';
+  });
+  h+='</table>'; if(!rows.length) h='<div style="color:var(--text2);font-size:13px;">No accounts with a username yet.</div>';
+  document.getElementById('igv-accts').innerHTML=h;
+  // reels
+  var top=reels.slice().sort(function(x,y){return (y.views||0)-(x.views||0);}).slice(0,150);
+  var t='<table class="data-table" style="width:100%;font-size:12.5px;"><tr><th style="text-align:left;">Posted</th><th style="text-align:left;">Account</th><th>Views</th><th>Since yesterday</th><th>Likes</th><th>Comments</th><th style="text-align:left;">Caption</th><th></th></tr>';
+  top.forEach(function(r){
+    var d=IGV.deltas[r.short_code];
+    t+='<tr><td style="text-align:left;white-space:nowrap;">'+igvBali(r.posted_at)+'</td><td style="text-align:left;">@'+escapeHtml(r.handle)+'</td>'
+      +'<td style="font-weight:700;">'+igvFmt(r.views)+'</td><td>'+(d!=null?'<span style="color:'+(d>0?'var(--green)':'var(--text2)')+';">'+(d>0?'+':'')+igvFmt(d)+'</span>':'–')+'</td>'
+      +'<td>'+igvFmt(r.likes)+'</td><td>'+igvFmt(r.comments)+'</td>'
+      +'<td style="text-align:left;color:var(--text2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(r.caption||'')+'">'+escapeHtml((r.caption||'').slice(0,80))+'</td>'
+      +'<td><a href="'+escapeHtml(r.url||('https://www.instagram.com/reel/'+r.short_code+'/'))+'" target="_blank">open ↗</a></td></tr>';
+  });
+  t+='</table>'; if(!top.length) t='<div style="color:var(--text2);font-size:13px;">No reels in this period yet.</div>';
+  document.getElementById('igv-reels').innerHTML=t;
+}
+async function igvRefresh(){
+  var b=document.getElementById('igv-refresh'); b.disabled=true;
+  try{
+    var s=await sb.from('phone_settings').select('value').eq('key','ig_stats').maybeSingle();
+    var tok=s.data&&s.data.value&&s.data.value.token;
+    if(!tok) throw new Error('only admins can start a pull');
+    var r=await fetch(SUPABASE_URL+'/functions/v1/ig-stats-sync',{method:'POST',headers:{'Content-Type':'application/json','x-sync-token':tok},body:JSON.stringify({action:'start'})});
+    var j=await r.json(); if(j.error) throw new Error(j.error);
+    document.getElementById('igv-msg').textContent='⏳ Pull started for '+j.handles+' accounts — numbers land in 5–15 minutes; this page refreshes itself.';
+    clearTimeout(IGV._t); IGV._t=setTimeout(loadIgViews,60000);
+  }catch(e){ document.getElementById('igv-msg').innerHTML='<span style="color:var(--red);">'+escapeHtml(e.message)+'</span>'; }
+  b.disabled=false;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
