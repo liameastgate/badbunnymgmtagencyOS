@@ -2810,7 +2810,7 @@
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="igv-model" onchange="igvRender()"><option value="">All models</option></select>
           <select id="igv-backend" onchange="igvRender()"><option value="">All phones</option><option value="multilogin">Multilogin</option><option value="geelark">GeeLark</option></select>
-          <select id="igv-days" onchange="igvRender()"><option value="7">Last 7 days</option><option value="3">Last 3 days</option><option value="1">Last 24 hours</option><option value="30">Last 30 days</option></select>
+          <select id="igv-days" onchange="igvRender()"><option value="3650">All time</option><option value="30">Posted in last 30 days</option><option value="9">Posted in last 9 days</option><option value="7">Posted in last 7 days</option><option value="3">Posted in last 3 days</option><option value="1">Posted in last 24 hours</option></select>
           <button class="btn btn-sm btn-ghost" id="igv-refresh" onclick="igvRefresh()">⟳ Pull now</button>
         </div>
       </div>
@@ -9292,7 +9292,7 @@ function igvBali(ts){ if(!ts) return '–'; try{ return new Date(ts).toLocaleStr
 async function loadIgViews(){
   var msg=document.getElementById('igv-msg'); msg.textContent='Loading…';
   var since=new Date(Date.now()-31*864e5).toISOString().slice(0,10);
-  var r1=await sb.from('ig_reel_latest').select('*').gte('posted_at',new Date(Date.now()-31*864e5).toISOString()).order('posted_at',{ascending:false}).limit(3000);
+  var r1=await sb.from('ig_reel_latest').select('*').order('posted_at',{ascending:false}).limit(5000);
   var r2=await sb.from('ig_profile_stats').select('*').gte('scraped_on',since).order('scraped_on',{ascending:true}).limit(5000);
   var r3=await sb.from('phone_accounts').select('handle,profile_name,model,backend,enabled').not('handle','is',null);
   var r4=await sb.from('ig_reel_stats').select('short_code,scraped_on,views').gte('scraped_on',new Date(Date.now()-3*864e5).toISOString().slice(0,10)).order('scraped_on',{ascending:true}).limit(10000);
@@ -9323,7 +9323,7 @@ function igvRender(){
   var fol=0, folPrev=0; accts.forEach(function(a){ var p=IGV.prof[a.h]; if(p&&p.followers!=null){ fol+=p.followers; var q=IGV.prev[a.h]; folPrev+=(q&&q.followers!=null?q.followers:p.followers); } });
   var dead=accts.filter(function(a){ var p=IGV.prof[a.h]; return p&&p.error; }).length;
   document.getElementById('igv-stats').innerHTML=
-     '<div class="stat-card accent"><div class="stat-label">Views</div><div class="stat-value">'+igvFmt(tot)+'</div></div>'
+     '<div class="stat-card accent"><div class="stat-label">'+(days>=3650?'Total views':'Views on these reels')+'</div><div class="stat-value">'+igvFmt(tot)+'</div></div>'
     +'<div class="stat-card"><div class="stat-label">Reels posted</div><div class="stat-value">'+reels.length+'</div></div>'
     +'<div class="stat-card"><div class="stat-label">Avg views / reel</div><div class="stat-value">'+(reels.length?igvFmt(Math.round(tot/reels.length)):'–')+'</div></div>'
     +'<div class="stat-card"><div class="stat-label">Followers (all)</div><div class="stat-value">'+igvFmt(fol)+(fol-folPrev?' <span style="font-size:13px;color:'+(fol>=folPrev?'var(--green)':'var(--red)')+';">'+(fol>=folPrev?'+':'')+igvFmt(fol-folPrev)+'</span>':'')+'</div></div>'
