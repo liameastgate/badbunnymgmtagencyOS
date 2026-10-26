@@ -381,19 +381,6 @@
   /* Chatting Script sidebar — models stacked top to bottom (SOPs-page pattern), each a
      compact row with a small avatar, rather than the wide description-card style of
      .guide-hub-card. */
-  /* Chatting Script on phones: list OR script, never both squeezed side by side.
-     #sheets-shell gets .sheet-open while a script is showing; "☰ Models" goes back.
-     On desktop the same button just collapses/expands the model list. */
-  .sheets-list-btn { display: inline-flex; }
-  .sheets-shell.side-collapsed #sheets-sidebar { display: none !important; }
-  @media (max-width: 768px) {
-    .sheets-shell { height: calc(100dvh - 96px) !important; }
-    .sheets-shell #sheets-sidebar { width: 100% !important; border-right: none !important; }
-    .sheets-shell #sheets-content { display: none; padding: 14px 12px !important; }
-    .sheets-shell.sheet-open #sheets-sidebar { display: none !important; }
-    .sheets-shell.sheet-open #sheets-content { display: block; }
-    .sheets-shell.side-collapsed:not(.sheet-open) #sheets-sidebar { display: flex !important; }
-  }
   .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
   .sheet-side-item:hover { background: var(--surface2); }
   .sheet-side-item.active { background: rgba(30,79,255,0.14); border-color: rgba(30,79,255,0.4); }
@@ -960,7 +947,6 @@
           <option value="reddit_x">🔞 Reddit / X</option>
           <option value="photos">📸 Non-nude photos</option>
           <option value="stories">📖 Story CTA bank</option>
-          <option value="repurpose">♻️ Repurpose bank (already captioned, post as-is)</option>
           <option value="sounds">🎵 Sounds</option>
           <option value="ppv">💎 PPV videos · OF only</option>
           <option value="sexting">💬 Sexting set · OF only</option>
@@ -2441,7 +2427,7 @@
 
     <!-- Chatting Script -->
     <div class="page" id="page-sheets">
-      <div id="sheets-shell" class="sheets-shell" style="display:flex;gap:0;height:calc(100vh - 120px);overflow:hidden;border:1px solid var(--border);border-radius:8px;">
+      <div style="display:flex;gap:0;height:calc(100vh - 120px);overflow:hidden;border:1px solid var(--border);border-radius:8px;">
         <!-- Model sidebar: models stacked top to bottom, search on top. A 'model' role
              account never sees this -- loadModelSheets() hides it and drops them straight
              into their own script in the content pane, full width. -->
@@ -2453,7 +2439,7 @@
           <div id="sheets-model-list" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <!-- Script content -->
-        <div style="flex:1;overflow-y:auto;padding:28px 32px;min-width:0;" id="sheets-content">
+        <div style="flex:1;overflow-y:auto;padding:28px 32px;" id="sheets-content">
           <div class="empty" style="margin-top:80px;"><div class="empty-icon">📋</div><p>Select a model to view their chatting script</p></div>
         </div>
       </div>
@@ -4293,9 +4279,18 @@ async function r2SignedUrl(key,method){
   return data.url;
 }
 async function loadContentLibrary(){
-  const{data,error}=await sb.from('content_library').select('*').order('created_at',{ascending:false});
-  if(error){ console.error('loadContentLibrary',error); STATE.library=[]; return; }
-  STATE.library=data||[];
+  // 27 Oct: the API hands back at most 1,000 rows per request, and the shared
+  // sound banks pushed the Library past that — older items (Raul's photos etc.)
+  // silently fell off. Page through until a short page comes back.
+  const PAGE=1000, all=[];
+  for(let from=0; from<50000; from+=PAGE){
+    const{data,error}=await sb.from('content_library').select('*')
+      .order('created_at',{ascending:false}).order('id',{ascending:true}).range(from,from+PAGE-1);
+    if(error){ console.error('loadContentLibrary',error); if(!all.length){ STATE.library=[]; return; } break; }
+    (data||[]).forEach(function(r){ all.push(r); });
+    if(!data||data.length<PAGE) break;
+  }
+  STATE.library=all;
   try{ const pr=await sb.from('phone_runs').select('clip_key,account_id,kind,started_at').eq('ok',true).in('kind',['post','story']).not('clip_key','is',null).limit(2000);
     const pa=await sb.from('phone_accounts').select('id,handle,profile_name'); const hn={}; (pa.data||[]).forEach(function(a){ hn[a.id]=a.handle||a.profile_name||'?'; });
     STATE.libPhoneUse={}; (pr.data||[]).forEach(function(r){ (STATE.libPhoneUse[r.clip_key]=STATE.libPhoneUse[r.clip_key]||[]).push({handle:hn[r.account_id]||'?',kind:r.kind,at:r.started_at}); });
@@ -4307,13 +4302,13 @@ async function loadContentLibrary(){
 }
 var LIB_CATEGORIES={
   // Pipeline: New uploads (unedited, never posted) -> Raw reels (trimmed, Factory adds caption + audio)
-  // -> Ready to post (finished; the phones post from here + the Repurpose bank).
+  // -> Ready to post (finished; the phones post from here).
   inbox:   {label:'New uploads',        short:'New',     icon:'📥', accept:'video/*,image/*', hint:'Straight from the models (app or Drive), unedited. Download, trim, then Move to → Raw reels or Ready to post. Never posted from here.'},
-  social:  {label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only — the phones post from here (and from the Repurpose bank)'},
+  social:  {label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only, captioned or not — the phones post from here'},
   reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
   photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
   stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
-  repurpose:{label:'Repurpose bank',    short:'Repurpose',icon:'♻️', accept:'video/*',        hint:'Talking heads and clips that already have their audio + caption — reposted as-is with fresh metadata, never re-captioned. Proven performers for trial reels.'},
+  // 24 Oct: the Repurpose bank was merged into Ready to post (same thing for the phones).
   raw:     {label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Filmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
   sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
   // ── OnlyFans-only (ofOnly) ── never public. Nothing that posts to phones / the Content
@@ -9481,8 +9476,9 @@ function renderCloudFarm(){
     else fl.innerHTML='<div class="card" style="border-color:rgba(255,200,60,.45);margin-bottom:12px;padding:8px 14px;"><div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="CF.flagsOpen=!CF.flagsOpen;renderCloudFarm();"><b>'+(CF.flagsOpen?'▾':'▸')+' 🚩 Flags ('+CF.flags.length+')</b><span class="cf-sub">'+(CF.flagsOpen?'click to collapse · <a href="#" onclick="event.stopPropagation();cfDismissAll();return false;">dismiss all</a>':'click to expand')+'</span></div>'
       +(CF.flagsOpen?'<div style="margin-top:6px;">':'<div style="display:none;">')
       +CF.flags.map(function(f){ var a=all.find(function(x){return x.id===f.account_id;})||{}; var d=f.detail||{};
-        var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn',layout_new:'cf-warn',check_failed:'cf-warn'}[f.kind]||'cf-none';
-        return '<div class="cf-flag"><span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace('_',' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div></div>';
+        var cls={post_removed:'cf-bad',banned:'cf-bad',cautious:'cf-warn',shadowbanned:'cf-shadow',login_lost:'cf-bad',run_failed:'cf-warn',layout_new:'cf-warn',check_failed:'cf-warn',ig_notice:'cf-bad',action_block:'cf-bad'}[f.kind]||'cf-none';
+        var shot=(typeof d.shot==='string'&&d.shot.indexOf('data:image/')===0)?'<a href="#" onclick="var w=window.open();w.document.write(\'<img src=&quot;\'+this.firstChild.src+\'&quot; style=&quot;max-width:100%&quot;>\');return false;"><img src="'+d.shot+'" style="width:72px;border-radius:6px;border:1px solid var(--border);flex-shrink:0;" title="click to enlarge"></a>':'';
+        return '<div class="cf-flag">'+shot+'<span class="cf-chip '+cls+'">'+escapeHtml(f.kind.replace(/_/g,' '))+'</span><div><b>'+escapeHtml(a.handle||a.profile_name||'?')+'</b> — '+escapeHtml(d.text||d.reason||f.kind)+(d.when?' · '+escapeHtml(d.when):'')+' <span class="cf-sub">· '+cfAEST(f.created_at)+' · <a href="#" onclick="cfDismiss(\''+f.id+'\');return false;">dismiss</a>'+(f.kind==='post_removed'?' · <a href="#" onclick="navigate(\'trainer\');return false;">add to Trainer</a>':'')+'</span></div></div>'; }).join('')+'</div></div>';
   }
   if(STATE._phoneErr){ wrap.innerHTML='<div style="color:var(--red);padding:12px;">'+escapeHtml(STATE._phoneErr)+'</div>'; return; }
   if(!P.length){ wrap.innerHTML='<div class="cf-sub" style="padding:14px;">No phones match. Sync from Multilogin or GeeLark to pull them in.</div>'; cfEstimate(); return; }
@@ -11407,7 +11403,7 @@ async function loadModelSheets(){
   const addBtn=document.getElementById('sheets-add-model-btn');
   if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
   renderSheetsSidebar();
-  if(!window._currentSheetModelId){ document.getElementById('sheets-shell')?.classList.remove('sheet-open'); renderSheetsLanding(); }
+  if(!window._currentSheetModelId) renderSheetsLanding();
 }
 
 function renderSheetsSidebar(){
@@ -11426,14 +11422,6 @@ function renderSheetsSidebar(){
     item.onclick=()=>{ const m=STATE.models.find(x=>x.id===item.dataset.modelId); if(m) openSheetForModel(m); };
   });
 }
-// Phone: back from a script to the model list. Desktop: hide/show the model list.
-function sheetsToggleList(){
-  const shell=document.getElementById('sheets-shell'); if(!shell) return;
-  if(window.matchMedia('(max-width: 768px)').matches){
-    shell.classList.remove('sheet-open','side-collapsed');
-    document.getElementById('sheets-model-list')?.scrollTo?.(0,0);
-  } else shell.classList.toggle('side-collapsed');
-}
 // Kept as the search box's oninput target name from before the layout change -- just an
 // alias so nothing else needs to know the sidebar was rebuilt.
 function filterSheetsHub(){ renderSheetsSidebar(); }
@@ -11447,14 +11435,12 @@ async function openSheetForModel(model){
   const canEdit=isStaffEdit||isOwnModel;
   window._currentSheetModelId=model.id;
   window._currentSheetId=sheet.id||null;
-  document.getElementById('sheets-shell')?.classList.add('sheet-open');
   if(role!=='model') renderSheetsSidebar(); // refresh to highlight the newly-selected row
   document.getElementById('sheets-content').innerHTML=`
     <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
     <div style="flex:1 1 420px;min-width:0;max-width:820px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
         <div>
-          ${role!=='model'?`<button class="btn btn-ghost btn-sm sheets-list-btn" style="margin-bottom:8px;" onclick="sheetsToggleList()">☰ Models</button>`:''}
           <div style="font-size:24px;font-weight:800;">${escapeHtml(model.name)}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px;">${escapeHtml(model.of_account||'')} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${100-parseFloat(model.split||20)}% to model / ${model.split||20}% agency</div>
         </div>
