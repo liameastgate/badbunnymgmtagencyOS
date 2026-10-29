@@ -4351,6 +4351,77 @@ var LIB_MAX_BYTES=2147483648;  // 2 GB sanity cap
 var LIB_AUTOSCAN_MAX=5;
 
 // ── Media probing (runs on the device, before upload) ──────────────────────
+// ── 27 Oct: HEIC (iPhone photos) ─────────────────────────────────────────────
+// Only Safari can draw HEIC; Chrome/Windows showed nothing (Raul's 184 photos
+// had no thumbnail and no preview). libheif (wasm, ~2 MB) is loaded only when
+// a HEIC actually needs decoding (heic2any's older libheif could not read
+// current iPhone files), turns it into a JPEG in the browser, and the
+// thumbnail is written back to the row so it's only ever done once.
+var LIB_HEIC_LIB=null;
+function libIsHeic(x){ return /\.(heic|heif)$/i.test((x&&(x.r2_key||x.name||x.title))||'') || /heic|heif/i.test((x&&(x.content_type||x.type))||''); }
+function libLoadHeic(){
+  if(LIB_HEIC_LIB) return LIB_HEIC_LIB;
+  LIB_HEIC_LIB=new Promise(function(res,rej){
+    var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/libheif-js@1.23.5/libheif-wasm/libheif-bundle.js';
+    s.onload=function(){
+      try{ var L=window.libheif; Promise.resolve(typeof L==='function'?L():L).then(res,rej); }catch(e){ rej(e); } };
+    s.onerror=function(){ LIB_HEIC_LIB=null; rej(new Error('could not load the HEIC decoder')); };
+    document.head.appendChild(s);
+  });
+  return LIB_HEIC_LIB;
+}
+// HEIC blob -> JPEG blob, longest side capped (a 24 MP photo at full size can
+// run a phone out of memory; 2000 px is plenty for a preview).
+async function libHeicToJpeg(blob,quality,maxSide){
+  var lib=await libLoadHeic();
+  var bytes=new Uint8Array(await blob.arrayBuffer());
+  var dec=new lib.HeifDecoder(), imgs=dec.decode(bytes);
+  if(!imgs||!imgs.length) throw new Error('not a readable HEIC');
+  var im=imgs[0], w=im.get_width(), h=im.get_height();
+  var c=document.createElement('canvas'); c.width=w; c.height=h; var ctx=c.getContext('2d');
+  var data=ctx.createImageData(w,h);
+  await new Promise(function(res,rej){ im.display(data,function(d){ d?res():rej(new Error('HEIC decode failed')); }); });
+  ctx.putImageData(data,0,0);
+  try{ im.free&&im.free(); }catch(e){}
+  var m=maxSide||2000, k=Math.min(1,m/Math.max(w,h));
+  var out=c; if(k<1){ out=document.createElement('canvas'); out.width=Math.round(w*k); out.height=Math.round(h*k); out.getContext('2d').drawImage(c,0,0,out.width,out.height); }
+  var jpg=await new Promise(function(res){ out.toBlob(res,'image/jpeg',quality||0.85); });
+  c.width=c.height=1;
+  jpg.origWidth=w; jpg.origHeight=h;
+  return jpg;
+}
+function libImgFromBlob(blob){
+  return new Promise(function(res,rej){ var u=URL.createObjectURL(blob), im=new Image();
+    im.onload=function(){ res({img:im,url:u}); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('unreadable image')); }; im.src=u; });
+}
+// Background thumbnail backfill for HEIC rows shown without one, two at a time.
+var LIB_HEIC_Q=[], LIB_HEIC_SEEN={}, LIB_HEIC_RUN=0;
+function libHeicQueue(it){
+  if(!it||it.thumb_data||LIB_HEIC_SEEN[it.id]) return;
+  LIB_HEIC_SEEN[it.id]=1; LIB_HEIC_Q.push(it); libHeicPump();
+}
+async function libHeicPump(){
+  while(LIB_HEIC_RUN<2 && LIB_HEIC_Q.length){
+    LIB_HEIC_RUN++;
+    (async function(it){
+      try{
+        var url=await libItemUrl(it);
+        var blob=await (await fetch(url)).blob();
+        var jpg=await libHeicToJpeg(blob,0.8,1000);
+        var r=await libImgFromBlob(jpg);
+        var th=libThumbFrom(r.img,r.img.naturalWidth,r.img.naturalHeight);
+        var w=jpg.origWidth||r.img.naturalWidth, h=jpg.origHeight||r.img.naturalHeight; URL.revokeObjectURL(r.url);
+        if(th){
+          it.thumb_data=th; it.width=it.width||w; it.height=it.height||h;
+          await sb.from('content_library').update({thumb_data:th,width:it.width,height:it.height}).eq('id',it.id);
+          document.querySelectorAll('[data-thumb="'+it.id+'"]').forEach(function(el){
+            el.innerHTML='<img src="'+th+'" style="width:100%;height:100%;object-fit:cover;display:block;">'; });
+        }
+      }catch(e){ console.warn('heic thumb',it.id,e); }
+      finally{ LIB_HEIC_RUN--; libHeicPump(); }
+    })(LIB_HEIC_Q.shift());
+  }
+}
 function libThumbFrom(src,w,h){
   if(!w||!h) return null;
   const W=320, H=Math.max(1,Math.round(320*h/w));
@@ -4367,7 +4438,13 @@ function libProbeFile(file){
     if(isImage){
       const img=new Image();
       img.onload=function(){ let th=null; try{ th=libThumbFrom(img,img.naturalWidth,img.naturalHeight); }catch(e){} done({kind:'image',width:img.naturalWidth,height:img.naturalHeight,duration:null,kbps:null,thumb:th}); };
-      img.onerror=function(){ done({kind:'image',error:'unreadable'}); };
+      img.onerror=function(){
+        if(!libIsHeic(file)) return done({kind:'image',error:'unreadable'});
+        var jpg; libHeicToJpeg(file,0.8,1000).then(function(j){ jpg=j; return libImgFromBlob(j); }).then(function(r){
+          let th=null; try{ th=libThumbFrom(r.img,r.img.naturalWidth,r.img.naturalHeight); }catch(e){}
+          URL.revokeObjectURL(r.url); done({kind:'image',width:jpg.origWidth||r.img.naturalWidth,height:jpg.origHeight||r.img.naturalHeight,duration:null,kbps:null,thumb:th});
+        }).catch(function(){ done({kind:'image',error:'unreadable'}); });
+      };
       img.src=url;
     } else if(isVideo){
       const v=document.createElement('video'); v.preload='metadata'; v.muted=true; v.playsInline=true; let meta=null;
@@ -4390,15 +4467,111 @@ function libHdVerdict(p){
   if(p.kind==='video'&&p.kbps&&p.kbps<LIB_MIN_VIDEO_KBPS) return 'This video\'s quality is low ('+p.kbps+' kbps) — it looks like it went through a chat app. Please upload the original if you have it.';
   return null;
 }
-function libPutWithProgress(url,file,onProgress){
+function libPutWithProgress(url,file,onProgress,noType){
   return new Promise(function(res,rej){
     const x=new XMLHttpRequest(); x.open('PUT',url);
-    x.setRequestHeader('Content-Type',file.type||'application/octet-stream');
+    if(!noType) x.setRequestHeader('Content-Type',file.type||'application/octet-stream');
+    x.timeout=180000;   // a stalled part on a dead connection must fail, not hang forever
     x.upload.onprogress=function(e){ if(e.lengthComputable&&onProgress) onProgress(e.loaded/e.total); };
     x.onload=function(){ (x.status>=200&&x.status<300)?res():rej(new Error('upload failed ('+x.status+')')); };
     x.onerror=function(){ rej(new Error('network error')); };
+    x.ontimeout=function(){ rej(new Error('timed out')); };
+    x.onabort=function(){ rej(new Error('aborted')); };
     x.send(file);
   });
+}
+
+// ── 27 Oct: phone-proof uploads ──────────────────────────────────────────────
+// A whole clip in one PUT died whenever the phone locked, switched app or lost
+// signal for a second, so uploads from a phone took several tries. Now: clips
+// over 8 MB go up in 8 MB parts (r2-sign mp_* actions); a part that fails waits
+// until the phone is back online and the page is visible, then is resent — the
+// parts already up stay up. The screen is kept awake while anything uploads.
+var LIB_PART=8*1024*1024, LIB_TRIES=8;
+function libSleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+function libWaitUsable(){
+  // wait for signal + the page in front (a backgrounded phone tab kills requests)
+  return new Promise(function(res){
+    function ok(){ return navigator.onLine!==false && document.visibilityState!=='hidden'; }
+    if(ok()) return res();
+    var t=setInterval(function(){ if(ok()){ clearInterval(t); window.removeEventListener('online',chk); document.removeEventListener('visibilitychange',chk); res(); } },1000);
+    function chk(){ if(ok()){ clearInterval(t); window.removeEventListener('online',chk); document.removeEventListener('visibilitychange',chk); res(); } }
+    window.addEventListener('online',chk); document.addEventListener('visibilitychange',chk);
+  });
+}
+async function libWithRetry(fn,onNote){
+  var last;
+  for(var a=1;a<=LIB_TRIES;a++){
+    await libWaitUsable();
+    try{ return await fn(); }catch(e){
+      last=e;
+      if(/\((4\d\d)\)/.test(e.message||'') && !/\((408|429)\)/.test(e.message||'')) throw e;   // a real refusal, not a blip
+      onNote&&onNote('Connection dropped — retrying ('+a+'/'+LIB_TRIES+')…');
+      await libSleep(Math.min(30000,1500*Math.pow(2,a-1)));
+    }
+  }
+  throw last||new Error('upload failed');
+}
+async function libR2(body){
+  const{data,error}=await sb.functions.invoke('r2-sign',{body:body});
+  if(error||!data||data.error) throw new Error((error&&error.message)||(data&&data.error)||'r2-sign failed');
+  return data;
+}
+var LIB_WAKE=null, LIB_WAKE_N=0;
+async function libWakeOn(){
+  LIB_WAKE_N++;
+  try{ if('wakeLock' in navigator && !LIB_WAKE) LIB_WAKE=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function libWakeOff(){
+  LIB_WAKE_N=Math.max(0,LIB_WAKE_N-1);
+  if(!LIB_WAKE_N && LIB_WAKE){ try{ LIB_WAKE.release(); }catch(e){} LIB_WAKE=null; }
+}
+document.addEventListener('visibilitychange',function(){
+  // the wake lock is dropped whenever the tab is hidden; take it back on return
+  if(document.visibilityState==='visible' && LIB_WAKE_N && !LIB_WAKE){ LIB_WAKE=null; libWakeOn().then(function(){ LIB_WAKE_N--; }); }
+});
+window.addEventListener('beforeunload',function(e){ if(LIB_WAKE_N){ e.preventDefault(); e.returnValue='Uploads are still running'; return e.returnValue; } });
+async function libUploadResumable(key,file,onProgress,onNote){
+  if(file.size<=LIB_PART){
+    return libWithRetry(async function(){
+      const url=await r2SignedUrl(key,'PUT');
+      await libPutWithProgress(url,file,onProgress);
+    },onNote);
+  }
+  const n=Math.ceil(file.size/LIB_PART);
+  const c=await libWithRetry(function(){ return libR2({action:'mp_create',key:key,contentType:file.type||'application/octet-stream'}); },onNote);
+  const uploadId=c.uploadId;
+  try{
+    for(let p=1;p<=n;p++){
+      const blob=file.slice((p-1)*LIB_PART,Math.min(file.size,p*LIB_PART));
+      await libWithRetry(async function(){
+        const s=await libR2({action:'mp_part',key:key,uploadId:uploadId,partNumber:p});
+        await libPutWithProgress(s.url,blob,function(f){ onProgress&&onProgress(((p-1)*LIB_PART+f*blob.size)/file.size); },true);
+      },onNote);
+      onProgress&&onProgress(Math.min(file.size,p*LIB_PART)/file.size);
+    }
+    await libWithRetry(function(){ return libR2({action:'mp_complete',key:key,uploadId:uploadId,parts:n}); },onNote);
+  }catch(e){
+    try{ await libR2({action:'mp_abort',key:key,uploadId:uploadId}); }catch(_){}
+    throw e;
+  }
+}
+// A small bar pinned to the bottom while uploads run: progress, "keep this open",
+// and a Retry button for anything that still failed after the automatic retries.
+var LIB_FAILED=[];
+function libUpBar(html,show){
+  var b=document.getElementById('lib-upbar');
+  if(!b){ b=document.createElement('div'); b.id='lib-upbar';
+    b.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;background:var(--surface,#1b1b22);color:var(--text,#fff);border:1px solid var(--border,#333);border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.35);display:none;';
+    document.body.appendChild(b); }
+  if(html!=null) b.innerHTML=html;
+  b.style.display=show===false?'none':'block';
+}
+async function libRetryFailed(){
+  var jobs=LIB_FAILED.splice(0); var groups=new Map();
+  jobs.forEach(function(j){ var g=groups.get(j.opt)||[]; g.push(j.file); groups.set(j.opt,g); });
+  for(const [opt,files] of groups){ await libUploadFiles(files,Object.assign({},opt,{skipHdAsk:true})); }
+  try{ if(typeof renderLibraryList==='function') renderLibraryList(); }catch(e){}
 }
 // Upload N files as library items. strictHd: reject outright (models) vs ask (agency).
 // Everything is probed FIRST, then you get ONE question about the whole batch -- dragging
@@ -4420,7 +4593,7 @@ async function libUploadFiles(files,opt){
   // ── one decision for the whole batch ──
   const bad=probes.filter(function(x){ return libHdVerdict(x.probe); });
   let use=probes;
-  if(bad.length){
+  if(bad.length && !opt.skipHdAsk){
     if(opt.strictHd){
       bad.forEach(function(x){ results.push({file:x.file, skipped:libHdVerdict(x.probe)}); });
       use=probes.filter(function(x){ return !libHdVerdict(x.probe); });
@@ -4442,14 +4615,24 @@ async function libUploadFiles(files,opt){
   }
 
   // ── pass 2: upload ──
+  await libWakeOn();
+  let nOk=0, nBad=0;
+  const bar=function(i,pc,note){
+    libUpBar('<b>Uploading '+(i+1)+' of '+use.length+'</b> · '+Math.round((pc||0)*100)+'%'
+      +(note?' <span style="color:#fbbf24;">· '+escapeHtml(note)+'</span>':'')
+      +'<div style="color:var(--text2,#aaa);font-size:12px;margin-top:3px;">Keep this screen open until it says done — the screen is kept awake for you.</div>');
+  };
+  try{
   for(let i=0;i<use.length;i++){
     const file=use[i].file, probe=use[i].probe;
     const label=(use.length>1?(i+1)+'/'+use.length+' · ':'')+file.name;
     const safe=(file.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
     const key='library/'+(opt.modelId||'agency')+'/'+Date.now()+'_'+i+'_'+safe;
     try{
-      const url=await r2SignedUrl(key,'PUT');
-      await libPutWithProgress(url,file,function(pc){ opt.onStatus&&opt.onStatus(label,'Uploading…',pc); });
+      bar(i,0);
+      await libUploadResumable(key,file,
+        function(pc){ bar(i,pc); opt.onStatus&&opt.onStatus(label,'Uploading…',pc); },
+        function(note){ bar(i,null,note); opt.onStatus&&opt.onStatus(label,note,0); });
       const meta=opt.perFile?opt.perFile(file)||{}:{};
       const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:meta.title||file.name,tags:meta.tags||opt.tags||null,r2_key:key,size_bytes:file.size,content_type:file.type||null,
         uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
@@ -4458,16 +4641,31 @@ async function libUploadFiles(files,opt){
       if(error) throw new Error(error.message);
       const item=ins&&ins[0];
       if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video'&&autoScan&&!libOfOnly(opt.category)) scanLibraryItem(item.id); }
-      results.push({file,item,key});
+      results.push({file,item,key}); nOk++;
       opt.onStatus&&opt.onStatus(label,'Done ✓',1);
-    }catch(e){ results.push({file,error:e.message}); opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0); }
+    }catch(e){
+      results.push({file,error:e.message}); nBad++;
+      LIB_FAILED.push({file:file,opt:opt});
+      opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0);
+    }
   }
+  } finally { libWakeOff(); }
+  if(nBad) libUpBar('<b>'+nOk+' uploaded · '+nBad+' failed</b> <button class="btn btn-primary" style="margin-left:8px;padding:4px 12px;" onclick="libRetryFailed()">Retry failed</button>'
+    +' <button class="btn btn-ghost" style="padding:4px 10px;" onclick="libUpBar(null,false)">✕</button>');
+  else { libUpBar('<b>Done ✓</b> · '+nOk+' uploaded',true); setTimeout(function(){ libUpBar(null,false); },4000); }
   return results;
 }
 function libPickFiles(accept,multiple){
   return new Promise(function(res){
+    // 27 Oct: kept in the page (hidden) until a choice is made — iOS Safari can drop
+    // the 'change' event of a detached input, so a picked clip silently went nowhere.
     const inp=document.createElement('input'); inp.type='file'; if(accept) inp.accept=accept; inp.multiple=!!multiple;
-    inp.onchange=function(){ res(Array.from(inp.files||[])); }; inp.click();
+    inp.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(inp);
+    const done=function(list){ try{ inp.remove(); }catch(e){} res(list); };
+    inp.onchange=function(){ done(Array.from(inp.files||[])); };
+    inp.addEventListener('cancel',function(){ done([]); });
+    inp.click();
   });
 }
 async function libItemUrl(it){
@@ -4491,12 +4689,18 @@ function libThumbHtml(it,size){
   const w=size||120, h=Math.round(w*0.62);
   const inner=it.thumb_data?'<img src="'+it.thumb_data+'" style="width:100%;height:100%;object-fit:cover;display:block;">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);">'+(libIsVideo(it)?'🎬':'🖼')+'</div>';
   const play=libIsVideo(it)?'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18);font-size:18px;pointer-events:none;">▶</div>':'';
-  return '<div onclick="libPreview(\''+it.id+'\')" style="position:relative;width:'+w+'px;height:'+h+'px;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer;flex-shrink:0;">'+inner+play+'</div>';
+  if(!it.thumb_data && libIsHeic(it)) libHeicQueue(it);
+  return '<div onclick="libPreview(\''+it.id+'\')" data-thumb="'+it.id+'" style="position:relative;width:'+w+'px;height:'+h+'px;border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer;flex-shrink:0;">'+inner+play+'</div>';
 }
 async function libPreview(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   scanShow(it.title||'Preview','<div style="color:var(--text2);">Loading…</div>');
-  try{ const u=await libItemUrl(it);
+  try{ let u=await libItemUrl(it);
+    if(!libIsVideo(it) && libIsHeic(it)){
+      scanShow(it.title||'Preview','<div style="color:var(--text2);">Converting iPhone photo…</div>');
+      const jpg=await libHeicToJpeg(await (await fetch(u)).blob(),0.9); u=URL.createObjectURL(jpg);
+      if(!it.thumb_data) libHeicQueue(it);
+    }
     scanShow(it.title||'Preview', libIsVideo(it)?'<video src="'+u+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>':'<img src="'+u+'" style="width:100%;height:100%;object-fit:contain;">');
   }catch(e){ scanShow(it.title||'Preview','<div style="color:var(--red);">Could not load: '+escapeHtml(e.message)+'</div>'); }
 }
@@ -5478,8 +5682,7 @@ async function trAddClips(){
       var probe=await libProbeFile(f);
       var safe=(f.name||'clip').replace(/[^a-zA-Z0-9._-]/g,'_');
       var key='takedowns/'+Date.now()+'_'+i+'_'+safe;
-      var url=await r2SignedUrl(key,'PUT');
-      await libPutWithProgress(url,f,function(){});
+      await libUploadResumable(key,f,null,function(n){ st.textContent='Uploading '+(i+1)+' of '+files.length+': '+f.name+' — '+n; });
       var row=Object.assign({file_name:f.name,storage_bucket:'bbm-content',
                              storage_path:key,thumb_data:probe.thumb||null},meta);
       const{data:ins,error}=await sb.from('takedown_cases').insert(row).select();
@@ -5604,8 +5807,7 @@ async function trTestClip(){
   body.innerHTML='<div style="font-size:13px;color:var(--text2);">⏳ Scanning '+escapeHtml(f.name)+' twice — with the case library and without…</div>';
   try{
     var key='trainer-test/'+Date.now()+'_'+(f.name||'clip').replace(/[^a-zA-Z0-9._-]/g,'_');
-    var put=await r2SignedUrl(key,'PUT');
-    await libPutWithProgress(put,f,function(){});
+    await libUploadResumable(key,f,null,null);
     var signed=await r2SignedUrl(key,'GET');
     const{data,error}=await sb.functions.invoke('trainer-service',{body:{action:'test',url:signed,frames:8}});
     if(error||!data||!data.job_id) throw new Error((data&&data.error)||'could not start');
