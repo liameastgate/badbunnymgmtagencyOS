@@ -13586,7 +13586,7 @@ function renderOnboardingList(el){
   el.innerHTML=
     '<div class="card"><div class="card-title" style="margin:0 0 8px;">🔗 New onboarding link</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="onb-name" placeholder="Model name" style="flex:1;min-width:180px;">'
-    +'<select id="onb-lang" style="width:130px;"><option value="en">English</option><option value="es">Español</option></select>'
+    +'<select id="onb-lang" style="width:130px;"><option value="en">English</option><option value="es">Castellano (España)</option></select>'
     +'<button class="btn btn-primary" onclick="createOnboarding()">Create &amp; copy link</button></div></div>'
     +'<div class="tabs">'+tabs.map(function(t){return '<div class="tab '+(ONB_TAB===t[0]?'active':'')+'" onclick="setOnbTab(\''+t[0]+'\')">'+t[1]+' ('+cnt(t[0])+')</div>';}).join('')+'</div>'
     +(list.length?list.map(onbCard).join(''):'<div class="empty" style="margin-top:16px;"><div class="empty-icon">🤝</div><p>Nothing here yet.</p></div>');
@@ -13594,7 +13594,7 @@ function renderOnboardingList(el){
 function onbCard(o){
   var a=o.answers||{};
   var pill={sent:'cscan-amber',in_progress:'cscan-amber',submitted:'cscan-green',reviewed:'cscan-green',signed:'cscan-green',declined:'cscan-red'}[o.status]||'cscan-amber';
-  var meta=[a.location,a.service,o.lang==='es'?'Español':'English',o.submitted_at?('submitted '+fmtDateTime(o.submitted_at)):('created '+fmtDateTime(o.created_at))].filter(Boolean).map(escapeHtml).join(' · ');
+  var meta=[a.location,a.service,o.lang==='es'?'Castellano':'English',o.submitted_at?('submitted '+fmtDateTime(o.submitted_at)):('created '+fmtDateTime(o.created_at))].filter(Boolean).map(escapeHtml).join(' · ');
   var rows=Object.keys(ONB_LABELS).filter(function(k){return a[k]!=null&&a[k]!=='';}).map(function(k){
     var v=Array.isArray(a[k])?a[k].join(', '):a[k];
     return '<div style="margin-bottom:12px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);">'+escapeHtml(ONB_LABELS[k])+'</div><div style="font-size:14px;white-space:pre-wrap;line-height:1.5;margin-top:3px;">'+escapeHtml(v)+'</div></div>';

@@ -52,7 +52,7 @@
 <body>
 <div class="hero"><div class="hero-in">
   <div class="brand"><div class="logo">BadBunny<span>MGMT</span></div>
-    <div class="lang"><button type="button" data-l="en" class="on">EN</button><button type="button" data-l="es">ES</button></div></div>
+    <div class="lang"><button type="button" data-l="en" class="on">EN</button><button type="button" data-l="es">ES 🇪🇸</button></div></div>
   <h1 data-t="title"></h1>
   <p class="intro" data-t="intro"></p>
   <p class="strong" data-t="strong"></p>
@@ -95,7 +95,7 @@
       fail:'Something went wrong sending this. Please try again.', done_h:'Thank you 🙌', done_p:'Your answers are in. We\'ll review them and get back to you shortly.',
       bad_h:'Link not found', bad_p:'This onboarding link isn\'t valid any more. Please ask us for a new one.',
       up:'＋ Upload screenshots', uploading:'Uploading…', upfail:'Upload failed — try again', choose:'Choose…'},
-    es:{title:'Incorporación de creadores',
+    es:{title:'Alta de creadores',
       intro:'Este formulario ayuda a nuestro equipo a conocerte a ti, tu página y cómo la promocionas, para crear un plan de marketing a tu medida. No hay respuestas correctas o incorrectas. Sé específico, honesto y detallado.',
       strong:'Respuestas vagas = un plan que no encaja contigo.',
       hello:'Hola {name} 👋',
@@ -103,7 +103,7 @@
       submit:'Enviar cuestionario', foot:'Tus respuestas son confidenciales y solo las usa nuestro equipo. Tu progreso se guarda automáticamente, así que puedes volver a este enlace más tarde.',
       saving:'Guardando…', saved:'Guardado ✓', req:'Responde las preguntas marcadas ({n} pendientes). Escribe N/A si alguna no aplica.',
       fail:'Algo salió mal al enviar. Inténtalo de nuevo.', done_h:'¡Gracias! 🙌', done_p:'Hemos recibido tus respuestas. Las revisaremos y te contactaremos pronto.',
-      bad_h:'Enlace no encontrado', bad_p:'Este enlace ya no es válido. Pídenos uno nuevo.',
+      bad_h:'Enlace no encontrado', bad_p:'Este enlace ya no es válido. Pídenos uno nuevo, por favor.',
       up:'＋ Subir capturas', uploading:'Subiendo…', upfail:'Error al subir — inténtalo de nuevo', choose:'Elige…'}
   };
 
@@ -134,17 +134,17 @@
     {id:'promo', en:['Promotion','Where your traffic comes from'], es:['Promoción','De dónde viene tu tráfico'], q:[
       {k:'promoting',type:'area',req:1,en:'Where are you currently promoting? (Attach IG, TikTok, Snapchat, X etc)',es:'¿Dónde te estás promocionando actualmente? (Adjunta IG, TikTok, Snapchat, X, etc.)',
         hen:'Paste the links to your profiles.',hes:'Pega los enlaces de tus perfiles.'},
-      {k:'other_channels',type:'area',req:1,en:'Do you use Reddit, Twitter/X or paid shoutouts?',es:'¿Usas Reddit, Twitter/X o shoutouts pagados?'},
+      {k:'other_channels',type:'area',req:1,en:'Do you use Reddit, Twitter/X or paid shoutouts?',es:'¿Usas Reddit, Twitter/X o shoutouts de pago?'},
       {k:'bans',type:'area',req:1,en:'Have any of your accounts been banned or shadowbanned?',es:'¿Alguna de tus cuentas ha sido baneada o ha tenido shadowban?'}
     ]},
     {id:'content', en:['Content capacity','What you can create for marketing'], es:['Capacidad de contenido','Lo que puedes crear para marketing'], q:[
-      {k:'reel_partners',type:'select',req:1,opts:{en:['Yes','Sometimes','No'],es:['Sí','A veces','No']},en:'Do you have people you can film Instagram reels with? (Skit style content)',es:'¿Tienes personas con las que puedas grabar reels de Instagram? (Contenido tipo sketch)'},
-      {k:'english',type:'select',req:1,opts:{en:['Yes','Somewhat','No'],es:['Sí','Más o menos','No']},en:'Are you comfortable speaking english in your reels?',es:'¿Te sientes cómodo hablando inglés en tus reels?'},
+      {k:'reel_partners',type:'select',req:1,opts:{en:['Yes','Sometimes','No'],es:['Sí','A veces','No']},en:'Do you have people you can film Instagram reels with? (Skit style content)',es:'¿Tienes gente con la que puedas grabar reels de Instagram? (Contenido tipo sketch)'},
+      {k:'english',type:'select',req:1,opts:{en:['Yes','Somewhat','No'],es:['Sí','Más o menos','No']},en:'Are you comfortable speaking english in your reels?',es:'¿Te sientes cómodo hablando en inglés en tus reels?'},
       {k:'days_week',type:'select',req:1,opts:{en:['0','1','2','3','4','5','6','7'],es:['0','1','2','3','4','5','6','7']},en:'How many days per week can you designate towards creating marketing content?',es:'¿Cuántos días por semana puedes dedicar a crear contenido de marketing?'},
       {k:'of_posting',type:'text',req:1,en:'How often do you post on your onlyfans page?',es:'¿Con qué frecuencia publicas en tu página de OnlyFans?'}
     ]},
     {id:'work', en:['Working with us','What you\'re looking for'], es:['Trabajar con nosotros','Lo que buscas'], q:[
-      {k:'service',type:'select',req:1,opts:{en:['Full scale management','Just chatting','Not sure yet'],es:['Gestión completa','Solo chatting','Aún no lo sé']},en:'Are you looking for full scale management? Or just chatting?',es:'¿Buscas gestión completa o solo chatting?'},
+      {k:'service',type:'select',req:1,opts:{en:['Full scale management','Just chatting','Not sure yet'],es:['Gestión completa','Solo chatting','Todavía no lo sé']},en:'Are you looking for full scale management? Or just chatting?',es:'¿Buscas una gestión completa o solo chatting?'},
       {k:'agency',type:'area',req:1,en:'Are you currently with another agency, or under any contract?',es:'¿Estás actualmente con otra agencia o bajo algún contrato?'},
       {k:'goals',type:'area',req:1,en:'What are your main goals you want to achieve while working with us?',es:'¿Cuáles son los principales objetivos que quieres lograr trabajando con nosotros?'},
       {k:'anything_else',type:'area',req:0,en:'Anything else you want us to know about you, your marketing or your page?',es:'¿Algo más que quieras que sepamos sobre ti, tu marketing o tu página?'}
