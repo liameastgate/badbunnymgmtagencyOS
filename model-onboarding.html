@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator onboarding — BadBunnyMGMT</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#08080f">
+<style>
+  :root{--bg:#08080f;--surface:#0d0d1c;--surface2:#12121f;--border:#1e2040;--accent:#1e4fff;--accent2:#6b8fff;--text:#fff;--text2:#8892b0;--red:#ef4444;--green:#4ade80}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;min-height:100vh}
+  .hero{background:linear-gradient(180deg,#0b1030 0%,#08080f 100%);border-bottom:1px solid var(--border);padding:34px 18px 30px}
+  .hero-in,.wrap{max-width:720px;margin:0 auto}
+  .brand{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+  .logo{font-weight:800;letter-spacing:.02em;font-size:17px}.logo span{color:var(--accent2)}
+  .lang{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+  .lang button{background:none;border:0;color:var(--text2);padding:6px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+  .lang button.on{background:var(--accent);color:#fff}
+  h1{font-size:30px;letter-spacing:-.01em;margin-bottom:10px}
+  .intro{color:#c3c9de;max-width:640px}
+  .strong{font-weight:700;margin-top:12px;font-size:14px}
+  .hello{margin-top:14px;font-size:13px;color:var(--accent2)}
+  .wrap{padding:24px 18px 80px}
+  .na{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:11px 14px;font-size:13.5px;color:#c3c9de;margin-bottom:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:16px;overflow:hidden}
+  .card-h{padding:16px 18px 12px;border-bottom:1px dashed var(--border)}
+  .card-h h2{font-size:17px}.card-h p{font-size:12.5px;color:var(--text2);margin-top:2px}
+  .card-b{padding:16px 18px 4px}
+  .field{margin-bottom:18px}
+  label.q{display:block;font-weight:700;font-size:14px;margin-bottom:7px}
+  label.q i{color:var(--red);font-style:normal;margin-left:3px}
+  .help{font-size:12.5px;color:var(--text2);margin-top:6px}
+  input[type=text],select,textarea{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font:inherit;font-size:14.5px}
+  textarea{min-height:92px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(30,79,255,.18)}
+  .bad{border-color:var(--red)!important}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--border);background:var(--surface2);color:#c3c9de;border-radius:20px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;user-select:none}
+  .chip.on{background:rgba(30,79,255,.2);border-color:var(--accent);color:#fff}
+  .files{display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:13px;color:#c3c9de}
+  .upbtn{display:inline-block;border:1px dashed var(--accent2);color:var(--accent2);border-radius:10px;padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer}
+  .submit{display:block;width:100%;background:var(--accent);color:#fff;border:0;border-radius:12px;padding:15px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
+  .submit[disabled]{opacity:.55;cursor:default}
+  .foot{font-size:12.5px;color:var(--text2);text-align:center;margin-top:10px}
+  .err{color:#ff8a8a;font-size:14px;margin-top:10px;display:none;text-align:center}
+  .saved{position:fixed;bottom:14px;right:14px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text2);opacity:0;transition:opacity .3s}
+  .msg{text-align:center;padding:70px 20px}.msg h1{margin-bottom:10px}.msg p{color:var(--text2)}
+  .hp{position:absolute;left:-9999px;height:0;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="hero"><div class="hero-in">
+  <div class="brand"><div class="logo">BadBunny<span>MGMT</span></div>
+    <div class="lang"><button type="button" data-l="en" class="on">EN</button><button type="button" data-l="es">ES</button></div></div>
+  <h1 data-t="title"></h1>
+  <p class="intro" data-t="intro"></p>
+  <p class="strong" data-t="strong"></p>
+  <p class="hello" id="hello"></p>
+</div></div>
+
+<div class="wrap" id="wrap">
+  <div class="msg" id="loading"><p>…</p></div>
+  <form id="f" novalidate style="display:none">
+    <div class="na" data-t="na"></div>
+    <div id="sections"></div>
+    <div class="hp"><input type="text" name="website" tabindex="-1" autocomplete="off"></div>
+    <button class="submit" id="submit" type="submit" data-t="submit"></button>
+    <div class="err" id="err"></div>
+    <p class="foot" data-t="foot"></p>
+  </form>
+  <div class="msg" id="done" style="display:none"><h1 data-t="done_h"></h1><p data-t="done_p"></p></div>
+  <div class="msg" id="bad" style="display:none"><h1 data-t="bad_h"></h1><p data-t="bad_p"></p></div>
+</div>
+<div class="saved" id="saved"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  var URL_='https://wdppbcmirldkviqxtjml.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcHBiY21pcmxka3ZpcXh0am1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDcyODQsImV4cCI6MjA5NjQyMzI4NH0.SDgLUJjzdREwhrkns6AeA9Y0Em6cOlfzLJjaNDW7raA';
+  var sb=window.supabase.createClient(URL_,KEY,{auth:{persistSession:false}});
+  var TOKEN=(new URLSearchParams(location.search).get('t')||'').trim();
+  var LANG='en', ANSWERS={}, FILES=[], LOCKED=false;
+
+  // --- copy (Liam's questions are word for word in "en") ---------------------
+  var UI={
+    en:{title:'Creator onboarding',
+      intro:'This form helps our team understand you, your page and how you promote it, so we can build a marketing plan that fits you. There are no right or wrong answers. Be specific, honest and detailed.',
+      strong:'Vague answers = a plan that doesn\'t fit you.',
+      hello:'Hi {name} 👋',
+      na:'If a question doesn\'t apply to you, just put N/A.',
+      submit:'Submit questionnaire', foot:'Your answers are confidential and only used by our team. Your progress saves automatically, so you can come back to this link later.',
+      saving:'Saving…', saved:'Saved ✓', req:'Please answer the highlighted questions ({n} left). Put N/A if one doesn\'t apply.',
+      fail:'Something went wrong sending this. Please try again.', done_h:'Thank you 🙌', done_p:'Your answers are in. We\'ll review them and get back to you shortly.',
+      bad_h:'Link not found', bad_p:'This onboarding link isn\'t valid any more. Please ask us for a new one.',
+      up:'＋ Upload screenshots', uploading:'Uploading…', upfail:'Upload failed — try again', choose:'Choose…'},
+    es:{title:'Incorporación de creadores',
+      intro:'Este formulario ayuda a nuestro equipo a conocerte a ti, tu página y cómo la promocionas, para crear un plan de marketing a tu medida. No hay respuestas correctas o incorrectas. Sé específico, honesto y detallado.',
+      strong:'Respuestas vagas = un plan que no encaja contigo.',
+      hello:'Hola {name} 👋',
+      na:'Si una pregunta no aplica a tu caso, escribe N/A.',
+      submit:'Enviar cuestionario', foot:'Tus respuestas son confidenciales y solo las usa nuestro equipo. Tu progreso se guarda automáticamente, así que puedes volver a este enlace más tarde.',
+      saving:'Guardando…', saved:'Guardado ✓', req:'Responde las preguntas marcadas ({n} pendientes). Escribe N/A si alguna no aplica.',
+      fail:'Algo salió mal al enviar. Inténtalo de nuevo.', done_h:'¡Gracias! 🙌', done_p:'Hemos recibido tus respuestas. Las revisaremos y te contactaremos pronto.',
+      bad_h:'Enlace no encontrado', bad_p:'Este enlace ya no es válido. Pídenos uno nuevo.',
+      up:'＋ Subir capturas', uploading:'Subiendo…', upfail:'Error al subir — inténtalo de nuevo', choose:'Elige…'}
+  };
+
+  // type: text | area | select | chips | files ; req = required
+  var SECTIONS=[
+    {id:'about', en:['About you','Basic details'], es:['Sobre ti','Datos básicos'], q:[
+      {k:'name',type:'text',req:1,en:'Your name / creator name',es:'Tu nombre / nombre de creador'},
+      {k:'location',type:'text',req:1,en:'What country are you in, and what is your time zone?',es:'¿En qué país estás y cuál es tu zona horaria?'},
+      {k:'languages',type:'text',req:1,en:'What languages do you speak?',es:'¿Qué idiomas hablas?'},
+      {k:'of_link',type:'text',req:1,en:'Your OnlyFans link',es:'Tu enlace de OnlyFans',ph:'onlyfans.com/…'}
+    ]},
+    {id:'brand', en:['Your brand','Who you are to your fans'], es:['Tu marca','Quién eres para tus fans'], q:[
+      {k:'niche',type:'area',req:1,en:'What is your current “niche” and how do you display yourself to fans as an online persona?',es:'¿Cuál es tu “nicho” actual y cómo te presentas ante tus fans como persona online?'},
+      {k:'closest',type:'chips',req:1,opts:['Gay','Bi','Straight / gay-for-pay','Daddy','Twink','Jock','Bear / muscle bear'],
+        en:'Which is closest to you?',es:'¿Cuál se acerca más a ti?',hen:'Tick all that fit.',hes:'Marca todas las que encajen.'},
+      {k:'boundaries',type:'area',req:1,en:'What content will you do, and not do, on social media and on OnlyFans?',es:'¿Qué contenido harás y no harás en redes sociales y en OnlyFans?'},
+      {k:'hobbies',type:'area',req:1,en:'What are your hobbies?',es:'¿Cuáles son tus pasatiempos?',
+        hen:'Sports, training, gaming, music, travel, cars — be specific (e.g. "Muay Thai twice a week", not just "sports").',
+        hes:'Deportes, gimnasio, videojuegos, música, viajes, coches — sé específico (p. ej. "Muay Thai dos veces por semana", no solo "deportes").'},
+      {k:'grew_up',type:'text',req:1,en:'Where did you grow up, and where do you live now?',es:'¿Dónde creciste y dónde vives ahora?'}
+    ]},
+    {id:'earnings', en:['Earnings','Where your page is today'], es:['Ganancias','Dónde está tu página hoy'], q:[
+      {k:'earnings',type:'area',req:1,en:'What are your current subscription, message and tip earnings for the last 30 and 90 days?',es:'¿Cuáles son tus ganancias actuales por suscripciones, mensajes y propinas de los últimos 30 y 90 días?'},
+      {k:'paid_subs',type:'area',req:1,en:'How many paid subscribers in the past week/month',es:'¿Cuántos suscriptores de pago en la última semana/mes?'},
+      {k:'screens',type:'files',req:0,en:'Earnings screenshots',es:'Capturas de tus ganancias',hen:'Statements page for the last 30 and 90 days.',hes:'Página de estadísticas de los últimos 30 y 90 días.'},
+      {k:'pricing',type:'area',req:1,en:'What is your subscription price, do you use free trial links, and what is your rebill (renewal) rate?',es:'¿Cuál es el precio de tu suscripción, usas enlaces de prueba gratuita y cuál es tu tasa de renovación?'}
+    ]},
+    {id:'promo', en:['Promotion','Where your traffic comes from'], es:['Promoción','De dónde viene tu tráfico'], q:[
+      {k:'promoting',type:'area',req:1,en:'Where are you currently promoting? (Attach IG, TikTok, Snapchat, X etc)',es:'¿Dónde te estás promocionando actualmente? (Adjunta IG, TikTok, Snapchat, X, etc.)',
+        hen:'Paste the links to your profiles.',hes:'Pega los enlaces de tus perfiles.'},
+      {k:'other_channels',type:'area',req:1,en:'Do you use Reddit, Twitter/X or paid shoutouts?',es:'¿Usas Reddit, Twitter/X o shoutouts pagados?'},
+      {k:'bans',type:'area',req:1,en:'Have any of your accounts been banned or shadowbanned?',es:'¿Alguna de tus cuentas ha sido baneada o ha tenido shadowban?'}
+    ]},
+    {id:'content', en:['Content capacity','What you can create for marketing'], es:['Capacidad de contenido','Lo que puedes crear para marketing'], q:[
+      {k:'reel_partners',type:'select',req:1,opts:{en:['Yes','Sometimes','No'],es:['Sí','A veces','No']},en:'Do you have people you can film Instagram reels with? (Skit style content)',es:'¿Tienes personas con las que puedas grabar reels de Instagram? (Contenido tipo sketch)'},
+      {k:'english',type:'select',req:1,opts:{en:['Yes','Somewhat','No'],es:['Sí','Más o menos','No']},en:'Are you comfortable speaking english in your reels?',es:'¿Te sientes cómodo hablando inglés en tus reels?'},
+      {k:'days_week',type:'select',req:1,opts:{en:['0','1','2','3','4','5','6','7'],es:['0','1','2','3','4','5','6','7']},en:'How many days per week can you designate towards creating marketing content?',es:'¿Cuántos días por semana puedes dedicar a crear contenido de marketing?'},
+      {k:'of_posting',type:'text',req:1,en:'How often do you post on your onlyfans page?',es:'¿Con qué frecuencia publicas en tu página de OnlyFans?'}
+    ]},
+    {id:'work', en:['Working with us','What you\'re looking for'], es:['Trabajar con nosotros','Lo que buscas'], q:[
+      {k:'service',type:'select',req:1,opts:{en:['Full scale management','Just chatting','Not sure yet'],es:['Gestión completa','Solo chatting','Aún no lo sé']},en:'Are you looking for full scale management? Or just chatting?',es:'¿Buscas gestión completa o solo chatting?'},
+      {k:'agency',type:'area',req:1,en:'Are you currently with another agency, or under any contract?',es:'¿Estás actualmente con otra agencia o bajo algún contrato?'},
+      {k:'goals',type:'area',req:1,en:'What are your main goals you want to achieve while working with us?',es:'¿Cuáles son los principales objetivos que quieres lograr trabajando con nosotros?'},
+      {k:'anything_else',type:'area',req:0,en:'Anything else you want us to know about you, your marketing or your page?',es:'¿Algo más que quieras que sepamos sobre ti, tu marketing o tu página?'}
+    ]}
+  ];
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function t(k){return UI[LANG][k];}
+  var NAME='';
+
+  function render(){
+    document.documentElement.lang=LANG;
+    document.querySelectorAll('[data-t]').forEach(function(el){ el.textContent=t(el.getAttribute('data-t')); });
+    document.getElementById('hello').textContent=NAME?t('hello').replace('{name}',NAME):'';
+    document.querySelectorAll('.lang button').forEach(function(b){ b.classList.toggle('on',b.getAttribute('data-l')===LANG); });
+    var html=SECTIONS.map(function(s){
+      var head=s[LANG];
+      return '<div class="card"><div class="card-h"><h2>'+esc(head[0])+'</h2><p>'+esc(head[1])+'</p></div><div class="card-b">'+s.q.map(field).join('')+'</div></div>';
+    }).join('');
+    document.getElementById('sections').innerHTML=html;
+    bind();
+  }
+  function field(q){
+    var lab='<label class="q" for="q_'+q.k+'">'+esc(q[LANG])+(q.req?'<i>*</i>':'')+'</label>';
+    var help=q['h'+LANG]?'<div class="help">'+esc(q['h'+LANG])+'</div>':'';
+    var v=ANSWERS[q.k], inp='';
+    if(q.type==='text') inp='<input type="text" id="q_'+q.k+'" data-k="'+q.k+'" value="'+esc(v||'')+'" placeholder="'+esc(q.ph||'')+'">';
+    else if(q.type==='area') inp='<textarea id="q_'+q.k+'" data-k="'+q.k+'">'+esc(v||'')+'</textarea>';
+    else if(q.type==='select'){
+      var o=q.opts[LANG], ov=q.opts.en;
+      inp='<select id="q_'+q.k+'" data-k="'+q.k+'"><option value="">'+esc(t('choose'))+'</option>'+o.map(function(x,i){return '<option value="'+esc(ov[i])+'" '+(v===ov[i]?'selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select>';
+    } else if(q.type==='chips'){
+      var sel=Array.isArray(v)?v:[];
+      inp='<div class="chips" id="q_'+q.k+'" data-k="'+q.k+'">'+q.opts.map(function(x){return '<span class="chip'+(sel.indexOf(x)>=0?' on':'')+'" data-v="'+esc(x)+'">'+esc(x)+'</span>';}).join('')+'</div>';
+    } else if(q.type==='files'){
+      inp='<label class="upbtn" id="q_'+q.k+'">'+esc(t('up'))+'<input type="file" accept="image/*,application/pdf" multiple hidden data-files="1"></label><div class="files" id="filelist">'+FILES.map(function(f){return '<div>📎 '+esc(f.name)+'</div>';}).join('')+'</div>';
+    }
+    return '<div class="field">'+lab+inp+help+'</div>';
+  }
+  function bind(){
+    document.querySelectorAll('[data-k]').forEach(function(el){
+      if(el.classList.contains('chips')){
+        el.querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ c.classList.toggle('on'); ANSWERS[el.getAttribute('data-k')]=[].map.call(el.querySelectorAll('.chip.on'),function(x){return x.getAttribute('data-v');}); el.classList.remove('bad'); queueSave(); }; });
+      } else {
+        el.oninput=el.onchange=function(){ ANSWERS[el.getAttribute('data-k')]=el.value; el.classList.remove('bad'); queueSave(); };
+      }
+    });
+    var fi=document.querySelector('[data-files]'); if(fi) fi.onchange=function(){ upload(fi.files); fi.value=''; };
+  }
+
+  // --- saving ----------------------------------------------------------------
+  var timer=null;
+  function flash(txt){ var s=document.getElementById('saved'); s.textContent=txt; s.style.opacity=1; clearTimeout(s._t); s._t=setTimeout(function(){s.style.opacity=0;},1600); }
+  function queueSave(){ try{localStorage.setItem('bbm_onb_'+TOKEN,JSON.stringify({a:ANSWERS,f:FILES,l:LANG}));}catch(e){} clearTimeout(timer); timer=setTimeout(function(){save(false);},1500); }
+  async function save(submit){
+    if(LOCKED) return {data:'locked'};
+    flash(t('saving'));
+    var r=await sb.rpc('onboarding_save',{p_token:TOKEN,p_answers:ANSWERS,p_files:FILES,p_lang:LANG,p_submit:!!submit});
+    if(!r.error && r.data!=='not_found') flash(t('saved'));
+    return r;
+  }
+
+  async function upload(list){
+    var lab=document.querySelector('.upbtn'); var orig=lab.firstChild.textContent;
+    for(var i=0;i<list.length;i++){
+      var file=list[i]; if(file.size>25*1024*1024) continue;
+      lab.firstChild.textContent=t('uploading');
+      try{
+        var key='onboarding/'+TOKEN+'/'+Date.now()+'_'+file.name.replace(/[^\w.\-]+/g,'_');
+        var s=await sb.functions.invoke('r2-sign',{body:{key:key,method:'PUT'}});
+        if(s.error||!s.data||!s.data.url) throw new Error('sign');
+        var p=await fetch(s.data.url,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
+        if(!p.ok) throw new Error('put');
+        FILES.push({key:key,name:file.name,type:file.type,size:file.size});
+        document.getElementById('filelist').innerHTML=FILES.map(function(f){return '<div>📎 '+esc(f.name)+'</div>';}).join('');
+        queueSave();
+      }catch(e){ lab.firstChild.textContent=t('upfail'); await new Promise(function(r){setTimeout(r,1800);}); }
+    }
+    lab.firstChild.textContent=t('up');
+  }
+
+  // --- submit ----------------------------------------------------------------
+  document.getElementById('f').addEventListener('submit',async function(e){
+    e.preventDefault();
+    var err=document.getElementById('err'); err.style.display='none';
+    if(document.querySelector('[name=website]').value) return;
+    var missing=[];
+    SECTIONS.forEach(function(s){ s.q.forEach(function(q){
+      if(!q.req) return; var v=ANSWERS[q.k];
+      var empty=Array.isArray(v)?!v.length:!String(v||'').trim();
+      if(empty) missing.push(q.k);
+    });});
+    document.querySelectorAll('.bad').forEach(function(x){x.classList.remove('bad');});
+    if(missing.length){
+      missing.forEach(function(k){ var el=document.getElementById('q_'+k); if(el) el.classList.add('bad'); });
+      err.textContent=t('req').replace('{n}',missing.length); err.style.display='block';
+      var first=document.getElementById('q_'+missing[0]); if(first){ first.scrollIntoView({behavior:'smooth',block:'center'}); if(first.focus) first.focus(); }
+      return;
+    }
+    var btn=document.getElementById('submit'); btn.disabled=true;
+    clearTimeout(timer);
+    var r=await save(true);
+    if(r.error||r.data!=='submitted'){ btn.disabled=false; err.textContent=t('fail'); err.style.display='block'; return; }
+    try{localStorage.removeItem('bbm_onb_'+TOKEN);}catch(e){}
+    document.getElementById('f').style.display='none'; document.getElementById('done').style.display='block'; window.scrollTo(0,0);
+  });
+
+  document.querySelectorAll('.lang button').forEach(function(b){ b.onclick=function(){ LANG=b.getAttribute('data-l'); render(); queueSave(); }; });
+
+  // --- load ------------------------------------------------------------------
+  (async function(){
+    function show(id){ ['loading','f','done','bad'].forEach(function(x){ document.getElementById(x).style.display=x===id?'block':'none'; }); }
+    if(!TOKEN){ render(); show('bad'); return; }
+    var r=await sb.rpc('onboarding_get',{p_token:TOKEN});
+    var d=r.data;
+    if(r.error||!d){ render(); show('bad'); return; }
+    NAME=d.model_name||''; LANG=d.lang==='es'?'es':'en';
+    ANSWERS=d.answers||{}; FILES=d.files||[];
+    try{ var loc=JSON.parse(localStorage.getItem('bbm_onb_'+TOKEN)||'null');
+      if(loc&&loc.a&&Object.keys(loc.a).length>Object.keys(ANSWERS).length){ ANSWERS=loc.a; FILES=loc.f||FILES; } }catch(e){}
+    render();
+    if(['submitted','reviewed','signed'].indexOf(d.status)>=0){ LOCKED=true; show('done'); return; }
+    show('f');
+  })();
+})();
+</script>
+</body>
+</html>
