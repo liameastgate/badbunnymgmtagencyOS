@@ -4438,6 +4438,13 @@ async function loadContentLibrary(){
 // Sounds only ever show inside the Sounds folder -- never in "All" or a model's file count.
 // Folders that are a to-do list, not a destination.
 function libIsToSort(k){ return k==='inbox'||k==='unsure'; }
+// A MOVE takes the file out of the folder you moved it from -- including when that folder
+// was one of its extra "Also in" folders (that was the bug: the main folder changed but the
+// file still showed in the old one through its extras). Any other extras are kept.
+function libMovePatch(it,cat,from){
+  var ex=(it.categories||[]).filter(function(k){ return k!==cat && k!==it.category && k!==from && LIB_CATEGORIES[k]; });
+  return {category:cat, categories:ex};
+}
 function libSoundOnly(i){ return i.category==='sounds'; }
 var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical';
 // ── Thumbnails on demand ─────────────────────────────────────────────────────
@@ -5485,7 +5492,7 @@ function libFocusOpen(){
   var items=libFiltered();
   if(!items.length){ alert('Nothing in this folder to go through.'); return; }
   var multi=false; try{ multi=localStorage.getItem('lf_multi')==='1'; }catch(e){}
-  LF={queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
+  LF={from:LIB_F.category, queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
   var ov=document.getElementById('lf-overlay');
   if(!ov){ ov=document.createElement('div'); ov.id='lf-overlay'; document.body.appendChild(ov); }
   ov.style.display='block'; document.body.style.overflow='hidden';
@@ -5575,7 +5582,7 @@ async function libFocusMove(cat){
   var prev={category:it.category, categories:(it.categories||[]).slice(), state:it.state, state_changed_at:it.state_changed_at};
   // Filing a file by hand IS the review: a scanner hold (needs_review) never blocks sorting,
   // and moving it releases it back to Fresh (same as Move to… on the card). Undo restores it.
-  var patch={category:cat};
+  var patch=libMovePatch(it,cat,LF.from);
   if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
   var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
   LF_BUSY=false;
@@ -5751,10 +5758,12 @@ async function libCardAction(id,sel){
     var cur0=(STATE.library||[]).find(function(x){return x.id===id;});
     if(cur0&&libOfOnly(cur0.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var cur=(STATE.library||[]).find(function(x){return x.id===id;});
-    if(cur&&cur.state==='needs_review') return libReview(id,cat);   // moving a held file also releases it
-    var r=await sb.from('content_library').update({category:cat}).eq('id',id).select();
+    if(!cur) return;
+    var mp=libMovePatch(cur,cat,LIB_F.category);
+    if(cur.state==='needs_review'){ mp.state='fresh'; mp.state_changed_at=new Date().toISOString(); }   // moving a held file also releases it
+    var r=await sb.from('content_library').update(mp).eq('id',id).select();
     if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
-    var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) it.category=cat;
+    Object.assign(cur,r.data[0]);
     renderLibraryList();
     var stt=document.getElementById('cl-upload-status'); if(stt){ stt.style.display='block'; stt.textContent='Moved 1 file → '+LIB_CATEGORIES[cat].label; }
   }
@@ -5825,10 +5834,20 @@ async function libBulkMoveTo(sel){
     var unf=picked.filter(function(i){ return i.category==='inbox'; }).length;
     if(unf&&!confirm(unf+' of these are still in New uploads (unedited). Ready to post means the phones can post them as they are.\n\nContinue?')) return;
   }
-  var patch={category:cat};
-  var r=await sb.from('content_library').update(patch).in('id',ids).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
-  picked.forEach(function(i){ i.category=cat; });
+  // Files with nothing extra to keep go in one request; the rest one by one (their extras differ).
+  var from=LIB_F.category, plain=[], fancy=[];
+  picked.forEach(function(i){ (libMovePatch(i,cat,from).categories.length?fancy:plain).push(i); });
+  var moved=0, err=null;
+  if(plain.length){
+    var r0=await sb.from('content_library').update({category:cat,categories:[]}).in('id',plain.map(function(i){return i.id;})).select();
+    if(r0.error) err=r0.error; else (r0.data||[]).forEach(function(row){ var it=picked.find(function(i){return i.id===row.id;}); if(it) Object.assign(it,row); moved++; });
+  }
+  for(var fi=0;fi<fancy.length;fi++){
+    var r1=await sb.from('content_library').update(libMovePatch(fancy[fi],cat,from)).eq('id',fancy[fi].id).select();
+    if(r1.error) err=r1.error; else if(r1.data&&r1.data.length){ Object.assign(fancy[fi],r1.data[0]); moved++; }
+  }
+  if(!moved){ alert('Could not move — '+(err?err.message:'no permission')); return; }
+  var r={data:{length:moved}};
   LIB_SEL={}; renderLibraryList();
   var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
 }
