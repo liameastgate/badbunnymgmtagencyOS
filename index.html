@@ -448,6 +448,19 @@
     .lf-hs { display:none; } .lf-mode { padding:8px 9px; font-size:12px; } .lf-head .btn { padding:8px 10px; }
     .lf-toast { bottom:68px; }
   }
+  /* Chatting Script on phones: list OR script, never both squeezed side by side.
+     #sheets-shell gets .sheet-open while a script is showing; "☰ Models" goes back.
+     On desktop the same button just collapses/expands the model list. */
+  .sheets-list-btn { display: inline-flex; }
+  .sheets-shell.side-collapsed #sheets-sidebar { display: none !important; }
+  @media (max-width: 768px) {
+    .sheets-shell { height: calc(100dvh - 96px) !important; }
+    .sheets-shell #sheets-sidebar { width: 100% !important; border-right: none !important; }
+    .sheets-shell #sheets-content { display: none; padding: 14px 12px !important; }
+    .sheets-shell.sheet-open #sheets-sidebar { display: none !important; }
+    .sheets-shell.sheet-open #sheets-content { display: block; }
+    .sheets-shell.side-collapsed:not(.sheet-open) #sheets-sidebar { display: flex !important; }
+  }
   .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
   .sheet-side-item:hover { background: var(--surface2); }
   .sheet-side-item.active { background: rgba(30,79,255,0.14); border-color: rgba(30,79,255,0.4); }
@@ -997,7 +1010,6 @@
          before anything is sent. -->
     <div class="page" id="page-model-upload">
       <div class="page-title">Upload</div>
-      <div class="page-sub">Send us your content — that's it</div>
       <div id="mu-body"></div>
     </div>
 
@@ -2497,7 +2509,7 @@
 
     <!-- Chatting Script -->
     <div class="page" id="page-sheets">
-      <div style="display:flex;gap:0;height:calc(100vh - 120px);overflow:hidden;border:1px solid var(--border);border-radius:8px;">
+      <div id="sheets-shell" class="sheets-shell" style="display:flex;gap:0;height:calc(100vh - 120px);overflow:hidden;border:1px solid var(--border);border-radius:8px;">
         <!-- Model sidebar: models stacked top to bottom, search on top. A 'model' role
              account never sees this -- loadModelSheets() hides it and drops them straight
              into their own script in the content pane, full width. -->
@@ -2509,7 +2521,7 @@
           <div id="sheets-model-list" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <!-- Script content -->
-        <div style="flex:1;overflow-y:auto;padding:28px 32px;" id="sheets-content">
+        <div style="flex:1;overflow-y:auto;padding:28px 32px;min-width:0;" id="sheets-content">
           <div class="empty" style="margin-top:80px;"><div class="empty-icon">📋</div><p>Select a model to view their chatting script</p></div>
         </div>
       </div>
@@ -3381,7 +3393,10 @@ async function initApp(user) {
   const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'fans' : profile.role === 'traffic' ? 'traffic' : 'overview';
   let savedPage=null;
   try{ savedPage=localStorage.getItem('agencyos_page'); }catch(e){}
-  navigate(savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage);
+  const startPage = savedPage && pageAllowed(savedPage, profile) ? savedPage : defaultPage;
+  VIEW_RESTORING={'content-upload':true, sheets:true};
+  navigate(startPage);
+  if(startPage===savedPage) viewRestoreScroll(startPage);
 }
 
 function pageAllowed(pageId, profile){
@@ -3846,6 +3861,36 @@ async function cfDownload(path){
   catch(e){ cfAlert('Could not get that file: '+(e.message||e),'error'); }
 }
 
+// ── Refresh memory ──────────────────────────────────────────────────────────
+// The page itself was already restored after a refresh (agencyos_page). This also remembers
+// where you were INSIDE a page -- which model's Library folder, which Chatting Script, which
+// tab -- plus how far down you'd scrolled, so a refresh lands exactly where you left off.
+var VIEW_MEM=(function(){ try{ return JSON.parse(localStorage.getItem('agencyos_view')||'{}')||{}; }catch(e){ return {}; } })();
+function viewGet(k){ return VIEW_MEM[k]; }
+function viewSave(k,v){ VIEW_MEM[k]=v; try{ localStorage.setItem('agencyos_view',JSON.stringify(VIEW_MEM)); }catch(e){} }
+var VIEW_RESTORING={};   // page -> true until its first render after a refresh has used the memory
+(function(){
+  var t=null;
+  window.addEventListener('scroll',function(){
+    clearTimeout(t); t=setTimeout(function(){
+      var pg=null; try{ pg=localStorage.getItem('agencyos_page'); }catch(e){}
+      if(pg && !VIEW_SCROLL_HOLD) viewSave('scroll:'+pg, Math.round(window.scrollY||0));
+    },250);
+  },{passive:true});
+})();
+var VIEW_SCROLL_HOLD=false;
+// Put the scroll back once the page's data has drawn. Content arrives async, so try a few
+// times as the page grows, and stop as soon as it lands (or the user scrolls themselves).
+function viewRestoreScroll(page){
+  var y=viewGet('scroll:'+page); if(!y) return;
+  VIEW_SCROLL_HOLD=true; var tries=0;
+  var tick=function(){
+    tries++;
+    if(document.documentElement.scrollHeight-window.innerHeight>=y-4){ window.scrollTo(0,y); VIEW_SCROLL_HOLD=false; return; }
+    if(tries<20) setTimeout(tick,250); else { window.scrollTo(0,y); VIEW_SCROLL_HOLD=false; }
+  };
+  setTimeout(tick,150);
+}
 function navigate(page) {
   const navItem=NAV.find(n=>n.id===page);
   if(navItem?.secret && !pageAllowed(page, STATE.profile)) page = STATE.profile?.role==='model' ? 'model-home' : 'overview';
@@ -3856,7 +3901,7 @@ function navigate(page) {
   const pageDomId = (page === 'traffic-sops' || page === 'model-guides') ? 'sops' : page;
   const el = document.getElementById('page-' + pageDomId); if (el) el.classList.add('active');
   const nav = document.getElementById('nav-' + (['cloud-farm','ig-views','proxy-checker'].indexOf(page) >= 0 ? 'command-center' : page)); if (nav) nav.classList.add('active');
-  try{ localStorage.setItem('agencyos_page', page); }catch(e){}
+  try{ if(localStorage.getItem('agencyos_page')!==page){ viewSave('scroll:'+page,0); } localStorage.setItem('agencyos_page', page); }catch(e){}
   // On mobile, picking a page auto-closes the drawer so the content is visible.
   if(window.innerWidth<=768){ const sb2=document.getElementById('sidebar'); if(sb2 && !sb2.classList.contains('collapsed')) toggleSidebar(); }
   if (page === 'overview') renderOverview();
@@ -3878,7 +3923,7 @@ function navigate(page) {
   if (page === 'content') { checkOrderCompletions(); loadContentScans(); }
   if (page === 'compliance') renderCompliance();
   if (page === 'compliance-hub') { loadContentLibrary().then(renderComplianceHub); loadContentScans(); }
-  if (page === 'reports') switchReportTab(STATE._reportsTab||'history');
+  if (page === 'reports') switchReportTab(STATE._reportsTab||viewGet('reportsTab')||'history');
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
@@ -5199,6 +5244,14 @@ function libRunwayHtml(key){
 function renderLibraryList(){
   var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
   if(!wrap) return;
+  if(VIEW_RESTORING['content-upload']){
+    VIEW_RESTORING['content-upload']=false;
+    var lm=viewGet('lib');
+    if(lm&&lm.model&&!LIB_F.model&&(lm.model==='agency'||(STATE.models||[]).some(function(m){return m.id===lm.model;}))){
+      LIB_F.model=lm.model; LIB_F.vault=LIB_VAULTS[lm.vault]?lm.vault:'model'; LIB_F.category=(lm.category&&(LIB_CATEGORIES[lm.category]||lm.category==='none'))?lm.category:'';
+    }
+  }
+  viewSave('lib',{model:LIB_F.model,vault:LIB_F.vault,category:LIB_F.category});
   var all=STATE.library||[];
 
   // ── Level 1: a card per model ───────────────────────────────────────────
@@ -7118,6 +7171,7 @@ function renderLeaderboard(){
 
 // ── Reports ──────────────────────────────────────────────────
 function switchReportTab(tab) {
+  STATE._reportsTab=tab; viewSave('reportsTab',tab);
   const order=['overview','bulk','upload','chatters','sales','reconcile','history'];
   document.querySelectorAll('#page-reports .tab').forEach((t,i)=>t.classList.toggle('active', order[i]===tab));
   document.getElementById('report-tab-overview').style.display=tab==='overview'?'block':'none';
@@ -9687,7 +9741,7 @@ async function phEdit(id){
 // the queue match (adds future slots / cancels planner-queued posts), and the
 // nightly plan_daily_posts() runs it for every account.
 // ============================================================================
-var CC = { tab: 'schedule', accts: [], live: {}, sched: {}, edits: {}, planEdits: {}, lib: [], views: {}, cfg: {}, days: [], sel: null, day: 0 };
+var CC = { tab: (function(){ try{ var t=JSON.parse(localStorage.getItem('agencyos_view')||'{}').ccTab; return (t==='schedule'||t==='library')?t:'schedule'; }catch(e){ return 'schedule'; } })(), accts: [], live: {}, sched: {}, edits: {}, planEdits: {}, lib: [], views: {}, cfg: {}, days: [], sel: null, day: 0 };
 function ccEtDate(offset) {
   var d = new Date(Date.now() + (offset || 0) * 864e5);
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
@@ -9717,7 +9771,7 @@ function ccGo(tab) {
   if (tab === 'proxies') { navigate('proxy-checker'); return; }
   if (tab === 'phones') { navigate('cloud-farm'); return; }
   if (!document.getElementById('page-command-center').classList.contains('active')) { CC.tab = tab; navigate('command-center'); return; }
-  CC.tab = tab; ccShowTab();
+  CC.tab = tab; viewSave('ccTab',tab); ccShowTab();
 }
 function ccShowTab() {
   document.getElementById('cc-tabbar').innerHTML = ccTabbarHtml(CC.tab);
@@ -12063,7 +12117,13 @@ async function loadModelSheets(){
   const addBtn=document.getElementById('sheets-add-model-btn');
   if(addBtn) addBtn.style.display=['admin','va'].includes(STATE.profile?.role)?'block':'none';
   renderSheetsSidebar();
-  if(!window._currentSheetModelId) renderSheetsLanding();
+  if(!window._currentSheetModelId && VIEW_RESTORING.sheets){
+    VIEW_RESTORING.sheets=false;
+    const lastM=STATE.models.find(m=>m.id===viewGet('sheet'));
+    if(lastM){ await openSheetForModel(lastM); return; }
+  }
+  VIEW_RESTORING.sheets=false;
+  if(!window._currentSheetModelId){ document.getElementById('sheets-shell')?.classList.remove('sheet-open'); renderSheetsLanding(); }
 }
 
 function renderSheetsSidebar(){
@@ -12082,6 +12142,14 @@ function renderSheetsSidebar(){
     item.onclick=()=>{ const m=STATE.models.find(x=>x.id===item.dataset.modelId); if(m) openSheetForModel(m); };
   });
 }
+// Phone: back from a script to the model list. Desktop: hide/show the model list.
+function sheetsToggleList(){
+  const shell=document.getElementById('sheets-shell'); if(!shell) return;
+  if(window.matchMedia('(max-width: 768px)').matches){
+    shell.classList.remove('sheet-open','side-collapsed'); viewSave('sheet',null);
+    document.getElementById('sheets-model-list')?.scrollTo?.(0,0);
+  } else shell.classList.toggle('side-collapsed');
+}
 // Kept as the search box's oninput target name from before the layout change -- just an
 // alias so nothing else needs to know the sidebar was rebuilt.
 function filterSheetsHub(){ renderSheetsSidebar(); }
@@ -12095,12 +12163,15 @@ async function openSheetForModel(model){
   const canEdit=isStaffEdit||isOwnModel;
   window._currentSheetModelId=model.id;
   window._currentSheetId=sheet.id||null;
+  viewSave('sheet',model.id);
+  document.getElementById('sheets-shell')?.classList.add('sheet-open');
   if(role!=='model') renderSheetsSidebar(); // refresh to highlight the newly-selected row
   document.getElementById('sheets-content').innerHTML=`
     <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
     <div style="flex:1 1 420px;min-width:0;max-width:820px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
         <div>
+          ${role!=='model'?`<button class="btn btn-ghost btn-sm sheets-list-btn" style="margin-bottom:8px;" onclick="sheetsToggleList()">☰ Models</button>`:''}
           <div style="font-size:24px;font-weight:800;">${escapeHtml(model.name)}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px;">${escapeHtml(model.of_account||'')} · ${model.mgmt_type==='chatting'?'Chatting':'Full Scale'} · ${100-parseFloat(model.split||20)}% to model / ${model.split||20}% agency</div>
         </div>
@@ -13240,7 +13311,7 @@ function renderFans(){
 }
 
 // ── Chat analyser ────────────────────────────────────────────
-var CA={tab:'runs',run:null,chatters:[],lines:[],rules:[],runs:[],busy:false,funnel:[],files:{msgs:null,sales:null}};
+var CA={tab:(function(){ try{ return JSON.parse(localStorage.getItem('agencyos_view')||'{}').caTab||'runs'; }catch(e){ return 'runs'; } })(),run:null,chatters:[],lines:[],rules:[],runs:[],busy:false,funnel:[],files:{msgs:null,sales:null}};
 function caStrip(h){ return (h==null?'':String(h)).replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&amp;/g,'&').trim(); }
 function caSecs(str){ if(!str) return null; var t=0,m,re=/(\d+)\s*([dhms])/g; while((m=re.exec(str))){ t+=parseInt(m[1])*({d:86400,h:3600,m:60,s:1})[m[2]]; } return t; }
 function caTs(date,time){ var d=new Date(date+' '+(time||'00:00:00')); return isNaN(d)?null:d; }
@@ -13504,7 +13575,7 @@ async function renderChatAnalyser(){
   if(!CA.run && CA.runs.length) await caLoadRun(CA.runs[0].id);
   caRender();
 }
-function caSetTab(t){ CA.tab=t; caRender(); }
+function caSetTab(t){ CA.tab=t; viewSave('caTab',t); caRender(); }
 // ── Attention: what chatters got wrong ───────────────────────────────────────
 // Admin only, and gated in the database as well as here — chatter_flags returns
 // nothing to anyone whose profile role is not admin, so a chatter poking the API
