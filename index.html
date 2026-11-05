@@ -4436,6 +4436,8 @@ async function loadContentLibrary(){
   ]);
 }
 // Sounds only ever show inside the Sounds folder -- never in "All" or a model's file count.
+// Folders that are a to-do list, not a destination.
+function libIsToSort(k){ return k==='inbox'||k==='unsure'; }
 function libSoundOnly(i){ return i.category==='sounds'; }
 var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical';
 // ── Thumbnails on demand ─────────────────────────────────────────────────────
@@ -4504,6 +4506,7 @@ function libThumbSet(id,th){
 var LIB_CATEGORIES={
   // ── 🔐 Model Vault ──
   inbox:   {vault:'model',   label:'New uploads',        short:'New',     icon:'📥', accept:'video/*,image/*', hint:'Reels, TikToks and Snaps straight from the model, not sorted yet. Sort them with 🎯 Focus. Never posted from here.'},
+  unsure:  {vault:'model',   label:'Unsure',             short:'Unsure',  icon:'🤷', accept:'video/*,image/*', hint:'The model wasn\'t sure where these go — sort them with 🎯 Focus', grad:'#f59e0b,#d97706'},
   // OnlyFans-only (ofOnly): never public. Nothing that posts to phones / the Content Factory
   // reads these keys, and they skip the Instagram compliance scanner.
   ppv:     {vault:'model',   label:'PPV videos',         short:'PPV',     icon:'💎', accept:'video/*',         ofOnly:true, hint:'Explicit short or full-length videos we sell in DMs', grad:'#ec4899,#8b5cf6'},
@@ -4533,7 +4536,8 @@ function libMoveOptions(prefix,skip){
 }
 // The six cards a model sees on the Upload page, in order.
 var MU_CARDS={of:['ppv','sexting','teasing','explicit'], mkt:['inbox','photos']};   // model uploads land in New uploads, never straight on the phones
-var MU_MKT={inbox:{label:'New uploads',hint:'Reels, TikToks and Snaps for our socials',grad:'#06b6d4,#3b82f6'},
+var MU_MKT={unsure:{label:'Unsure',hint:'Not sure where it goes? Send it here and we\'ll sort it',grad:'#f59e0b,#d97706'},
+            inbox:{label:'New uploads',hint:'Reels, TikToks and Snaps for our socials',grad:'#06b6d4,#3b82f6'},
             social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
             photos:{label:'Non-nude photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
 function libOfOnly(k){ return !!(LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].ofOnly); }
@@ -5361,7 +5365,7 @@ function renderLibraryList(){
           return '<div style="font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--text2);margin:8px 0 2px;">'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'</div>'
             +libVaultKeys(v).map(function(c){
               var n=mine.filter(function(i){return libInCat(i,c);}).length;
-              var hot=(c==='inbox'&&n);
+              var hot=(libIsToSort(c)&&n);
               return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(hot?'#e6b428':n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+(hot?n+' to sort':n)+'</b></div>';
             }).join('');
         }).join('');
@@ -5402,7 +5406,7 @@ function renderLibraryList(){
     +(LIB_SHOW_SCANNER?'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned here, and retry anything that failed">🔍 Scan / retry failed</button>':'')
     +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'+(['admin','va'].includes(STATE.profile?.role)?'<button class="btn btn-ghost" onclick="vertOpenManager()" title="Content tags and their Factory rules">🏷 Tags</button>':'')+'</div>'
     +'<div class="lv-seg">'+['model','factory'].map(function(v){
-        var n=mine.filter(function(i){return libInVault(i,v)&&!libSoundOnly(i);}).length, todo=v==='model'?mine.filter(function(i){return libInCat(i,'inbox');}).length:0;
+        var n=mine.filter(function(i){return libInVault(i,v)&&!libSoundOnly(i);}).length, todo=v==='model'?mine.filter(function(i){return libIsToSort(i.category);}).length:0;
         return '<button class="lv-'+v+(LIB_F.vault===v?' on':'')+'" onclick="libSetVault(\''+v+'\')">'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+' <span style="opacity:.7;">'+n+'</span>'+(todo?'<span class="lv-dot">'+todo+'</span>':'')+'</button>';
       }).join('')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
@@ -5462,7 +5466,8 @@ function renderLibraryList(){
 }
 function libOpenModel(key){ LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
   // Land on New uploads when the model has sent something that still needs sorting.
-  LIB_F.category=(STATE.library||[]).some(function(i){ return (key==='agency'?!i.model_id:i.model_id===key)&&libInCat(i,'inbox'); })?'inbox':'';
+  var own=(STATE.library||[]).filter(function(i){ return key==='agency'?!i.model_id:i.model_id===key; });
+  LIB_F.category=own.some(function(i){return libInCat(i,'inbox');})?'inbox':own.some(function(i){return libInCat(i,'unsure');})?'unsure':'';
   renderLibraryList(); }
 function libSetVault(v){ LIB_F.vault=v; LIB_F.category=''; LIB_SEL={}; renderLibraryList(); }
 // ── 🎯 Focus mode: sort a folder one file at a time ────────────────────────────
@@ -5499,7 +5504,7 @@ function libFocusKind(it){ return libIsVideo(it)?'video':(/^audio\//.test(it.con
 function libFocusDests(it){
   var kind=libFocusKind(it), out={model:[],factory:[]};
   Object.keys(LIB_CATEGORIES).forEach(function(k){
-    var c=LIB_CATEGORIES[k]; if(k===it.category&&!(LF&&LF.multi&&k!=='inbox')) return;
+    var c=LIB_CATEGORIES[k]; if(k===it.category&&!(LF&&LF.multi&&!libIsToSort(k))) return;
     if((c.accept||'').indexOf(kind+'/*')<0) return;   // only folders that take this kind of file
     out[c.vault].push(k);
   });
@@ -5530,7 +5535,7 @@ function libFocusPaint(){
   var it=libFocusItem(), d=libFocusDests(it), n=0;
   if(LF.multi&&LF.pickFor!==it.id){   // start from where the file already lives
     LF.pickFor=it.id;
-    LF.pick=[it.category].concat(it.categories||[]).filter(function(k,ix,a){ return k&&k!=='inbox'&&LIB_CATEGORIES[k]&&a.indexOf(k)===ix; });
+    LF.pick=[it.category].concat(it.categories||[]).filter(function(k,ix,a){ return k&&!libIsToSort(k)&&LIB_CATEGORIES[k]&&a.indexOf(k)===ix; });
   }
   var btn=function(k){ n++; var c=LIB_CATEGORIES[k], on=LF.multi&&LF.pick.indexOf(k)>=0;
     return '<button class="lf-dest'+(LF.multi?' lf-multi':'')+(on?' on':'')+'" data-key="'+n+'" onclick="'+(LF.multi?'libFocusPick':'libFocusMove')+'(\''+k+'\')">'+(LF.multi?'<i class="lf-tick">'+(on?'✓':'')+'</i>':'')+c.icon+' <span>'+escapeHtml(c.label)+(c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
@@ -6072,6 +6077,8 @@ async function renderModelUpload(){
     +'<div class="mu-grid">'+MU_CARDS.of.map(card).join('')+'</div>'
     +'<div class="mu-sec">📣 For marketing <span class="mu-pill" style="background:rgba(34,197,94,.14);color:#4ade80;">Public · must be safe</span></div>'
     +'<div class="mu-grid">'+MU_CARDS.mkt.map(card).join('')+'</div>'
+    +'<div class="mu-sec">🤷 Not sure?</div>'
+    +'<div class="mu-grid">'+card('unsure')+'</div>'
     +'<div style="font-size:12px;color:var(--text2);margin:0 0 18px;line-height:1.5;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;">📌 Always send the <b>original</b> from your camera roll — anything that went through WhatsApp or Messenger gets compressed and we can\'t use it. You can pick several at once.</div>'
     +(openOrders.length?'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:4px 0 10px;">Your open orders ('+openOrders.length+')</div>'+openOrders.map(orderCard).join(''):'')
     +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px;">Recent uploads</div>'
