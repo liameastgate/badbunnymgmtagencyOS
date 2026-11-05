@@ -381,6 +381,66 @@
   /* Chatting Script sidebar — models stacked top to bottom (SOPs-page pattern), each a
      compact row with a small avatar, rather than the wide description-card style of
      .guide-hub-card. */
+  /* Content Library: vault switch + 🎯 Focus mode */
+  .lv-seg { display:inline-flex; flex-wrap:wrap; gap:4px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:10px; }
+  .lv-seg button { position:relative; border:0; background:none; color:var(--text2); font-weight:800; font-size:13.5px; padding:9px 15px; border-radius:9px; cursor:pointer; }
+  .lv-seg button.lv-model.on { background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; }
+  .lv-seg button.lv-factory.on { background:linear-gradient(135deg,#06b6d4,#3b82f6); color:#fff; }
+  .lv-dot { margin-left:6px; background:#e6b428; color:#111; font-size:10.5px; font-weight:800; border-radius:10px; padding:1px 7px; }
+  .lf-go { margin-left:auto; border:0; border-radius:10px; padding:8px 14px; font-weight:800; font-size:13px; cursor:pointer; background:linear-gradient(135deg,#f59e0b,#e6b428); color:#111; }
+  #lf-overlay { display:none; position:fixed; inset:0; z-index:9000; background:#05050b; overflow:auto; }
+  .lf-in { max-width:1180px; margin:0 auto; padding:16px 16px 90px; position:relative; min-height:100%; }
+  .lf-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .lf-ring { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:relative; flex-shrink:0; }
+  .lf-ring::after { content:''; position:absolute; inset:5px; border-radius:50%; background:#05050b; }
+  .lf-ring span { position:relative; z-index:1; font-size:12px; font-weight:800; }
+  .lf-title { font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lf-sub { font-size:12px; color:var(--text2); }
+  .lf-body { display:grid; grid-template-columns:1fr minmax(240px,340px) 1fr; gap:16px; align-items:start; }
+  .lf-col { border-radius:14px; padding:10px; border:1px solid var(--border); }
+  .lf-col.lf-model { background:rgba(236,72,153,.06); border-color:rgba(236,72,153,.3); }
+  .lf-col.lf-factory { background:rgba(6,182,212,.06); border-color:rgba(6,182,212,.3); }
+  .lf-lab { font-size:10.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; margin:2px 2px 9px; }
+  .lf-model .lf-lab { color:#f472b6; } .lf-factory .lf-lab { color:#22d3ee; }
+  .lf-dest { width:100%; text-align:left; border:1px solid var(--border); background:var(--surface); color:#fff; border-radius:11px; padding:13px 12px; cursor:pointer; font-size:15px; font-weight:700; display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  .lf-dest:hover { border-color:var(--accent2); background:rgba(30,79,255,.12); }
+  .lf-dest span { flex:1; } .lf-dest small { display:block; font-size:11px; font-weight:500; color:var(--text2); margin-top:1px; }
+  .lf-dest kbd, .lf-foot kbd { font-family:inherit; font-size:11px; color:var(--text2); border:1px solid var(--border); border-radius:5px; padding:1px 6px; }
+  .lf-prev { aspect-ratio:9/16; max-height:62vh; width:100%; border-radius:14px; background:#000; overflow:hidden; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto; }
+  .lf-prev video, .lf-prev img { width:100%; height:100%; object-fit:contain; display:block; }
+  .lf-prev img[style*="blur"] { position:absolute; inset:0; object-fit:cover; }
+  .lf-load { position:relative; color:var(--text2); font-size:13px; padding:12px; text-align:center; }
+  .lf-meta { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.5; word-break:break-word; } .lf-meta b { color:#fff; font-size:13px; }
+  .lf-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+  .lf-held { margin-top:8px; font-size:12px; color:var(--red); background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.3); border-radius:9px; padding:7px 9px; line-height:1.45; }
+  .lf-foot { position:fixed; left:0; right:0; bottom:0; background:rgba(5,5,11,.96); border-top:1px solid var(--border); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; z-index:2; }
+  .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
+  .lf-foot button:disabled { opacity:.4; cursor:default; }
+  .lf-foot .lf-bin { color:#f87171; }
+  .lf-toast { display:none; position:fixed; left:50%; bottom:76px; transform:translateX(-50%); background:#111827; border:1px solid #4ade80; color:#fff; border-radius:10px; padding:9px 14px; font-size:13px; z-index:3; white-space:nowrap; }
+  .lf-toast a { color:var(--accent2); margin-left:10px; cursor:pointer; font-weight:700; }
+  .lf-done { text-align:center; padding:60px 10px; }
+  @media (max-width: 860px) {
+    .lf-body { grid-template-columns:1fr 1fr; }
+    .lf-mid { grid-column:1 / -1; order:-1; }
+    .lf-prev { max-height:46vh; width:auto; }
+    .lf-dest { padding:12px 10px; font-size:14px; } .lf-dest kbd { display:none; }
+    .lf-foot kbd { display:none; }
+  }
+  @media (max-width: 600px) {
+    .lf-in { padding:10px 10px 80px; }
+    .lf-head { margin-bottom:8px; } .lf-ring { width:44px; height:44px; } .lf-sub { display:none; } .lf-title { font-size:15px; }
+    .lf-body { grid-template-columns:1fr; gap:10px; }
+    .lf-prev { max-height:36vh; }
+    .lf-meta { margin-top:5px; } .lf-m2 { display:none; }
+    .lf-held { padding:6px 8px; font-size:11.5px; }
+    .lf-col { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:8px; }
+    .lf-lab { grid-column:1 / -1; margin:0 2px 2px; }
+    .lf-dest { margin:0; padding:11px 9px; font-size:13.5px; gap:7px; } .lf-dest small { display:none; }
+    .lf-foot { gap:6px; flex-wrap:nowrap; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+    .lf-foot button { padding:10px 10px; font-size:13px; flex:1; white-space:nowrap; }
+    .lf-toast { bottom:68px; }
+  }
   .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
   .sheet-side-item:hover { background: var(--surface2); }
   .sheet-side-item.active { background: rgba(30,79,255,0.14); border-color: rgba(30,79,255,0.4); }
@@ -941,18 +1001,20 @@
         <div class="modal-title"><span>Upload content</span><button class="modal-close" onclick="closeModal('cl-upload-modal')">✕</button></div>
         <div class="form-group"><label>Model</label><select id="cl-up-model"></select></div>
         <div class="form-group"><label>Category</label><select id="cl-up-cat">
-          <option value="inbox">📥 New uploads (unedited — trim first)</option>
-          <option value="raw">🎞️ Raw reels (trimmed — Factory adds caption + audio)</option>
-          <option value="social">✅ Ready to post (finished — phones post these)</option>
-          <option value="reddit_x">🔞 Reddit / X</option>
+          <optgroup label="🔐 Model Vault">
+          <option value="inbox">📥 New uploads (not sorted yet)</option>
           <option value="photos">📸 Non-nude photos</option>
-          <option value="stories">📖 Story CTA bank</option>
-          <option value="sounds">🎵 Sounds</option>
           <option value="ppv">💎 PPV videos · OF only</option>
           <option value="sexting">💬 Sexting set · OF only</option>
           <option value="explicit">🔥 Explicit photos · OF only</option>
           <option value="teasing">🖤 Teasing photos · OF feed / Twitter</option>
-          <option value="nsfw">⛔ NSFW · OnlyFans only</option>
+          </optgroup>
+          <optgroup label="🏭 Content Factory Vault">
+          <option value="raw">🎞️ Raw reels (trimmed — Factory adds caption + audio)</option>
+          <option value="social">✅ Ready to post (finished — phones post these)</option>
+          <option value="stories">📖 Story CTA bank</option>
+          <option value="sounds">🎵 Sounds</option>
+          </optgroup>
         </select></div>
         <div class="form-group"><label>Tag <span style="font-weight:400;color:var(--text2);">(optional — decides the Factory's audio + captions; tag Sounds to make a tag's own sound pool)</span></label><select id="cl-up-vert"><option value="">No tag</option></select></div>
         <div id="cl-up-alert" style="font-size:12px;color:#e6b428;min-height:16px;"></div>
@@ -4311,33 +4373,42 @@ async function loadContentLibrary(){
     STATE.postings=r.data||[];
   }
 }
+// 6 Nov: two vaults. 🔐 Model Vault = what the model sends us (exactly the six cards on her
+// Upload page, same names). 🏭 Content Factory Vault = what we make and the phones post.
+// NSFW and Reddit / X were retired (NSFW files moved to PPV videos).
 var LIB_CATEGORIES={
-  // Pipeline: New uploads (unedited, never posted) -> Raw reels (trimmed, Factory adds caption + audio)
-  // -> Ready to post (finished; the phones post from here).
-  inbox:   {label:'New uploads',        short:'New',     icon:'📥', accept:'video/*,image/*', hint:'Straight from the models (app or Drive), unedited. Download, trim, then Move to → Raw reels or Ready to post. Never posted from here.'},
-  social:  {label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only, captioned or not — the phones post from here'},
-  reddit_x:{label:'Reddit / X',         short:'Reddit/X', icon:'🔞', accept:'video/*,image/*', hint:'The spicier stuff for Reddit and X'},
-  photos:  {label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
-  stories: {label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
-  // 24 Oct: the Repurpose bank was merged into Ready to post (same thing for the phones).
-  raw:     {label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Filmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
-  sounds:  {label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'},
-  // ── OnlyFans-only (ofOnly) ── never public. Nothing that posts to phones / the Content
-  // Factory reads these keys, and they skip the Instagram compliance scanner (it would only
-  // burn scan credits on content that is never going near Instagram).
-  ppv:     {label:'PPV videos',         short:'PPV',     icon:'💎', accept:'video/*',         ofOnly:true, hint:'Explicit short or full-length videos we sell in DMs', grad:'#ec4899,#8b5cf6'},
-  sexting: {label:'Sexting sets',       short:'Sexting', icon:'💬', accept:'video/*,image/*', ofOnly:true, hint:'A set of clips that build up — tap them in order', grad:'#f43f5e,#f97316'},
-  explicit:{label:'Explicit photos',    short:'Explicit',icon:'🔥', accept:'image/*',         ofOnly:true, hint:'Photos sold in DMs on OF', grad:'#e11d48,#be185d'},
-  teasing: {label:'Teasing photos',     short:'Teasing', icon:'🖤', accept:'image/*',         ofOnly:true, hint:'OF feed + Twitter. Underwear / lingerie is fine', grad:'#a855f7,#6366f1'},
-  // Too explicit for any promo platform -- OnlyFans only. Where something goes when it
-  // slips through into a social category and can't actually be posted there.
-  nsfw:    {label:'NSFW · OF only',     short:'NSFW',    icon:'⛔', accept:'video/*,image/*', ofOnly:true, hint:'Too explicit to promote anywhere — paid page only'}
+  // ── 🔐 Model Vault ──
+  inbox:   {vault:'model',   label:'New uploads',        short:'New',     icon:'📥', accept:'video/*,image/*', hint:'Reels, TikToks and Snaps straight from the model, not sorted yet. Sort them with 🎯 Focus. Never posted from here.'},
+  photos:  {vault:'model',   label:'Non-nude photos',    short:'Photos',  icon:'📸', accept:'image/*',         hint:'Clean photos for profiles, carousels, ads'},
+  // OnlyFans-only (ofOnly): never public. Nothing that posts to phones / the Content Factory
+  // reads these keys, and they skip the Instagram compliance scanner.
+  ppv:     {vault:'model',   label:'PPV videos',         short:'PPV',     icon:'💎', accept:'video/*',         ofOnly:true, hint:'Explicit short or full-length videos we sell in DMs', grad:'#ec4899,#8b5cf6'},
+  sexting: {vault:'model',   label:'Sexting sets',       short:'Sexting', icon:'💬', accept:'video/*,image/*', ofOnly:true, hint:'A set of clips that build up — tap them in order', grad:'#f43f5e,#f97316'},
+  explicit:{vault:'model',   label:'Explicit photos',    short:'Explicit',icon:'🔥', accept:'image/*',         ofOnly:true, hint:'Photos sold in DMs on OF', grad:'#e11d48,#be185d'},
+  teasing: {vault:'model',   label:'Teasing photos',     short:'Teasing', icon:'🖤', accept:'image/*',         ofOnly:true, hint:'OF feed + Twitter. Underwear / lingerie is fine', grad:'#a855f7,#6366f1'},
+  // ── 🏭 Content Factory Vault ── pipeline: Raw reels -> Ready to post (the phones post from here)
+  raw:     {vault:'factory', label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Trimmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
+  social:  {vault:'factory', label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only, captioned or not — the phones post from here'},
+  stories: {vault:'factory', label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
+  sounds:  {vault:'factory', label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'}
 };
+var LIB_VAULTS={
+  model:  {label:'Model Vault',           icon:'🔐', hint:'What the model sends. Never posted to phones.', grad:'#ec4899,#8b5cf6'},
+  factory:{label:'Content Factory Vault', icon:'🏭', hint:'What we make and post. Models never see this.',   grad:'#06b6d4,#3b82f6'}
+};
+function libVaultKeys(v){ return Object.keys(LIB_CATEGORIES).filter(function(k){ return LIB_CATEGORIES[k].vault===v; }); }
+function libInVault(i,v){ if(LIB_CATEGORIES[i.category]&&LIB_CATEGORIES[i.category].vault===v) return true; return (i.categories||[]).some(function(k){ return LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].vault===v; }); }
+// "Move to" options grouped by vault, for the card menu and the bulk bar.
+function libMoveOptions(prefix,skip){
+  return ['model','factory'].map(function(v){
+    return '<optgroup label="'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'">'+libVaultKeys(v).filter(function(k){return k!==skip;}).map(function(k){ return '<option value="'+prefix+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; }).join('')+'</optgroup>';
+  }).join('');
+}
 // The six cards a model sees on the Upload page, in order.
 var MU_CARDS={of:['ppv','sexting','explicit','teasing'], mkt:['inbox','photos']};   // model uploads land in New uploads, never straight on the phones
-var MU_MKT={inbox:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
+var MU_MKT={inbox:{label:'New uploads',hint:'Reels, TikToks and Snaps for our socials',grad:'#06b6d4,#3b82f6'},
             social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
-            photos:{label:'Non-explicit photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
+            photos:{label:'Non-nude photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
 function libOfOnly(k){ return !!(LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].ofOnly); }
 var LIB_STATES={
   fresh:   {label:'Fresh',    icon:'🟢', style:'background:rgba(46,196,120,.16);color:#4ade80;',  help:'Never posted. Can go on ONE phone account.'},
@@ -4876,7 +4947,7 @@ function editLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const title=prompt('Title:',it.title||''); if(title===null) return;
   const tags=prompt('Tags (comma separated — e.g. bedroom, tease, gym):',it.tags||''); if(tags===null) return;
-  const cat=prompt('Category — inbox (New uploads) / raw / social (Ready to post) / repurpose / photos / reddit_x (blank = none):',it.category||''); if(cat===null) return;
+  const cat=prompt('Category — '+Object.keys(LIB_CATEGORIES).map(function(k){return k+' ('+LIB_CATEGORIES[k].label+')';}).join(' / ')+' (blank = none):',it.category||''); if(cat===null) return;
   const category=LIB_CATEGORIES[(cat||'').trim()]?(cat||'').trim():null;
   sb.from('content_library').update({title:title,tags:tags,category:category}).eq('id',id).select().then(function(r){
     if(r.error||!r.data||!r.data.length){ alert('Could not save.'); return; }
@@ -4949,13 +5020,6 @@ async function libReview(id,category){
   if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
   Object.assign(it,patch); renderLibraryList();
 }
-// "This slipped through" -- one tap to reclassify something that can't be promoted.
-async function libMarkNsfw(id){
-  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  var r=await sb.from('content_library').update({category:'nsfw'}).eq('id',id).select();
-  if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
-  it.category='nsfw'; renderLibraryList();
-}
 async function libSetState(id,state){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
   const msg={retired:'Retire this item? It will be hidden from the pools and can\'t be posted.',fresh:'Put this back in the Fresh pool? Only do this if it was never actually posted.',reusable:'Force this to Reusable without moving its account to cloud?'}[state];
@@ -5010,7 +5074,7 @@ function libPools(items){
 // inside their content. Every file carries model + category + lifecycle state, so the
 // "folders" are just saved filters -- nothing is physically filed anywhere, and a file
 // can be re-filed without moving bytes.
-var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders',factory:false,vertical:''};
+var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders',factory:false,vertical:'',vault:'model'};
 // What the Meta scanner said, as a filter you can act on. The verdict lives in
 // content_scans, so this is a view over existing data -- nothing is copied or moved.
 var LIB_OUTCOMES={
@@ -5064,7 +5128,8 @@ function libSetSort(a,b){
 function libFiltered(){
   var items=(STATE.library||[]);
   if(LIB_F.model) items=items.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
-  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? !i.category : libInCat(i,LIB_F.category); });
+  if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? (!i.category||!LIB_CATEGORIES[i.category]) : libInCat(i,LIB_F.category); });
+  else if(LIB_F.model&&LIB_F.vault) items=items.filter(function(i){ return libInVault(i,LIB_F.vault); });
   if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
   if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
   if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
@@ -5146,9 +5211,13 @@ function renderLibraryList(){
         var mine=all.filter(function(i){ return key==='agency' ? !i.model_id : i.model_id===key; });
         var fresh=mine.filter(function(i){return (i.state||'fresh')==='fresh';}).length;
         var bytes=mine.reduce(function(s,i){return s+(i.size_bytes||0);},0);
-        var cats=Object.keys(LIB_CATEGORIES).map(function(c){
-          var n=mine.filter(function(i){return libInCat(i,c);}).length;
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+n+'</b></div>';
+        var cats=['model','factory'].map(function(v){
+          return '<div style="font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--text2);margin:8px 0 2px;">'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'</div>'
+            +libVaultKeys(v).map(function(c){
+              var n=mine.filter(function(i){return libInCat(i,c);}).length;
+              var hot=(c==='inbox'&&n);
+              return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(hot?'#e6b428':n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+(hot?n+' to sort':n)+'</b></div>';
+            }).join('');
         }).join('');
         var unfiled=mine.filter(function(i){return !i.category;}).length;
         var vids=mine.filter(libIsVideo);
@@ -5175,7 +5244,7 @@ function renderLibraryList(){
   // ── Level 2: inside one model ───────────────────────────────────────────
   var mine=all.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
   var catTab=function(val,label,icon){
-    var n=(val==='none'?mine.filter(function(i){return !i.category;}):val?mine.filter(function(i){return libInCat(i,val);}):mine).length;
+    var n=(val==='none'?mine.filter(function(i){return !i.category||!LIB_CATEGORIES[i.category];}):val?mine.filter(function(i){return libInCat(i,val);}):mine.filter(function(i){return libInVault(i,LIB_F.vault);})).length;
     var on=LIB_F.category===val;
     return '<button onclick="LIB_F.category=\''+val+'\';renderLibraryList()" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;">'+(icon?icon+' ':'')+label+' <span style="opacity:.7;">'+n+'</span></button>';
   };
@@ -5186,9 +5255,14 @@ function renderLibraryList(){
     +'<button class="btn btn-primary" onclick="libOpenUpload()">📤 Upload</button>'
     +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned here, and retry anything that failed">🔍 Scan / retry failed</button>'
     +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'+(['admin','va'].includes(STATE.profile?.role)?'<button class="btn btn-ghost" onclick="vertOpenManager()" title="Content tags and their Factory rules">🏷 Tags</button>':'')+'</div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
-    +catTab('','All')+Object.keys(LIB_CATEGORIES).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
-    +(mine.some(function(i){return !i.category;})?catTab('none','Uncategorised','⚠'):'')+'</div>'
+    +'<div class="lv-seg">'+['model','factory'].map(function(v){
+        var n=mine.filter(function(i){return libInVault(i,v);}).length, todo=v==='model'?mine.filter(function(i){return libInCat(i,'inbox');}).length:0;
+        return '<button class="lv-'+v+(LIB_F.vault===v?' on':'')+'" onclick="libSetVault(\''+v+'\')">'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+' <span style="opacity:.7;">'+n+'</span>'+(todo?'<span class="lv-dot">'+todo+'</span>':'')+'</button>';
+      }).join('')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
+    +catTab('','All','')+libVaultKeys(LIB_F.vault).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
+    +(mine.some(function(i){return !i.category||!LIB_CATEGORIES[i.category];})?catTab('none','Uncategorised','⚠'):'')
+    +'<button class="lf-go" onclick="libFocusOpen()" title="Go through this folder one file at a time">🎯 Focus'+(function(){ var n=libFiltered().length; return n?' · '+n:''; })()+'</button></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
     +'<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-right:2px;">Scan result</span>'
     +(function(){
@@ -5227,7 +5301,7 @@ function renderLibraryList(){
   var bar=libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
     +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
-    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+Object.keys(LIB_CATEGORIES).map(function(k){ return '<option value="'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; }).join('')+'</select>'
+    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+libMoveOptions('','')+'</select>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
     +((STATE.verticals||[]).length?'<select class="btn btn-sm btn-ghost" style="cursor:pointer;" onchange="libBulkTag(this)"><option value="">🏷 Tag as…</option>'+vertList('').map(function(v){return '<option value="'+v.key+'">'+escapeHtml(v.label)+'</option>';}).join('')+'<option value="__none">✕ Remove tag</option></select>':'')
     +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
@@ -5240,7 +5314,165 @@ function renderLibraryList(){
     ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>'
     : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
 }
-function libOpenModel(key){ LIB_F.model=key; LIB_F.category=''; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+function libOpenModel(key){ LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
+  // Land on New uploads when the model has sent something that still needs sorting.
+  LIB_F.category=(STATE.library||[]).some(function(i){ return (key==='agency'?!i.model_id:i.model_id===key)&&libInCat(i,'inbox'); })?'inbox':'';
+  renderLibraryList(); }
+function libSetVault(v){ LIB_F.vault=v; LIB_F.category=''; LIB_SEL={}; renderLibraryList(); }
+// ── 🎯 Focus mode: sort a folder one file at a time ────────────────────────────
+// Full screen, nothing else on it. Big preview in the middle, 🔐 Model Vault folders on
+// the left, 🏭 Content Factory folders on the right — only the folders that take this kind
+// of file. Tap (or press the number) and it moves on to the next one. Every step can be
+// undone, binning included: the row is only deleted from the database, and the stored
+// file is only removed once Focus is closed, so Undo can put the row straight back.
+var LF=null;
+function libFocusTitle(){
+  var f=LIB_F.category&&LIB_CATEGORIES[LIB_F.category]?LIB_CATEGORIES[LIB_F.category].label:(LIB_F.category==='none'?'Uncategorised':LIB_VAULTS[LIB_F.vault].label);
+  return libOwnerName(LIB_F.model)+' · '+f;
+}
+function libFocusOpen(){
+  var items=libFiltered();
+  if(!items.length){ alert('Nothing in this folder to go through.'); return; }
+  LF={queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle()};
+  var ov=document.getElementById('lf-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='lf-overlay'; document.body.appendChild(ov); }
+  ov.style.display='block'; document.body.style.overflow='hidden';
+  document.addEventListener('keydown',libFocusKey);
+  libFocusPaint();
+}
+function libFocusClose(){
+  var ov=document.getElementById('lf-overlay'); if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+  document.body.style.overflow='';
+  document.removeEventListener('keydown',libFocusKey);
+  if(LF){ LF.binned.forEach(function(row){ if((row.storage_bucket||'r2')==='r2') r2SignedUrl(row.r2_key,'DELETE').then(function(u){ fetch(u,{method:'DELETE'}); }).catch(function(){}); }); }
+  LF=null; renderLibraryList();
+}
+function libFocusItem(){ if(!LF) return null; var id=LF.queue[LF.i]; return (STATE.library||[]).find(function(x){return x.id===id;})||null; }
+function libFocusKind(it){ return libIsVideo(it)?'video':(/^audio\//.test(it.content_type||'')||/\.(mp3|m4a|wav|aac|ogg)$/i.test(it.r2_key||''))?'audio':'image'; }
+function libFocusDests(it){
+  var kind=libFocusKind(it), out={model:[],factory:[]};
+  Object.keys(LIB_CATEGORIES).forEach(function(k){
+    var c=LIB_CATEGORIES[k]; if(k===it.category) return;
+    if((c.accept||'').indexOf(kind+'/*')<0) return;   // only folders that take this kind of file
+    out[c.vault].push(k);
+  });
+  return out;
+}
+function libFocusUrl(it){
+  if(!LF.urls[it.id]) LF.urls[it.id]=libItemUrl(it).then(async function(u){
+    if(!libIsVideo(it)&&libIsHeic(it)){ var jpg=await libHeicToJpeg(await (await fetch(u)).blob(),0.88,1600); return URL.createObjectURL(jpg); }
+    return u;
+  });
+  return LF.urls[it.id];
+}
+function libFocusPaint(){
+  var ov=document.getElementById('lf-overlay'); if(!ov||!LF) return;
+  // Skip anything that vanished (deleted elsewhere) so the queue never stalls.
+  while(LF.i<LF.queue.length&&!libFocusItem()) LF.i++;
+  var total=LF.queue.length, pos=Math.min(LF.i,total), pct=total?pos/total*100:100;
+  var head='<div class="lf-head"><div class="lf-ring" style="background:conic-gradient(#4ade80 '+(pct*3.6)+'deg,var(--surface2) 0deg);"><span>'+pos+'/'+total+'</span></div>'
+    +'<div style="flex:1;min-width:0;"><div class="lf-title">'+escapeHtml(LF.title)+'</div><div class="lf-sub">Tap a folder (or press its number). Undo is always there.</div></div>'
+    +'<button class="btn btn-ghost" onclick="libFocusClose()">✕ Done</button></div>';
+  if(LF.i>=total){
+    ov.innerHTML='<div class="lf-in">'+head+'<div class="lf-done"><div style="font-size:54px;">🎉</div><div style="font-size:20px;font-weight:800;margin-top:6px;">All '+total+' done</div>'
+      +'<div style="color:var(--text2);font-size:13px;margin-top:6px;">Nothing left in this folder to go through.</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap;">'+(LF.hist.length?'<button class="btn btn-ghost" onclick="libFocusUndo()">↶ Undo last</button>':'')+'<button class="btn btn-primary" onclick="libFocusClose()">Back to the Library</button></div></div></div>';
+    return;
+  }
+  var it=libFocusItem(), d=libFocusDests(it), n=0;
+  var btn=function(k){ n++; var c=LIB_CATEGORIES[k];
+    return '<button class="lf-dest" data-key="'+n+'" onclick="libFocusMove(\''+k+'\')">'+c.icon+' <span>'+escapeHtml(c.label)+(c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
+  var col=function(v){ return d[v].length?'<div class="lf-col lf-'+v+'"><div class="lf-lab">'+LIB_VAULTS[v].icon+' '+(v==='model'?'Keep · ':'Post · ')+LIB_VAULTS[v].label+'</div>'+d[v].map(btn).join('')+'</div>':'<div></div>'; };
+  var left=col('model'), right=col('factory');
+  var cur=LIB_CATEGORIES[it.category];
+  var dims=(it.width&&it.height)?it.width+'×'+it.height:'';
+  var meta=[libFocusKind(it)==='video'?'Video':libFocusKind(it)==='audio'?'Audio':'Photo',libFmtDur(it.duration_sec),dims,libFmtSize(it.size_bytes),fmtDate(it.created_at)].filter(Boolean).join(' · ');
+  var held=it.state==='needs_review'?'<div class="lf-held">🛑 Scanner flag: Instagram might remove this. Have a look — wherever you file it counts as reviewed.</div>':'';
+  ov.innerHTML='<div class="lf-in">'+head
+    +'<div class="lf-body">'+left
+    +'<div class="lf-mid"><div class="lf-prev" id="lf-prev">'+(it.thumb_data?'<img src="'+it.thumb_data+'" style="filter:blur(6px);opacity:.5;">':'')+'<div class="lf-load">Loading…</div></div>'
+    +'<div class="lf-meta"><b>'+escapeHtml(it.title||'Untitled')+'</b><span class="lf-m2"><br>'+escapeHtml(meta)+'</span></div>'
+    +'<div class="lf-chips">'+(cur?'<span class="cscan cscan-grey">Now in '+cur.icon+' '+escapeHtml(cur.label)+'</span>':'<span class="cscan cscan-red">⚠ Uncategorised</span>')+libStateChip(it)+(libIsVideo(it)?libCompliancePill(it):'')+'</div>'+held+'</div>'
+    +right+'</div>'
+    +'<div class="lf-foot"><button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
+    +'<button onclick="downloadLibraryItem(\''+it.id+'\')">⬇ Download</button><button class="lf-bin" onclick="libFocusBin()">🗑 Bin</button></div>'
+    +'<div class="lf-toast" id="lf-toast"></div></div>';
+  var tok=++LF.token;
+  libFocusUrl(it).then(function(u){
+    if(!LF||tok!==LF.token) return;
+    var box=document.getElementById('lf-prev'); if(!box) return;
+    var k=libFocusKind(it);
+    box.innerHTML=k==='video'?'<video src="'+u+'" autoplay muted loop playsinline controls></video>':k==='audio'?'<audio src="'+u+'" controls autoplay style="width:90%;"></audio>':'<img src="'+u+'">';
+  }).catch(function(e){ var box=document.getElementById('lf-prev'); if(box&&LF&&tok===LF.token) box.innerHTML='<div class="lf-load" style="color:var(--red);">Could not load the preview — '+escapeHtml(e.message||'')+'</div>'; });
+  var nx=LF.queue[LF.i+1]&&(STATE.library||[]).find(function(x){return x.id===LF.queue[LF.i+1];}); if(nx) libFocusUrl(nx).catch(function(){});   // warm the next one
+}
+function libFocusToast(html){
+  var t=document.getElementById('lf-toast'); if(!t) return;
+  t.innerHTML=html; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; },2600);
+}
+var LF_BUSY=false;
+async function libFocusMove(cat){
+  if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it||!LIB_CATEGORIES[cat]) return;
+  if(libOfOnly(it.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
+  LF_BUSY=true;
+  var prev={category:it.category, state:it.state, state_changed_at:it.state_changed_at};
+  // Filing a file by hand IS the review: a scanner hold (needs_review) never blocks sorting,
+  // and moving it releases it back to Fresh (same as Move to… on the card). Undo restores it.
+  var patch={category:cat};
+  if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
+  var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
+  LF_BUSY=false;
+  if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not move — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
+  Object.assign(it,r.data[0]);
+  LF.hist.push({type:'move',id:it.id,prev:prev,label:LIB_CATEGORIES[cat].label});
+  LF.i++; libFocusPaint();
+  libFocusToast('✓ Moved to '+LIB_CATEGORIES[cat].icon+' '+escapeHtml(LIB_CATEGORIES[cat].label)+' <a onclick="libFocusUndo()">Undo</a>');
+}
+function libFocusSkip(){ if(!LF||LF.i>=LF.queue.length) return; LF.hist.push({type:'skip'}); LF.i++; libFocusPaint(); }
+async function libFocusBin(){
+  if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it) return;
+  LF_BUSY=true;
+  var row=Object.assign({},it);
+  var r=await sb.from('content_library').delete().eq('id',it.id).select();
+  LF_BUSY=false;
+  if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not bin — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
+  STATE.library=(STATE.library||[]).filter(function(x){return x.id!==it.id;});
+  LF.binned.push(row); LF.hist.push({type:'bin',row:row});
+  // keep the queue position stable: the binned id stays in the queue, paint() skips it
+  LF.i++; libFocusPaint();
+  libFocusToast('🗑 Binned <a onclick="libFocusUndo()">Undo</a>');
+}
+async function libFocusUndo(){
+  if(LF_BUSY||!LF||!LF.hist.length) return;
+  var h=LF.hist.pop(); LF_BUSY=true;
+  try{
+    if(h.type==='move'){
+      var r=await sb.from('content_library').update(h.prev).eq('id',h.id).select();
+      if(r.error||!r.data||!r.data.length) throw new Error(r.error?r.error.message:'no permission');
+      var it=(STATE.library||[]).find(function(x){return x.id===h.id;}); if(it) Object.assign(it,r.data[0]);
+    } else if(h.type==='bin'){
+      var r2=await sb.from('content_library').insert(h.row).select();
+      if(r2.error||!r2.data||!r2.data.length) throw new Error(r2.error?r2.error.message:'no permission');
+      STATE.library=(STATE.library||[]).concat([r2.data[0]]);
+      LF.binned=LF.binned.filter(function(b){return b.id!==h.row.id;});
+    }
+  }catch(e){ LF_BUSY=false; LF.hist.push(h); libFocusToast('⚠ Could not undo — '+escapeHtml(e.message||'')); return; }
+  LF_BUSY=false;
+  // step back to the file that was just undone
+  var target=h.type==='bin'?h.row.id:h.id;
+  LF.i=Math.max(0,LF.i-1);
+  if(target&&LF.queue[LF.i]!==target){ var at=LF.queue.lastIndexOf(target,LF.i); if(at>=0) LF.i=at; }
+  libFocusPaint(); libFocusToast('↶ Undone');
+}
+function libFocusKey(e){
+  if(!LF) return;
+  if(e.target&&/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(e.key==='Escape'){ e.preventDefault(); return libFocusClose(); }
+  if(e.key==='ArrowRight'){ e.preventDefault(); return libFocusSkip(); }
+  if(e.key==='z'||e.key==='Z'||e.key==='Backspace'){ e.preventDefault(); return libFocusUndo(); }
+  if(/^[1-9]$/.test(e.key)){ var b=document.querySelector('#lf-overlay .lf-dest[data-key="'+e.key+'"]'); if(b){ e.preventDefault(); b.click(); } }
+}
+
 function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
 
 function libPhoneUseFor(i){
@@ -5264,10 +5496,8 @@ function libCardHtml(i){
   var st=i.state||'fresh';
   var reviewBtns = (st==='needs_review')
     ? '<button class="btn btn-sm btn-green" title="Looks fine — put it back in the Fresh pool" onclick="libSetState(\''+i.id+'\',\'fresh\')">✓ Clear</button>'
-      +'<button class="btn btn-sm btn-ghost" title="Can\'t be promoted on IG — move to Reddit/X and release it" onclick="libReview(\''+i.id+'\',\'reddit_x\')">🔞</button>'
+      +'<button class="btn btn-sm btn-ghost" title="Can\'t be promoted on IG — move to Teasing photos (OF only) and release it" onclick="libReview(\''+i.id+'\',\'teasing\')">🖤</button>'
     : '';
-  var nsfwBtn = i.category==='nsfw' ? '' :
-    '<button class="btn btn-sm btn-ghost" title="Too explicit to promote — move to NSFW (OnlyFans only)" onclick="libMarkNsfw(\''+i.id+'\')">🔥</button>';
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
     +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
@@ -5292,9 +5522,7 @@ function libCardActionOptions(i){
   if(st!=='retired') h+='<option value="post">📌 Record posting</option>';
   h+='<option value="phone">📲 Save to Photos</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
   if((STATE.verticals||[]).length) h+='<option value="tag">🏷 Tag…</option>';
-  h+='</optgroup><optgroup label="Move to →">';
-  Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k!==i.category) h+='<option value="cat:'+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
-  h+='</optgroup><optgroup label="Also in → (tick / untick)">';
+  h+='</optgroup>'+libMoveOptions('cat:',i.category).replace(/<optgroup label="/g,'<optgroup label="Move to → ')+'<optgroup label="Also in → (tick / untick)">';
   var extra=i.categories||[];
   Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k===i.category||k==='nsfw') return; var on=extra.indexOf(k)>=0; h+='<option value="also:'+k+'">'+(on?'☑':'☐')+' '+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
   h+='</optgroup><optgroup label="State">';
@@ -5327,7 +5555,6 @@ async function libCardAction(id,sel){
   }
   if(v.indexOf('cat:')===0){
     var cat=v.slice(4);
-    if(cat==='nsfw') return libMarkNsfw(id);
     var cur0=(STATE.library||[]).find(function(x){return x.id===id;});
     if(cur0&&libOfOnly(cur0.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var cur=(STATE.library||[]).find(function(x){return x.id===id;});
