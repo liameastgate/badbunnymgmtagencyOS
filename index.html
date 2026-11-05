@@ -1014,7 +1014,7 @@
           <option value="ppv">💎 PPV videos · OF only</option>
           <option value="sexting">💬 Sexting set · OF only</option>
           <option value="explicit">🔥 Explicit photos · OF only</option>
-          <option value="teasing">🖤 Teasing photos · OF feed / Twitter</option>
+          <option value="teasing">🧱 OF wall · photos + videos for the OF feed</option>
           </optgroup>
           <optgroup label="🏭 Content Factory Vault">
           <option value="raw">🎞️ Raw reels (trimmed — Factory adds caption + audio)</option>
@@ -4391,8 +4391,9 @@ var LIB_CATEGORIES={
   // reads these keys, and they skip the Instagram compliance scanner.
   ppv:     {vault:'model',   label:'PPV videos',         short:'PPV',     icon:'💎', accept:'video/*',         ofOnly:true, hint:'Explicit short or full-length videos we sell in DMs', grad:'#ec4899,#8b5cf6'},
   sexting: {vault:'model',   label:'Sexting sets',       short:'Sexting', icon:'💬', accept:'video/*,image/*', ofOnly:true, hint:'A set of clips that build up — tap them in order', grad:'#f43f5e,#f97316'},
+  // Nov: Teasing photos became OF wall (key stays 'teasing' so existing files and DB checks are untouched).
+  teasing: {vault:'model',   label:'OF wall',            short:'Wall',    icon:'🧱', accept:'video/*,image/*', ofOnly:true, hint:'Photos and videos for the OnlyFans feed. Underwear / lingerie / teasing is fine', grad:'#a855f7,#6366f1'},
   explicit:{vault:'model',   label:'Explicit photos',    short:'Explicit',icon:'🔥', accept:'image/*',         ofOnly:true, hint:'Photos sold in DMs on OF', grad:'#e11d48,#be185d'},
-  teasing: {vault:'model',   label:'Teasing photos',     short:'Teasing', icon:'🖤', accept:'image/*',         ofOnly:true, hint:'OF feed + Twitter. Underwear / lingerie is fine', grad:'#a855f7,#6366f1'},
   // ── 🏭 Content Factory Vault ── pipeline: Raw reels -> Ready to post (the phones post from here)
   raw:     {vault:'factory', label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Trimmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
   social:  {vault:'factory', label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only, captioned or not — the phones post from here'},
@@ -4412,7 +4413,7 @@ function libMoveOptions(prefix,skip){
   }).join('');
 }
 // The six cards a model sees on the Upload page, in order.
-var MU_CARDS={of:['ppv','sexting','explicit','teasing'], mkt:['inbox','photos']};   // model uploads land in New uploads, never straight on the phones
+var MU_CARDS={of:['ppv','sexting','teasing','explicit'], mkt:['inbox','photos']};   // model uploads land in New uploads, never straight on the phones
 var MU_MKT={inbox:{label:'New uploads',hint:'Reels, TikToks and Snaps for our socials',grad:'#06b6d4,#3b82f6'},
             social:{label:'IG / TikTok / Snap',hint:'Reels, TikToks and snaps for our socials',grad:'#06b6d4,#3b82f6'},
             photos:{label:'Non-nude photos',hint:'Marketing photos — nothing explicit at all',grad:'#22c55e,#14b8a6'}};
@@ -5544,7 +5545,7 @@ function libCardHtml(i){
   var st=i.state||'fresh';
   var reviewBtns = (st==='needs_review')
     ? '<button class="btn btn-sm btn-green" title="Looks fine — put it back in the Fresh pool" onclick="libSetState(\''+i.id+'\',\'fresh\')">✓ Clear</button>'
-      +'<button class="btn btn-sm btn-ghost" title="Can\'t be promoted on IG — move to Teasing photos (OF only) and release it" onclick="libReview(\''+i.id+'\',\'teasing\')">🖤</button>'
+      +'<button class="btn btn-sm btn-ghost" title="Can\'t be promoted on IG — move to OF wall (OF only) and release it" onclick="libReview(\''+i.id+'\',\'teasing\')">🧱</button>'
     : '';
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
