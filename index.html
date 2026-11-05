@@ -417,6 +417,12 @@
   .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
   .lf-foot button:disabled { opacity:.4; cursor:default; }
   .lf-foot .lf-bin { color:#f87171; }
+  .lf-foot .lf-sort { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; color:#fff; font-weight:800; }
+  .lf-mode { border:1px solid var(--border); background:var(--surface2); color:var(--text2); border-radius:10px; padding:9px 12px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .lf-mode.on { background:rgba(34,197,94,.15); border-color:#22c55e; color:#4ade80; }
+  .lf-tick { font-style:normal; width:20px; height:20px; flex-shrink:0; border-radius:6px; border:1.5px solid var(--text2); display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; }
+  .lf-dest.on { border-color:#22c55e; background:rgba(34,197,94,.14); }
+  .lf-dest.on .lf-tick { background:#22c55e; border-color:#22c55e; color:#fff; }
   .lf-toast { display:none; position:fixed; left:50%; bottom:76px; transform:translateX(-50%); background:#111827; border:1px solid #4ade80; color:#fff; border-radius:10px; padding:9px 14px; font-size:13px; z-index:3; white-space:nowrap; }
   .lf-toast a { color:var(--accent2); margin-left:10px; cursor:pointer; font-weight:700; }
   .lf-done { text-align:center; padding:60px 10px; }
@@ -438,7 +444,8 @@
     .lf-lab { grid-column:1 / -1; margin:0 2px 2px; }
     .lf-dest { margin:0; padding:11px 9px; font-size:13.5px; gap:7px; } .lf-dest small { display:none; }
     .lf-foot { gap:6px; flex-wrap:nowrap; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
-    .lf-foot button { padding:10px 10px; font-size:13px; flex:1; white-space:nowrap; }
+    .lf-foot button { padding:10px 6px; font-size:13px; flex:1 1 auto; min-width:0; white-space:nowrap; }
+    .lf-hs { display:none; } .lf-mode { padding:8px 9px; font-size:12px; } .lf-head .btn { padding:8px 10px; }
     .lf-toast { bottom:68px; }
   }
   .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
@@ -3623,7 +3630,7 @@ function cfRenderCards(){
   }).join('');
 }
 function cfOpenLib(cat){
-  LIB_F.model=cfModelId(); LIB_F.category=cat; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q='';
+  LIB_F.model=cfModelId(); LIB_F.category=cat; LIB_F.vault=(LIB_CATEGORIES[cat]&&LIB_CATEGORIES[cat].vault)||'model'; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q='';
   navigate('content-upload');
 }
 async function cfRunCard(key){
@@ -4724,7 +4731,7 @@ async function libUploadFiles(files,opt){
       const{data:ins,error}=await sb.from('content_library').insert(row).select();
       if(error) throw new Error(error.message);
       const item=ins&&ins[0];
-      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(probe.kind==='video'&&autoScan&&!libOfOnly(opt.category)) scanLibraryItem(item.id); }
+      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(LIB_SHOW_SCANNER&&probe.kind==='video'&&autoScan&&!libOfOnly(opt.category)) scanLibraryItem(item.id); }
       results.push({file,item,key}); nOk++;
       opt.onStatus&&opt.onStatus(label,'Done ✓',1);
     }catch(e){
@@ -5074,6 +5081,9 @@ function libPools(items){
 // inside their content. Every file carries model + category + lifecycle state, so the
 // "folders" are just saved filters -- nothing is physically filed anywhere, and a file
 // can be re-filed without moving bytes.
+// Nov: the Instagram scanner is switched off for the Content Library -- no auto-scan on upload,
+// no scan filters / pills / state pools / held banner. Flip to true to bring it all back.
+var LIB_SHOW_SCANNER=false;
 var LIB_F={model:'',category:'',state:'',q:'',outcome:'',view:'folders',factory:false,vertical:'',vault:'model'};
 // What the Meta scanner said, as a filter you can act on. The verdict lives in
 // content_scans, so this is a view over existing data -- nothing is copied or moved.
@@ -5130,8 +5140,8 @@ function libFiltered(){
   if(LIB_F.model) items=items.filter(function(i){ return LIB_F.model==='agency' ? !i.model_id : i.model_id===LIB_F.model; });
   if(LIB_F.category) items=items.filter(function(i){ return LIB_F.category==='none' ? (!i.category||!LIB_CATEGORIES[i.category]) : libInCat(i,LIB_F.category); });
   else if(LIB_F.model&&LIB_F.vault) items=items.filter(function(i){ return libInVault(i,LIB_F.vault); });
-  if(LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
-  if(LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
+  if(LIB_SHOW_SCANNER&&LIB_F.state) items=items.filter(function(i){ return (i.state||'fresh')===LIB_F.state; });
+  if(LIB_SHOW_SCANNER&&LIB_F.outcome) items=items.filter(function(i){ return libOutcomeOf(i)===LIB_F.outcome; });
   if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
   if(LIB_F.vertical) items=items.filter(function(i){ return LIB_F.vertical==='__none' ? !i.vertical : i.vertical===LIB_F.vertical; });
   if(LIB_F.category==='sexting') items=items.slice().sort(libSetSort);
@@ -5195,7 +5205,7 @@ function renderLibraryList(){
     if(head) head.innerHTML='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
       +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text2);flex:1;">Pick a model</div>'
       +'<button class="btn btn-primary" onclick="libOpenUpload()">📤 Upload</button>'
-      +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned, and retry anything that failed">🔍 Scan / retry failed</button>'
+      +(LIB_SHOW_SCANNER?'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned, and retry anything that failed">🔍 Scan / retry failed</button>':'')
       +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'
       +(['admin','va'].includes(STATE.profile?.role)?'<button class="btn btn-ghost" onclick="vertOpenManager()" title="Content tags and their Factory rules">🏷 Tags</button>':'')
       +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
@@ -5232,9 +5242,9 @@ function renderLibraryList(){
           +libRunwayHtml(key)
           +cats
           +(unfiled?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e6b428;"><span>⚠ Uncategorised</span><b>'+unfiled+'</b></div>':'')
-          +(oc?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px;">'+oc+'</div>':'')
+          +(LIB_SHOW_SCANNER&&oc?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px;">'+oc+'</div>':'')
           +(function(){ var nr=mine.filter(function(i){return i.state==='needs_review';}).length;
-            return nr?'<div style="margin-top:6px;font-size:11.5px;color:var(--red);font-weight:700;">🛑 '+nr+' held for review</div>':''; })()
+            return LIB_SHOW_SCANNER&&nr?'<div style="margin-top:6px;font-size:11.5px;color:var(--red);font-weight:700;">🛑 '+nr+' held for review</div>':''; })()
           +'<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
           +'<span style="color:'+(fresh<LIB_LOW_STOCK?'#e6b428':'#4ade80')+';">🟢 '+fresh+' fresh</span><span>'+libFmtSize(bytes)+'</span></div></div>';
       }).join('')+'</div>';
@@ -5253,7 +5263,7 @@ function renderLibraryList(){
     +'<button class="btn btn-ghost btn-sm" onclick="libBackToFolders()">← All models</button>'
     +'<div style="font-size:16px;font-weight:800;flex:1;">'+escapeHtml(libOwnerName(LIB_F.model))+'</div>'
     +'<button class="btn btn-primary" onclick="libOpenUpload()">📤 Upload</button>'
-    +'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned here, and retry anything that failed">🔍 Scan / retry failed</button>'
+    +(LIB_SHOW_SCANNER?'<button class="btn btn-ghost" onclick="libScanUnscanned()" title="Scan anything unscanned here, and retry anything that failed">🔍 Scan / retry failed</button>':'')
     +'<button class="btn btn-ghost" onclick="libGoFactory()">🏭 Content Factory</button>'+(['admin','va'].includes(STATE.profile?.role)?'<button class="btn btn-ghost" onclick="vertOpenManager()" title="Content tags and their Factory rules">🏷 Tags</button>':'')+'</div>'
     +'<div class="lv-seg">'+['model','factory'].map(function(v){
         var n=mine.filter(function(i){return libInVault(i,v);}).length, todo=v==='model'?mine.filter(function(i){return libInCat(i,'inbox');}).length:0;
@@ -5263,7 +5273,7 @@ function renderLibraryList(){
     +catTab('','All','')+libVaultKeys(LIB_F.vault).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
     +(mine.some(function(i){return !i.category||!LIB_CATEGORIES[i.category];})?catTab('none','Uncategorised','⚠'):'')
     +'<button class="lf-go" onclick="libFocusOpen()" title="Go through this folder one file at a time">🎯 Focus'+(function(){ var n=libFiltered().length; return n?' · '+n:''; })()+'</button></div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
+    +(LIB_SHOW_SCANNER?''+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
     +'<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-right:2px;">Scan result</span>'
     +(function(){
       var scoped=mine.filter(function(i){ return !LIB_F.category || (LIB_F.category==='none'?!i.category:libInCat(i,LIB_F.category)); });
@@ -5275,10 +5285,10 @@ function renderLibraryList(){
       return btn('','Any')+Object.keys(LIB_OUTCOMES).map(function(k){ return btn(k,LIB_OUTCOMES[k].label,LIB_OUTCOMES[k].icon); }).join('');
     })()
     +(LIB_F.outcome?'<span style="font-size:11.5px;color:var(--text2);margin-left:4px;">— select all, then <b>Set category</b> to file them</span>':'')
-    +'</div>'
+    +'</div>':'')
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-    +'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
-    +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>'
+    +(LIB_SHOW_SCANNER?'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
+    +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>':'')
     +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +((STATE.verticals||[]).length?'<select onchange="LIB_F.vertical=this.value;renderLibraryList()"><option value="">🏷 Any tag</option>'+vertList('',true).map(function(v){var n=mine.filter(function(i){return i.vertical===v.key;}).length;return '<option value="'+v.key+'"'+(LIB_F.vertical===v.key?' selected':'')+'>'+escapeHtml(v.label)+' ('+n+')</option>';}).join('')+'<option value="__none"'+(LIB_F.vertical==='__none'?' selected':'')+'>Untagged</option></select>':'')
     +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
@@ -5289,7 +5299,7 @@ function renderLibraryList(){
 
   var p=libPools(mine);
   var low=(STATE.models||[]).map(function(m){ return {m:m,f:all.filter(function(i){return i.model_id===m.id&&i.state==='fresh';}).length}; }).filter(function(x){return x.f<LIB_LOW_STOCK;});
-  if(pools) pools.innerHTML='<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">'
+  if(pools) pools.innerHTML=!LIB_SHOW_SCANNER?'':'<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">'
     +statCard('🟢 Fresh',p.fresh,'green')+statCard('🛑 Needs review',p.needs_review||0,p.needs_review?'red':'')
     +statCard('📱 In use',p.in_use,'yellow')+statCard('☁️ Reusable',p.reusable,'accent')+statCard('💤 Retired',p.retired)+'</div>'
     +((p.needs_review||0)?'<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 13px;font-size:12.5px;color:var(--red);margin:-4px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
@@ -5333,7 +5343,8 @@ function libFocusTitle(){
 function libFocusOpen(){
   var items=libFiltered();
   if(!items.length){ alert('Nothing in this folder to go through.'); return; }
-  LF={queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle()};
+  var multi=false; try{ multi=localStorage.getItem('lf_multi')==='1'; }catch(e){}
+  LF={queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
   var ov=document.getElementById('lf-overlay');
   if(!ov){ ov=document.createElement('div'); ov.id='lf-overlay'; document.body.appendChild(ov); }
   ov.style.display='block'; document.body.style.overflow='hidden';
@@ -5352,7 +5363,7 @@ function libFocusKind(it){ return libIsVideo(it)?'video':(/^audio\//.test(it.con
 function libFocusDests(it){
   var kind=libFocusKind(it), out={model:[],factory:[]};
   Object.keys(LIB_CATEGORIES).forEach(function(k){
-    var c=LIB_CATEGORIES[k]; if(k===it.category) return;
+    var c=LIB_CATEGORIES[k]; if(k===it.category&&!(LF&&LF.multi&&k!=='inbox')) return;
     if((c.accept||'').indexOf(kind+'/*')<0) return;   // only folders that take this kind of file
     out[c.vault].push(k);
   });
@@ -5371,7 +5382,8 @@ function libFocusPaint(){
   while(LF.i<LF.queue.length&&!libFocusItem()) LF.i++;
   var total=LF.queue.length, pos=Math.min(LF.i,total), pct=total?pos/total*100:100;
   var head='<div class="lf-head"><div class="lf-ring" style="background:conic-gradient(#4ade80 '+(pct*3.6)+'deg,var(--surface2) 0deg);"><span>'+pos+'/'+total+'</span></div>'
-    +'<div style="flex:1;min-width:0;"><div class="lf-title">'+escapeHtml(LF.title)+'</div><div class="lf-sub">Tap a folder (or press its number). Undo is always there.</div></div>'
+    +'<div style="flex:1;min-width:0;"><div class="lf-title">'+escapeHtml(LF.title)+'</div><div class="lf-sub">'+(LF.multi?'Tick every folder it belongs in, then Sort. The first one ticked is its main folder.':'Tap a folder (or press its number). Undo is always there.')+'</div></div>'
+    +'<button class="lf-mode'+(LF.multi?' on':'')+'" onclick="libFocusMulti()" title="Put one file in several folders at once">'+(LF.multi?'☑ Several<span class="lf-hs"> folders</span>: ON':'☐ Several<span class="lf-hs"> folders</span>')+'</button>'
     +'<button class="btn btn-ghost" onclick="libFocusClose()">✕ Done</button></div>';
   if(LF.i>=total){
     ov.innerHTML='<div class="lf-in">'+head+'<div class="lf-done"><div style="font-size:54px;">🎉</div><div style="font-size:20px;font-weight:800;margin-top:6px;">All '+total+' done</div>'
@@ -5380,22 +5392,26 @@ function libFocusPaint(){
     return;
   }
   var it=libFocusItem(), d=libFocusDests(it), n=0;
-  var btn=function(k){ n++; var c=LIB_CATEGORIES[k];
-    return '<button class="lf-dest" data-key="'+n+'" onclick="libFocusMove(\''+k+'\')">'+c.icon+' <span>'+escapeHtml(c.label)+(c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
+  if(LF.multi&&LF.pickFor!==it.id){   // start from where the file already lives
+    LF.pickFor=it.id;
+    LF.pick=[it.category].concat(it.categories||[]).filter(function(k,ix,a){ return k&&k!=='inbox'&&LIB_CATEGORIES[k]&&a.indexOf(k)===ix; });
+  }
+  var btn=function(k){ n++; var c=LIB_CATEGORIES[k], on=LF.multi&&LF.pick.indexOf(k)>=0;
+    return '<button class="lf-dest'+(LF.multi?' lf-multi':'')+(on?' on':'')+'" data-key="'+n+'" onclick="'+(LF.multi?'libFocusPick':'libFocusMove')+'(\''+k+'\')">'+(LF.multi?'<i class="lf-tick">'+(on?'✓':'')+'</i>':'')+c.icon+' <span>'+escapeHtml(c.label)+(c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
   var col=function(v){ return d[v].length?'<div class="lf-col lf-'+v+'"><div class="lf-lab">'+LIB_VAULTS[v].icon+' '+(v==='model'?'Keep · ':'Post · ')+LIB_VAULTS[v].label+'</div>'+d[v].map(btn).join('')+'</div>':'<div></div>'; };
   var left=col('model'), right=col('factory');
   var cur=LIB_CATEGORIES[it.category];
   var dims=(it.width&&it.height)?it.width+'×'+it.height:'';
   var meta=[libFocusKind(it)==='video'?'Video':libFocusKind(it)==='audio'?'Audio':'Photo',libFmtDur(it.duration_sec),dims,libFmtSize(it.size_bytes),fmtDate(it.created_at)].filter(Boolean).join(' · ');
-  var held=it.state==='needs_review'?'<div class="lf-held">🛑 Scanner flag: Instagram might remove this. Have a look — wherever you file it counts as reviewed.</div>':'';
+  var held=LIB_SHOW_SCANNER&&it.state==='needs_review'?'<div class="lf-held">🛑 Scanner flag: Instagram might remove this. Have a look — wherever you file it counts as reviewed.</div>':'';
   ov.innerHTML='<div class="lf-in">'+head
     +'<div class="lf-body">'+left
     +'<div class="lf-mid"><div class="lf-prev" id="lf-prev">'+(it.thumb_data?'<img src="'+it.thumb_data+'" style="filter:blur(6px);opacity:.5;">':'')+'<div class="lf-load">Loading…</div></div>'
     +'<div class="lf-meta"><b>'+escapeHtml(it.title||'Untitled')+'</b><span class="lf-m2"><br>'+escapeHtml(meta)+'</span></div>'
-    +'<div class="lf-chips">'+(cur?'<span class="cscan cscan-grey">Now in '+cur.icon+' '+escapeHtml(cur.label)+'</span>':'<span class="cscan cscan-red">⚠ Uncategorised</span>')+libStateChip(it)+(libIsVideo(it)?libCompliancePill(it):'')+'</div>'+held+'</div>'
+    +'<div class="lf-chips">'+(cur?'<span class="cscan cscan-grey">Now in '+cur.icon+' '+escapeHtml(cur.label)+'</span>':'<span class="cscan cscan-red">⚠ Uncategorised</span>')+libStateChip(it)+(LIB_SHOW_SCANNER&&libIsVideo(it)?libCompliancePill(it):'')+'</div>'+held+'</div>'
     +right+'</div>'
-    +'<div class="lf-foot"><button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
-    +'<button onclick="downloadLibraryItem(\''+it.id+'\')">⬇ Download</button><button class="lf-bin" onclick="libFocusBin()">🗑 Bin</button></div>'
+    +'<div class="lf-foot">'+(LF.multi?'<button class="lf-sort" onclick="libFocusSort()" '+(LF.pick.length?'':'disabled')+'>✓ Sort'+(LF.pick.length?' into '+LF.pick.length:'')+' <kbd>↵</kbd></button>':'')+'<button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
+    +'<button onclick="downloadLibraryItem(\''+it.id+'\')">⬇<span class="lf-hs"> Download</span></button><button class="lf-bin" onclick="libFocusBin()">🗑 Bin</button></div>'
     +'<div class="lf-toast" id="lf-toast"></div></div>';
   var tok=++LF.token;
   libFocusUrl(it).then(function(u){
@@ -5415,7 +5431,7 @@ async function libFocusMove(cat){
   if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it||!LIB_CATEGORIES[cat]) return;
   if(libOfOnly(it.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
   LF_BUSY=true;
-  var prev={category:it.category, state:it.state, state_changed_at:it.state_changed_at};
+  var prev={category:it.category, categories:(it.categories||[]).slice(), state:it.state, state_changed_at:it.state_changed_at};
   // Filing a file by hand IS the review: a scanner hold (needs_review) never blocks sorting,
   // and moving it releases it back to Fresh (same as Move to… on the card). Undo restores it.
   var patch={category:cat};
@@ -5428,7 +5444,37 @@ async function libFocusMove(cat){
   LF.i++; libFocusPaint();
   libFocusToast('✓ Moved to '+LIB_CATEGORIES[cat].icon+' '+escapeHtml(LIB_CATEGORIES[cat].label)+' <a onclick="libFocusUndo()">Undo</a>');
 }
-function libFocusSkip(){ if(!LF||LF.i>=LF.queue.length) return; LF.hist.push({type:'skip'}); LF.i++; libFocusPaint(); }
+function libFocusMulti(){
+  if(!LF) return; LF.multi=!LF.multi; LF.pickFor=null; LF.pick=[];
+  try{ localStorage.setItem('lf_multi',LF.multi?'1':'0'); }catch(e){}
+  libFocusPaint();
+}
+function libFocusPick(k){
+  if(!LF) return; var at=LF.pick.indexOf(k);
+  if(at>=0) LF.pick.splice(at,1); else LF.pick.push(k);
+  libFocusPaint();
+}
+// Several folders at once: the first ticked becomes the file's main folder (category), the
+// rest go in categories[] -- the same "Also in" list the card menu edits. Works for photos,
+// videos and audio alike; the buttons only offer folders that take that kind of file.
+async function libFocusSort(){
+  if(LF_BUSY||!LF||!LF.pick.length) return; var it=libFocusItem(); if(!it) return;
+  var picks=LF.pick.filter(function(k){return LIB_CATEGORIES[k];}); if(!picks.length) return;
+  var anyOf=picks.some(libOfOnly), anyPublic=picks.some(function(k){return !libOfOnly(k);});
+  if((libOfOnly(it.category)||anyOf)&&anyPublic&&!confirm('This mixes OnlyFans-only and public folders ('+picks.map(function(k){return LIB_CATEGORIES[k].label;}).join(', ')+'). The public ones mean it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
+  LF_BUSY=true;
+  var prev={category:it.category, categories:(it.categories||[]).slice(), state:it.state, state_changed_at:it.state_changed_at};
+  var patch={category:picks[0], categories:picks.slice(1)};
+  if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
+  var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
+  LF_BUSY=false;
+  if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not sort — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
+  Object.assign(it,r.data[0]);
+  LF.hist.push({type:'move',id:it.id,prev:prev,label:picks.length+' folders'});
+  LF.i++; LF.pickFor=null; LF.pick=[]; libFocusPaint();
+  libFocusToast('✓ Sorted into '+picks.map(function(k){return LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].short);}).join(' + ')+' <a onclick="libFocusUndo()">Undo</a>');
+}
+function libFocusSkip(){ if(!LF||LF.i>=LF.queue.length) return; LF.hist.push({type:'skip'}); LF.i++; LF.pickFor=null; libFocusPaint(); }
 async function libFocusBin(){
   if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it) return;
   LF_BUSY=true;
@@ -5462,13 +5508,15 @@ async function libFocusUndo(){
   var target=h.type==='bin'?h.row.id:h.id;
   LF.i=Math.max(0,LF.i-1);
   if(target&&LF.queue[LF.i]!==target){ var at=LF.queue.lastIndexOf(target,LF.i); if(at>=0) LF.i=at; }
-  libFocusPaint(); libFocusToast('↶ Undone');
+  LF.pickFor=null; libFocusPaint(); libFocusToast('↶ Undone');
 }
 function libFocusKey(e){
   if(!LF) return;
   if(e.target&&/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if(e.key==='Escape'){ e.preventDefault(); return libFocusClose(); }
   if(e.key==='ArrowRight'){ e.preventDefault(); return libFocusSkip(); }
+  if(e.key==='Enter'&&LF.multi){ e.preventDefault(); return libFocusSort(); }
+  if(e.key==='m'||e.key==='M'){ e.preventDefault(); return libFocusMulti(); }
   if(e.key==='z'||e.key==='Z'||e.key==='Backspace'){ e.preventDefault(); return libFocusUndo(); }
   if(/^[1-9]$/.test(e.key)){ var b=document.querySelector('#lf-overlay .lf-dest[data-key="'+e.key+'"]'); if(b){ e.preventDefault(); b.click(); } }
 }
@@ -5507,7 +5555,7 @@ function libCardHtml(i){
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+orderChip+postedChip+phoneChip+hdWarn+(libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +'<select class="lib-act" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
     +libCardActionOptions(i)
@@ -5835,7 +5883,7 @@ async function libDoUpload(){
   var res=await libUploadFiles(files,{modelId:modelId,ownerType:modelId?'model':'agency',category:cat,strictHd:false,vertical:vtag,
     onStatus:function(l,s,p){ if(st) st.textContent=l+' — '+s+(p&&p<1?' '+Math.round(p*100)+'%':''); }});
   var ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
-  if(st) st.textContent=ok+' uploaded'+(files.length>LIB_AUTOSCAN_MAX?' · scan skipped for a bulk drop — use “Scan unscanned” when you want it':'')
+  if(st) st.textContent=ok+' uploaded'+(LIB_SHOW_SCANNER&&files.length>LIB_AUTOSCAN_MAX?' · scan skipped for a bulk drop — use “Scan unscanned” when you want it':'')
     +(bad.length?' · '+bad.length+' not uploaded ('+bad.slice(0,3).map(function(b){return b.file.name;}).join(', ')+(bad.length>3?'…':'')+')':'');
   renderLibraryList();
 }
