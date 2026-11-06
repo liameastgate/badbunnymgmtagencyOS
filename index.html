@@ -2538,15 +2538,10 @@
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
         <select id="msg-model" onchange="renderMessages()" style="min-width:180px;"></select>
         <div class="tabs" style="margin-bottom:0;">
-          <div class="tab active" id="msg-tab-mm" onclick="switchMsgTab('mm')">Mass Messages</div>
-          <div class="tab" id="msg-tab-bumps" onclick="switchMsgTab('bumps')">Bumps</div>
           <div class="tab" id="msg-tab-welcome" onclick="switchMsgTab('welcome')">Welcome</div>
+          <div class="tab" id="msg-tab-bumps" onclick="switchMsgTab('bumps')">Bumps</div>
+          <div class="tab active" id="msg-tab-mm" onclick="switchMsgTab('mm')">Mass Messages</div>
           <div class="tab" id="msg-tab-winback" onclick="switchMsgTab('winback')">Winback</div>
-        </div>
-        <div class="tabs" id="msg-time-toggle" style="margin-bottom:0;">
-          <div class="tab active" id="msg-time-all" onclick="switchMsgTime('all')">All day</div>
-          <div class="tab" id="msg-time-morning" onclick="switchMsgTime('morning')">🌅 Morning</div>
-          <div class="tab" id="msg-time-evening" onclick="switchMsgTime('evening')">🌙 Evening</div>
         </div>
         <div class="tabs" id="msg-view-toggle" style="margin-bottom:0;margin-left:auto;">
           <div class="tab active" id="msg-view-active" onclick="switchMsgView('active')">📥 Active</div>
@@ -12678,20 +12673,55 @@ function renderMessages(){
   items.sort(function(a,b){ return (!reusable&&archive) ? (new Date(b.used_at||0)-new Date(a.used_at||0)) : (new Date(b.created_at)-new Date(a.created_at)); });
   const labels={mm:'mass message',bump:'bump',welcome:'welcome message',winback:'win-back message'};
   const addFn={mm:'addMassMessage()',bump:'addBump()',welcome:'addWelcome()',winback:'addWinback()'}[kind];
-  const addBtn=(isAdmin&&!archive)?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
+  const addBtn=(isAdmin&&!archive&&kind!=='mm')?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
   const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Cold opens for new subs — reusable. (name) = his real first name only, lowercase is fine, once. If his display name is a username or a number, drop it and send the line without it. No “Hey”, no “thanks for the sub”, no exclamation marks. Whatever he replies, message two names the content that matches his answer and drops a free preview. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
   const countHtml=reusable?(all.length+' message'+(all.length===1?'':'s')):(activeCount+' active · '+archCount+' archived');
   const shownIds={}; items.forEach(function(m){ shownIds[m.id]=1; });
   Object.keys(MSG_SEL).forEach(function(id){ if(!shownIds[id]) delete MSG_SEL[id]; });
   const nSel=Object.keys(MSG_SEL).length;
   const bulk=(isAdmin&&items.length)?'<button class="btn btn-sm btn-ghost" onclick="msgSelectAll()">'+(nSel===items.length?'☐ Clear selection':'☑ Select all ('+items.length+')')+'</button>'
+    +(nSel&&kind==='mm'?'<button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'morning\',null)">→ 🌅 Morning ('+nSel+')</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'evening\',null)">→ 🌙 Evening ('+nSel+')</button>':'')
     +(nSel?'<button class="btn btn-sm btn-danger" onclick="msgDeleteSelected()">🗑 Delete selected ('+nSel+')</button>':'<button class="btn btn-sm btn-danger" onclick="msgDeleteAllShown()" title="Deletes everything listed below: this model, this tab, this time filter'+(reusable?'':', '+(archive?'archive':'active'))+'">🗑 Delete all ('+items.length+')</button>'):'';
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div style="display:flex;gap:6px;flex-wrap:wrap;">'+addBtn+bulk+'</div>'
     +'<span style="font-size:12px;color:var(--text2);">'+countHtml+'</span></div>'
     +(hint&&!archive?'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+hint+'Always personalise before sending.</div>':'')
     +(MSG_SHOWN={kind:kind,ids:items.map(function(m){return m.id;})},'')
-    +(items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
+    +(kind==='mm'&&(items.length||(isAdmin&&!archive))?msgMmSections(items,isAdmin,archive):'')
+    +(kind==='mm'&&(items.length||(isAdmin&&!archive))?'':items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
       :'<div class="empty" style="margin-top:20px;"><div class="empty-icon">'+(archive?'🗄️':'💬')+'</div><p>'+(archive?'Nothing used yet — archive is empty.':'No '+labels[kind]+'s loaded for this model.'+(isAdmin?' Add some above to fill the queue.':' Ask an admin to refill.'))+'</p></div>');
+}
+// Mass messages are split into 🌅 Morning and 🌙 Evening (each with its own Add button);
+// anything not given a time yet sits in "Not set" until it's moved with the 🌅 / 🌙 buttons.
+function msgMmSections(items,isAdmin,archive){
+  var groups={morning:[],evening:[],none:[]};
+  items.forEach(function(m){ (groups[m.time_of_day==='morning'||m.time_of_day==='evening'?m.time_of_day:'none']).push(m); });
+  var sec=function(key,title,hint){
+    var list=groups[key]; if(key==='none'&&!list.length) return '';
+    var add=(isAdmin&&!archive&&key!=='none')?'<button class="btn btn-sm btn-primary" onclick="addMassMessage(\''+key+'\')">➕ Add '+(key==='morning'?'morning':'evening')+' message</button>':'';
+    var move=(isAdmin&&key==='none'&&list.length)?'<button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'morning\',null)">🌅 Move all to morning</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'evening\',null)">🌙 Move all to evening</button>':'';
+    return '<div style="margin:6px 0 16px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+      +'<div style="font-size:15px;font-weight:800;">'+title+' <span style="color:var(--text2);font-weight:600;font-size:12.5px;">'+list.length+'</span></div>'
+      +(hint?'<span style="font-size:12px;color:var(--text2);">'+hint+'</span>':'')+'<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">'+move+add+'</div></div>'
+      +(list.length?list.map(function(m){return msgCard('mm',m,isAdmin,archive);}).join(''):'<div style="font-size:12.5px;color:var(--text2);padding:10px 2px;">'+(archive?'None used yet.':'None yet.')+'</div>')
+      +'</div>';
+  };
+  return sec('morning','🌅 Morning','')+sec('evening','🌙 Evening','')+sec('none','⏳ Not set yet','Give each one a time with 🌅 / 🌙');
+}
+// Move mass messages to morning / evening: one (id), the ticked ones, or (null) all "Not set" on screen.
+async function msgSetTimeMany(tod,ids){
+  if(!ids){
+    var sel=Object.keys(MSG_SEL);
+    ids=sel.length?sel:(STATE.massMessages||[]).filter(function(m){ return MSG_SHOWN.ids.indexOf(m.id)>=0 && m.time_of_day!=='morning' && m.time_of_day!=='evening'; }).map(function(m){return m.id;});
+  }
+  if(!ids.length) return;
+  if(ids.length>1&&!confirm('Move '+ids.length+' mass messages to '+(tod==='morning'?'🌅 Morning':'🌙 Evening')+'?')) return;
+  for(var i=0;i<ids.length;i+=200){
+    var r=await sb.from('mass_messages').update({time_of_day:tod}).in('id',ids.slice(i,i+200)).select('id');
+    if(r.error){ alert('Could not move: '+r.error.message); break; }
+    var ok={}; (r.data||[]).forEach(function(x){ ok[x.id]=1; });
+    (STATE.massMessages||[]).forEach(function(m){ if(ok[m.id]) m.time_of_day=tod; });
+  }
+  MSG_SEL={}; renderMessages();
 }
 function msgCard(kind,m,isAdmin,archive){
   const reusable=kind==='welcome';
@@ -12705,7 +12735,7 @@ function msgCard(kind,m,isAdmin,archive){
     : (archive
       ? '<button class="btn btn-sm btn-ghost" onclick="restoreMsg('+kq+')">↩ Restore</button>'
       : '<button class="btn btn-sm btn-primary" onclick="markUsed('+kq+')" title="Mark used &amp; move to archive">✓ Used</button> <button class="btn btn-sm btn-ghost" onclick="copyMsg('+kq+',this)">⧉ Copy</button>');
-  const timeChip=m.time_of_day?'<span class="cscan '+(m.time_of_day==='morning'?'cscan-amber':'cscan-blue')+'" style="cursor:default;">'+(MSG_TIME_LABEL[m.time_of_day]||m.time_of_day)+'</span> ':'';
+  const timeChip=(kind!=='mm'&&(m.time_of_day==='morning'||m.time_of_day==='evening'))?'<span class="cscan '+(m.time_of_day==='morning'?'cscan-amber':'cscan-blue')+'" style="cursor:default;">'+(MSG_TIME_LABEL[m.time_of_day]||m.time_of_day)+'</span> ':'';
   const rest=(tags||usedInfo)?(tags+usedInfo):(reusable?'':'<span style="font-size:11px;color:var(--text2);">ready</span>');
   const badge=timeChip+rest;
   return '<div class="card" style="padding:12px 14px;margin-bottom:10px;'+((!reusable&&archive)?'opacity:.7;':'')+'">'
@@ -12713,7 +12743,9 @@ function msgCard(kind,m,isAdmin,archive){
     +(isAdmin?'<input type="checkbox" '+(MSG_SEL[m.id]?'checked':'')+' onchange="msgToggleSel(\''+m.id+'\',this.checked)" style="width:17px;height:17px;margin:0;cursor:pointer;accent-color:var(--accent);">':'')+'<div>'+badge+'</div></div>'
     +'<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'+right+'</div></div>'
     +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(m.body||'')+'</div>'
-    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMsg('+kq+')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMsg('+kq+')">✕</button></div>':'')
+    +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMsg('+kq+')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMsg('+kq+')">✕</button>'
+      +(kind==='mm'?(m.time_of_day!=='morning'?'<button class="btn btn-sm btn-ghost" title="Move to Morning" onclick="msgSetTimeMany(\'morning\',[\''+m.id+'\'])">→ 🌅</button>':'')+(m.time_of_day!=='evening'?'<button class="btn btn-sm btn-ghost" title="Move to Evening" onclick="msgSetTimeMany(\'evening\',[\''+m.id+'\'])">→ 🌙</button>':''):'')
+      +'</div>':'')
     +'</div>';
 }
 async function markUsed(kind,id){
@@ -12769,7 +12801,7 @@ function editMsg(kind,id){
   const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(!m) return;
   const bodyv=prompt('Message text:',m.body||''); if(bodyv===null||!bodyv.trim()) return;
   const upd={body:bodyv.trim()};
-  const tod=msgTimePrompt(m.time_of_day||''); upd.time_of_day=tod;
+  if(kind==='mm'){ upd.time_of_day=msgTimePrompt(m.time_of_day||''); }
   if(kind==='mm'){ const tone=prompt('Tone / vibe:',m.tone||''); if(tone===null) return; upd.tone=tone.trim()||null; }
   if(kind==='bump'){ const status=bumpStatusPrompt(m.status); if(status===null) return; const rr=prompt('Reply rate note (optional):',m.reply_rate||''); if(rr===null) return; upd.status=status; upd.reply_rate=rr.trim()||null; }
   sb.from(msgTable(kind)).update(upd).eq('id',id).select().then(function(r){
@@ -12778,10 +12810,10 @@ function editMsg(kind,id){
   });
 }
 function bumpStatusPrompt(cur){ const v=prompt('Status — type "proven" or "testing":',cur||'testing'); if(v===null) return null; return (v.trim().toLowerCase()==='proven')?'proven':'testing'; }
-async function addMassMessage(){
+async function addMassMessage(when){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const tone=prompt('Tone / vibe (e.g. flirty, dominant, girlfriend, playful):',''); if(tone===null) return;
-  const tod=msgTimePrompt(MSG_TIME!=='all'?MSG_TIME:'');
+  const tod=(when==='morning'||when==='evening')?when:msgTimePrompt('');
   const bodyv=prompt('Mass message text:',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('mass_messages').insert({model_id:modelId,tone:(tone.trim()||null),time_of_day:tod,body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
@@ -12791,7 +12823,7 @@ async function addBump(){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const bodyv=prompt('Bump text:',''); if(bodyv===null||!bodyv.trim()) return;
   const status=bumpStatusPrompt('testing'); if(status===null) return;
-  const tod=msgTimePrompt(MSG_TIME!=='all'?MSG_TIME:'');
+  const tod=null;   // morning / evening only applies to mass messages now
   const rr=prompt('Reply rate note (optional, e.g. "62%"):',''); if(rr===null) return;
   const r=await sb.from('bumps').insert({model_id:modelId,body:bodyv.trim(),status:status,time_of_day:tod,reply_rate:(rr.trim()||null)}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
@@ -12799,7 +12831,7 @@ async function addBump(){
 }
 async function addWelcome(){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
-  const tod=msgTimePrompt(MSG_TIME!=='all'?MSG_TIME:'');
+  const tod=null;   // morning / evening only applies to mass messages now
   const bodyv=prompt('Welcome message text:',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('welcome_messages').insert({model_id:modelId,time_of_day:tod,body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
@@ -12807,7 +12839,7 @@ async function addWelcome(){
 }
 async function addWinback(){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
-  const tod=msgTimePrompt(MSG_TIME!=='all'?MSG_TIME:'');
+  const tod=null;   // morning / evening only applies to mass messages now
   const bodyv=prompt('Win-back message text (for expired / cancelled subs):',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('winback_messages').insert({model_id:modelId,time_of_day:tod,body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
