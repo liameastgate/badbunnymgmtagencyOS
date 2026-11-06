@@ -12623,6 +12623,8 @@ function openSheetForModelById(id){ const m=STATE.models.find(x=>x.id===id); if(
 
 // ── Messages: Mass Messages / Bumps / Welcome (refill + archive) ───────────
 var MSG_TAB='mm', MSG_VIEW='active', MSG_TIME='all';
+var MSG_SEL={}, MSG_SHOWN={kind:'mm',ids:[]};   // ids ticked for bulk delete (only ever the ones currently on screen)
+function msgSetArr(kind,arr){ if(kind==='mm') STATE.massMessages=arr; else if(kind==='bump') STATE.bumps=arr; else if(kind==='winback') STATE.winbackMessages=arr; else STATE.welcomeMessages=arr; }
 var MSG_TIME_LABEL={morning:'🌅 morning',evening:'🌙 evening'};
 function msgTimePrompt(cur){ var v=prompt('When is this for? Type: morning / evening / any','morning'===cur?'morning':(cur||'any')); if(v===null) return null; v=(v||'').trim().toLowerCase(); return (v==='morning'||v==='evening')?v:null; }
 function msgTable(kind){ return kind==='mm'?'mass_messages':kind==='bump'?'bumps':kind==='winback'?'winback_messages':'welcome_messages'; }
@@ -12679,9 +12681,15 @@ function renderMessages(){
   const addBtn=(isAdmin&&!archive)?'<button class="btn btn-sm btn-primary" onclick="'+addFn+'">➕ Add '+labels[kind]+'</button>':'';
   const hint=kind==='bump'?'Bumps to re-engage quiet fans. ':(kind==='welcome'?'Cold opens for new subs — reusable. (name) = his real first name only, lowercase is fine, once. If his display name is a username or a number, drop it and send the line without it. No “Hey”, no “thanks for the sub”, no exclamation marks. Whatever he replies, message two names the content that matches his answer and drops a free preview. ':(kind==='winback'?'Win-back messages for expired / cancelled subs. ':''));
   const countHtml=reusable?(all.length+' message'+(all.length===1?'':'s')):(activeCount+' active · '+archCount+' archived');
-  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div>'+addBtn+'</div>'
+  const shownIds={}; items.forEach(function(m){ shownIds[m.id]=1; });
+  Object.keys(MSG_SEL).forEach(function(id){ if(!shownIds[id]) delete MSG_SEL[id]; });
+  const nSel=Object.keys(MSG_SEL).length;
+  const bulk=(isAdmin&&items.length)?'<button class="btn btn-sm btn-ghost" onclick="msgSelectAll()">'+(nSel===items.length?'☐ Clear selection':'☑ Select all ('+items.length+')')+'</button>'
+    +(nSel?'<button class="btn btn-sm btn-danger" onclick="msgDeleteSelected()">🗑 Delete selected ('+nSel+')</button>':'<button class="btn btn-sm btn-danger" onclick="msgDeleteAllShown()" title="Deletes everything listed below: this model, this tab, this time filter'+(reusable?'':', '+(archive?'archive':'active'))+'">🗑 Delete all ('+items.length+')</button>'):'';
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div style="display:flex;gap:6px;flex-wrap:wrap;">'+addBtn+bulk+'</div>'
     +'<span style="font-size:12px;color:var(--text2);">'+countHtml+'</span></div>'
     +(hint&&!archive?'<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+hint+'Always personalise before sending.</div>':'')
+    +(MSG_SHOWN={kind:kind,ids:items.map(function(m){return m.id;})},'')
     +(items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
       :'<div class="empty" style="margin-top:20px;"><div class="empty-icon">'+(archive?'🗄️':'💬')+'</div><p>'+(archive?'Nothing used yet — archive is empty.':'No '+labels[kind]+'s loaded for this model.'+(isAdmin?' Add some above to fill the queue.':' Ask an admin to refill.'))+'</p></div>');
 }
@@ -12701,7 +12709,8 @@ function msgCard(kind,m,isAdmin,archive){
   const rest=(tags||usedInfo)?(tags+usedInfo):(reusable?'':'<span style="font-size:11px;color:var(--text2);">ready</span>');
   const badge=timeChip+rest;
   return '<div class="card" style="padding:12px 14px;margin-bottom:10px;'+((!reusable&&archive)?'opacity:.7;':'')+'">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div>'+badge+'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;"><div style="display:flex;align-items:center;gap:8px;">'
+    +(isAdmin?'<input type="checkbox" '+(MSG_SEL[m.id]?'checked':'')+' onchange="msgToggleSel(\''+m.id+'\',this.checked)" style="width:17px;height:17px;margin:0;cursor:pointer;accent-color:var(--accent);">':'')+'<div>'+badge+'</div></div>'
     +'<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'+right+'</div></div>'
     +'<div style="font-size:13px;white-space:pre-wrap;line-height:1.5;">'+escapeHtml(m.body||'')+'</div>'
     +(isAdmin?'<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="editMsg('+kq+')">✏ Edit</button><button class="btn btn-sm btn-danger" onclick="delMsg('+kq+')">✕</button></div>':'')
@@ -12726,11 +12735,35 @@ function delMsg(kind,id){
   if(!confirm('Delete this permanently?')) return;
   sb.from(msgTable(kind)).delete().eq('id',id).select().then(function(r){
     if(r.error||!r.data||!r.data.length){ alert('Could not delete.'); return; }
-    if(kind==='mm') STATE.massMessages=(STATE.massMessages||[]).filter(function(x){return x.id!==id;});
-    else if(kind==='bump') STATE.bumps=(STATE.bumps||[]).filter(function(x){return x.id!==id;});
-    else STATE.welcomeMessages=(STATE.welcomeMessages||[]).filter(function(x){return x.id!==id;});
-    renderMessages();
+    msgSetArr(kind,(msgArr(kind)||[]).filter(function(x){return x.id!==id;}));   // (win-backs used to linger on screen here)
+    delete MSG_SEL[id]; renderMessages();
   });
+}
+// ── Bulk delete ── tick cards, or "Delete all" for everything currently listed
+// (this model + this tab + this time filter + active/archive).
+function msgToggleSel(id,on){ if(on) MSG_SEL[id]=1; else delete MSG_SEL[id]; renderMessages(); }
+function msgSelectAll(){
+  var ids=MSG_SHOWN.ids||[];
+  if(Object.keys(MSG_SEL).length===ids.length){ MSG_SEL={}; } else { MSG_SEL={}; ids.forEach(function(id){ MSG_SEL[id]=1; }); }
+  renderMessages();
+}
+function msgDeleteSelected(){ msgDeleteMany(MSG_SHOWN.kind,Object.keys(MSG_SEL)); }
+function msgDeleteAllShown(){ msgDeleteMany(MSG_SHOWN.kind,(MSG_SHOWN.ids||[]).slice()); }
+async function msgDeleteMany(kind,ids){
+  if(!ids.length) return;
+  var labels={mm:'mass message',bump:'bump',welcome:'welcome message',winback:'win-back message'};
+  var mdl=(STATE.models||[]).find(function(m){return m.id===(document.getElementById('msg-model')||{}).value;});
+  if(!confirm('Delete '+ids.length+' '+labels[kind]+(ids.length===1?'':'s')+(mdl?' for '+mdl.name:'')+' permanently?\n\nThis cannot be undone.')) return;
+  var gone={}, err=null;
+  for(var i=0;i<ids.length;i+=200){
+    var r=await sb.from(msgTable(kind)).delete().in('id',ids.slice(i,i+200)).select('id');
+    if(r.error){ err=r.error; break; }
+    (r.data||[]).forEach(function(x){ gone[x.id]=1; });
+  }
+  var n=Object.keys(gone).length;
+  msgSetArr(kind,(msgArr(kind)||[]).filter(function(x){return !gone[x.id];}));
+  MSG_SEL={}; renderMessages();
+  if(err||n<ids.length) alert('Deleted '+n+' of '+ids.length+'.'+(err?' '+err.message:' You may not have permission for the rest.'));
 }
 function editMsg(kind,id){
   const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(!m) return;
