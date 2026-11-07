@@ -408,6 +408,7 @@
   .lf-dest kbd, .lf-foot kbd { font-family:inherit; font-size:11px; color:var(--text2); border:1px solid var(--border); border-radius:5px; padding:1px 6px; }
   .lf-prev { aspect-ratio:9/16; max-height:62vh; width:100%; border-radius:14px; background:#000; overflow:hidden; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto; }
   .lf-prev video, .lf-prev img { width:100%; height:100%; object-fit:contain; display:block; }
+  .lf-snd { position:absolute; left:50%; bottom:58px; transform:translateX(-50%); border:0; border-radius:20px; padding:8px 14px; background:rgba(0,0,0,.75); color:#fff; font-weight:800; font-size:13px; cursor:pointer; z-index:2; }
   .lf-prev img[style*="blur"] { position:absolute; inset:0; object-fit:cover; }
   .lf-load { position:relative; color:var(--text2); font-size:13px; padding:12px; text-align:center; }
   .lf-meta { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.5; word-break:break-word; } .lf-meta b { color:#fff; font-size:13px; }
@@ -461,6 +462,32 @@
     .sheets-shell.sheet-open #sheets-content { display: block; }
     .sheets-shell.side-collapsed:not(.sheet-open) #sheets-sidebar { display: flex !important; }
   }
+  /* Messages: All day / Morning / Evening cards */
+  .msg-tz { display:flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 12px; font-size:13px; }
+  .msg-tz b { font-size:14.5px; } .msg-tz .ph { font-size:11px; font-weight:800; border-radius:20px; padding:2px 9px; }
+  .mm-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:start; }
+  @media (max-width: 1000px) { .mm-cols { grid-template-columns:1fr; } }
+  .mm-col { background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:visible; }
+  .mm-col.now { box-shadow:0 0 0 1px var(--mmc); border-color:var(--mmc); }
+  .mm-h { display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--border); position:relative; border-radius:16px 16px 0 0; }
+  .mm-h::before { content:''; position:absolute; left:0; right:0; top:0; height:3px; background:var(--mmc); border-radius:16px 16px 0 0; }
+  .mm-h .tt { font-weight:800; font-size:15px; } .mm-h .n { color:var(--text2); font-weight:700; font-size:12.5px; }
+  .mm-h .when { margin-left:auto; font-size:11.5px; color:var(--text2); text-align:right; line-height:1.3; }
+  .mm-row { display:flex; flex-wrap:wrap; gap:6px 9px; align-items:flex-start; padding:11px 12px; border-top:1px solid rgba(30,32,64,.7); }
+  .mm-row:first-of-type { border-top:none; }
+  .mm-row input[type=checkbox] { margin-top:3px; width:15px; height:15px; flex:0 0 15px; accent-color:var(--accent); cursor:pointer; }
+  .mm-txt { flex:1 1 calc(100% - 30px); min-width:0; font-size:13.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word; }
+  .mm-tone { display:inline-block; font-size:10.5px; font-weight:700; color:var(--text2); background:var(--surface2); border-radius:6px; padding:1px 7px; margin-bottom:4px; }
+  .mm-acts { display:flex; gap:5px; align-items:center; justify-content:flex-end; width:100%; }
+  .mm-ib { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:8px; padding:5px 8px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .mm-ib.u { background:var(--accent); border-color:var(--accent); }
+  .mm-more { position:relative; }
+  .mm-menu { display:none; position:absolute; right:0; top:30px; background:#151830; border:1px solid var(--border); border-radius:10px; padding:5px; z-index:20; min-width:150px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .mm-more.open .mm-menu { display:block; }
+  .mm-menu div { padding:7px 10px; font-size:12.5px; border-radius:7px; cursor:pointer; white-space:nowrap; } .mm-menu div:hover { background:var(--surface2); }
+  .mm-menu .del { color:#f87171; }
+  .mm-add { display:block; width:calc(100% - 20px); margin:10px; border:1px dashed var(--accent2); color:var(--accent2); background:none; border-radius:10px; padding:8px; font-weight:800; font-size:12.5px; cursor:pointer; }
+  .mm-empty { font-size:12.5px; color:var(--text2); padding:14px; }
   .sheet-side-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
   .sheet-side-item:hover { background: var(--surface2); }
   .sheet-side-item.active { background: rgba(30,79,255,0.14); border-color: rgba(30,79,255,0.4); }
@@ -2537,6 +2564,7 @@
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
         <select id="msg-model" onchange="renderMessages()" style="min-width:180px;"></select>
+        <div id="msg-tz" class="msg-tz" style="display:none;"></div>
         <div class="tabs" style="margin-bottom:0;">
           <div class="tab" id="msg-tab-welcome" onclick="switchMsgTab('welcome')">Welcome</div>
           <div class="tab" id="msg-tab-bumps" onclick="switchMsgTab('bumps')">Bumps</div>
@@ -5561,9 +5589,24 @@ function libFocusPaint(){
     if(!LF||tok!==LF.token) return;
     var box=document.getElementById('lf-prev'); if(!box) return;
     var k=libFocusKind(it);
-    box.innerHTML=k==='video'?'<video src="'+u+'" autoplay muted loop playsinline controls></video>':k==='audio'?'<audio src="'+u+'" controls autoplay style="width:90%;"></audio>':'<img src="'+u+'">';
+    if(k==='video'){ libFocusVideo(box,u); return; }
+    box.innerHTML=k==='audio'?'<audio src="'+u+'" controls autoplay style="width:90%;"></audio>':'<img src="'+u+'">';
   }).catch(function(e){ var box=document.getElementById('lf-prev'); if(box&&LF&&tok===LF.token) box.innerHTML='<div class="lf-load" style="color:var(--red);">Could not load the preview — '+escapeHtml(e.message||'')+'</div>'; });
   var nx=LF.queue[LF.i+1]&&(STATE.library||[]).find(function(x){return x.id===LF.queue[LF.i+1];}); if(nx) libFocusUrl(nx).catch(function(){});   // warm the next one
+}
+// Videos play WITH sound. Opening Focus and every tap/keypress count as you interacting with
+// the page, so the browser allows it. If you mute a clip, the next ones stay muted until you
+// unmute again (LF_MUTED is kept for the session). If a browser still blocks sound, the clip
+// plays muted with a "Tap for sound" button instead of not playing at all.
+var LF_MUTED=false;
+function libFocusVideo(box,u){
+  box.innerHTML='<video src="'+u+'" autoplay loop playsinline controls></video><button class="lf-snd" style="display:none;">🔊 Tap for sound</button>';
+  var v=box.querySelector('video'), b=box.querySelector('.lf-snd');
+  v.muted=LF_MUTED; v.volume=1;
+  v.addEventListener('volumechange',function(){ if(!v._auto) LF_MUTED=v.muted; v._auto=false; if(!v.muted) b.style.display='none'; });
+  b.onclick=function(){ LF_MUTED=false; v.muted=false; v.play().catch(function(){}); b.style.display='none'; };
+  var p=v.play();
+  if(p&&p.catch) p.catch(function(){ v._auto=true; v.muted=true; v.play().catch(function(){}); if(!LF_MUTED) b.style.display='block'; });
 }
 function libFocusToast(html){
   var t=document.getElementById('lf-toast'); if(!t) return;
@@ -12659,6 +12702,9 @@ function copyMsg(kind,id,btn){
 }
 function renderMessages(){
   const body=document.getElementById('msg-body'); if(!body) return;
+  (function(){ var mid=(document.getElementById('msg-model')||{}).value; if(!mid) return;
+    if(mid in MSG_TZ_CACHE){ msgTzPaint(MSG_TZ_CACHE[mid]); }
+    else { msgTzFor(mid).then(function(tz){ if(((document.getElementById('msg-model')||{}).value)===mid){ msgTzPaint(tz); renderMessages(); } }); } })();
   const kind=msgKind();
   const reusable=kind==='welcome';           // welcome messages are reused indefinitely — no "used"/archive
   const modelId=(document.getElementById('msg-model')||{}).value;
@@ -12680,7 +12726,7 @@ function renderMessages(){
   Object.keys(MSG_SEL).forEach(function(id){ if(!shownIds[id]) delete MSG_SEL[id]; });
   const nSel=Object.keys(MSG_SEL).length;
   const bulk=(isAdmin&&items.length)?'<button class="btn btn-sm btn-ghost" onclick="msgSelectAll()">'+(nSel===items.length?'☐ Clear selection':'☑ Select all ('+items.length+')')+'</button>'
-    +(nSel&&kind==='mm'?'<button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'morning\',null)">→ 🌅 Morning ('+nSel+')</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'evening\',null)">→ 🌙 Evening ('+nSel+')</button>':'')
+    +(nSel&&kind==='mm'?'<button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(null,null)">→ 🕐 All day</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'morning\',null)">→ 🌅 Morning</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'evening\',null)">→ 🌙 Evening</button>':'')
     +(nSel?'<button class="btn btn-sm btn-danger" onclick="msgDeleteSelected()">🗑 Delete selected ('+nSel+')</button>':'<button class="btn btn-sm btn-danger" onclick="msgDeleteAllShown()" title="Deletes everything listed below: this model, this tab, this time filter'+(reusable?'':', '+(archive?'archive':'active'))+'">🗑 Delete all ('+items.length+')</button>'):'';
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div style="display:flex;gap:6px;flex-wrap:wrap;">'+addBtn+bulk+'</div>'
     +'<span style="font-size:12px;color:var(--text2);">'+countHtml+'</span></div>'
@@ -12690,31 +12736,90 @@ function renderMessages(){
     +(kind==='mm'&&(items.length||(isAdmin&&!archive))?'':items.length?items.map(function(m){return msgCard(kind,m,isAdmin,archive);}).join('')
       :'<div class="empty" style="margin-top:20px;"><div class="empty-icon">'+(archive?'🗄️':'💬')+'</div><p>'+(archive?'Nothing used yet — archive is empty.':'No '+labels[kind]+'s loaded for this model.'+(isAdmin?' Add some above to fill the queue.':' Ask an admin to refill.'))+'</p></div>');
 }
-// Mass messages are split into 🌅 Morning and 🌙 Evening (each with its own Add button);
-// anything not given a time yet sits in "Not set" until it's moved with the 🌅 / 🌙 buttons.
+// Mass messages: three cards side by side -- 🕐 All day (no time set), 🌅 Morning, 🌙 Evening.
+// The card matching the model's current local time (from their Chatting Script) is highlighted.
+var MM_COLS=[['all','🕐','All day','Any time','#6b8fff'],['morning','🌅','Morning','6am – 12pm','#e6b428'],['evening','🌙','Evening','6pm – late','#8b5cf6']];
+function mmSlot(m){ return m.time_of_day==='morning'||m.time_of_day==='evening'?m.time_of_day:'all'; }
 function msgMmSections(items,isAdmin,archive){
-  var groups={morning:[],evening:[],none:[]};
-  items.forEach(function(m){ (groups[m.time_of_day==='morning'||m.time_of_day==='evening'?m.time_of_day:'none']).push(m); });
-  var sec=function(key,title,hint){
-    var list=groups[key]; if(key==='none'&&!list.length) return '';
-    var add=(isAdmin&&!archive&&key!=='none')?'<button class="btn btn-sm btn-primary" onclick="addMassMessage(\''+key+'\')">➕ Add '+(key==='morning'?'morning':'evening')+' message</button>':'';
-    var move=(isAdmin&&key==='none'&&list.length)?'<button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'morning\',null)">🌅 Move all to morning</button><button class="btn btn-sm btn-ghost" onclick="msgSetTimeMany(\'evening\',null)">🌙 Move all to evening</button>':'';
-    return '<div style="margin:6px 0 16px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
-      +'<div style="font-size:15px;font-weight:800;">'+title+' <span style="color:var(--text2);font-weight:600;font-size:12.5px;">'+list.length+'</span></div>'
-      +(hint?'<span style="font-size:12px;color:var(--text2);">'+hint+'</span>':'')+'<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">'+move+add+'</div></div>'
-      +(list.length?list.map(function(m){return msgCard('mm',m,isAdmin,archive);}).join(''):'<div style="font-size:12.5px;color:var(--text2);padding:10px 2px;">'+(archive?'None used yet.':'None yet.')+'</div>')
+  var now=(MSG_TZ_NOW&&MSG_TZ_NOW.phase)||'';
+  return '<div class="mm-cols">'+MM_COLS.map(function(c){
+    var list=items.filter(function(m){return mmSlot(m)===c[0];}), hl=!archive&&c[0]===now;
+    return '<div class="mm-col'+(hl?' now':'')+'" style="--mmc:'+c[4]+';"><div class="mm-h"><span style="font-size:19px;">'+c[1]+'</span><span class="tt">'+c[2]+'</span><span class="n">'+list.length+'</span>'
+      +'<span class="when">'+c[3]+(hl?'<br><b style="color:#fff;">← now for this model</b>':'')+'</span></div>'
+      +(list.length?list.map(function(m){return mmRow(m,c[0],isAdmin,archive);}).join(''):'<div class="mm-empty">'+(archive?'None used yet.':'None yet.')+'</div>')
+      +((isAdmin&&!archive)?'<button class="mm-add" onclick="addMassMessage(\''+c[0]+'\')">＋ Add '+c[2].toLowerCase()+' message</button>':'')
       +'</div>';
-  };
-  return sec('morning','🌅 Morning','')+sec('evening','🌙 Evening','')+sec('none','⏳ Not set yet','Give each one a time with 🌅 / 🌙');
+  }).join('')+'</div>';
+}
+function mmRow(m,slot,isAdmin,archive){
+  var q="'mm','"+m.id+"'";
+  var main=archive
+    ? '<span style="font-size:11px;color:var(--text2);">'+(m.used_at?'used '+fmtDate(m.used_at):'')+'</span><button class="mm-ib" onclick="restoreMsg('+q+')">↩ Restore</button>'
+    : '<button class="mm-ib" onclick="copyMsg('+q+',this)">⧉ Copy</button><button class="mm-ib u" onclick="markUsed('+q+')" title="Mark used &amp; move to archive">✓ Used</button>';
+  var menu=isAdmin?'<span class="mm-more"><button class="mm-ib" onclick="mmMenu(this,event)">⋯</button><div class="mm-menu"><div onclick="editMsg('+q+')">✏ Edit</div>'
+    +MM_COLS.filter(function(c){return c[0]!==slot;}).map(function(c){ return '<div onclick="msgSetTimeMany('+(c[0]==='all'?'null':"'"+c[0]+"'")+',[\''+m.id+'\'])">→ '+c[1]+' '+c[2]+'</div>'; }).join('')
+    +'<div class="del" onclick="delMsg('+q+')">✕ Delete</div></div></span>':'';
+  return '<div class="mm-row">'+(isAdmin?'<input type="checkbox" '+(MSG_SEL[m.id]?'checked':'')+' onchange="msgToggleSel(\''+m.id+'\',this.checked)">':'')
+    +'<div class="mm-txt">'+(m.tone?'<span class="mm-tone">'+escapeHtml(m.tone)+'</span>\n':'')+escapeHtml(m.body||'')+'</div>'
+    +'<div class="mm-acts">'+main+menu+'</div></div>';
+}
+function mmMenu(btn,ev){
+  ev.stopPropagation();
+  var wrap=btn.parentNode, open=wrap.classList.contains('open');
+  document.querySelectorAll('.mm-more.open').forEach(function(x){ x.classList.remove('open'); });
+  if(!open) wrap.classList.add('open');
+}
+document.addEventListener('click',function(){ document.querySelectorAll('.mm-more.open').forEach(function(x){ x.classList.remove('open'); }); });
+
+// ── Model time zone (from the "Timezone:" line in their Chatting Script) ──
+var MSG_TZ_CACHE={}, MSG_TZ_NOW=null;
+var MSG_TZ_WORDS=[[/madrid|spain|valencia|barcelona/i,'Europe/Madrid'],[/perth|\bwa\b/i,'Australia/Perth'],[/monterrey/i,'America/Monterrey'],
+  [/mexico city|cdmx/i,'America/Mexico_City'],[/\bqld\b|queensland|brisbane|gladstone|gold coast/i,'Australia/Brisbane'],
+  [/sao paulo|são paulo|brazil|brasil|rio/i,'America/Sao_Paulo'],[/paraguay|asunci/i,'America/Asuncion'],
+  [/melbourne|sydney|victoria|\bnsw\b|\bvic\b|canberra/i,'Australia/Melbourne'],[/adelaide/i,'Australia/Adelaide'],[/darwin/i,'Australia/Darwin'],
+  [/new york|eastern|\best\b|miami|florida|toronto/i,'America/New_York'],[/chicago|central|\bcst\b|texas|dallas|houston/i,'America/Chicago'],
+  [/denver|mountain/i,'America/Denver'],[/los angeles|pacific|\bpst\b|california|vegas/i,'America/Los_Angeles'],
+  [/london|\buk\b|england/i,'Europe/London'],[/cuba|havana/i,'America/Havana'],[/colombia|bogot/i,'America/Bogota'],[/argentina|buenos/i,'America/Argentina/Buenos_Aires'],
+  [/vietnam|ho chi minh|hanoi/i,'Asia/Ho_Chi_Minh'],[/cambodia|phnom/i,'Asia/Phnom_Penh'],[/thailand|bangkok/i,'Asia/Bangkok'],[/bali|indonesia|denpasar/i,'Asia/Makassar'],[/auckland|new zealand/i,'Pacific/Auckland']];
+function msgTzResolve(label){
+  label=String(label||'').trim(); if(!label) return null;
+  var iana=(label.match(/\b[A-Z][a-z]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/)||[])[0];
+  if(iana){ try{ new Intl.DateTimeFormat('en-US',{timeZone:iana}); return iana; }catch(e){} }
+  for(var i=0;i<MSG_TZ_WORDS.length;i++) if(MSG_TZ_WORDS[i][0].test(label)) return MSG_TZ_WORDS[i][1];
+  var g=label.match(/(?:GMT|UTC)\s*([+-])\s*(\d{1,2})/i);   // "GMT-6" -> Etc/GMT+6 (POSIX sign is flipped)
+  if(g) return 'Etc/GMT'+(g[1]==='+'?'-':'+')+parseInt(g[2],10);
+  return null;
+}
+async function msgTzFor(modelId){
+  if(modelId in MSG_TZ_CACHE) return MSG_TZ_CACHE[modelId];
+  var r=await sb.from('model_sheets').select('onboarding_text').eq('model_id',modelId).maybeSingle();
+  var line=r&&r.data&&r.data.onboarding_text?((r.data.onboarding_text.match(/^\s*Time ?zone[^:\n]*:[ \t]*([^\n]*)$/im)||[])[1]||'').trim():'';
+  var label=line.replace(/\s*\((?:GMT|UTC)[^)]*\)\s*$/i,'').trim()||line;
+  MSG_TZ_CACHE[modelId]=line?{label:label,iana:msgTzResolve(line)}:null;
+  return MSG_TZ_CACHE[modelId];
+}
+function msgTzPaint(tz){
+  var el=document.getElementById('msg-tz'); if(!el) return;
+  if(!tz){ MSG_TZ_NOW=null; el.style.display='flex'; el.innerHTML='🕒 <span style="color:var(--text2);">No time zone in this model\'s Chatting Script</span>'; return; }
+  var t='', ph=null;
+  if(tz.iana){
+    var now=new Date();
+    t=now.toLocaleTimeString('en-US',{timeZone:tz.iana,hour:'numeric',minute:'2-digit'});
+    var h=parseInt(now.toLocaleString('en-US',{timeZone:tz.iana,hour:'numeric',hour12:false}),10)%24;
+    ph=(h>=5&&h<12)?['🌅 Morning','#e6b428','morning']:((h>=17||h<2)?['🌙 Evening','#8b5cf6','evening']:['☀️ Afternoon','#22c55e','']);
+  }
+  MSG_TZ_NOW={phase:ph?ph[2]:''};
+  el.style.display='flex';
+  el.innerHTML='🕒 <span>'+escapeHtml(tz.label)+'</span>'+(t?' · <b>'+t+'</b> <span style="color:var(--text2);">their time</span> <span class="ph" style="background:'+ph[1]+'22;color:'+ph[1]+';">'+ph[0]+'</span>':'');
 }
 // Move mass messages to morning / evening: one (id), the ticked ones, or (null) all "Not set" on screen.
 async function msgSetTimeMany(tod,ids){
   if(!ids){
     var sel=Object.keys(MSG_SEL);
-    ids=sel.length?sel:(STATE.massMessages||[]).filter(function(m){ return MSG_SHOWN.ids.indexOf(m.id)>=0 && m.time_of_day!=='morning' && m.time_of_day!=='evening'; }).map(function(m){return m.id;});
+    ids=sel;
   }
   if(!ids.length) return;
-  if(ids.length>1&&!confirm('Move '+ids.length+' mass messages to '+(tod==='morning'?'🌅 Morning':'🌙 Evening')+'?')) return;
+  if(ids.length>1&&!confirm('Move '+ids.length+' mass messages to '+(tod==='morning'?'🌅 Morning':tod==='evening'?'🌙 Evening':'🕐 All day')+'?')) return;
   for(var i=0;i<ids.length;i+=200){
     var r=await sb.from('mass_messages').update({time_of_day:tod}).in('id',ids.slice(i,i+200)).select('id');
     if(r.error){ alert('Could not move: '+r.error.message); break; }
@@ -12801,7 +12906,6 @@ function editMsg(kind,id){
   const m=(msgArr(kind)||[]).find(function(x){return x.id===id;}); if(!m) return;
   const bodyv=prompt('Message text:',m.body||''); if(bodyv===null||!bodyv.trim()) return;
   const upd={body:bodyv.trim()};
-  if(kind==='mm'){ upd.time_of_day=msgTimePrompt(m.time_of_day||''); }
   if(kind==='mm'){ const tone=prompt('Tone / vibe:',m.tone||''); if(tone===null) return; upd.tone=tone.trim()||null; }
   if(kind==='bump'){ const status=bumpStatusPrompt(m.status); if(status===null) return; const rr=prompt('Reply rate note (optional):',m.reply_rate||''); if(rr===null) return; upd.status=status; upd.reply_rate=rr.trim()||null; }
   sb.from(msgTable(kind)).update(upd).eq('id',id).select().then(function(r){
@@ -12813,7 +12917,7 @@ function bumpStatusPrompt(cur){ const v=prompt('Status — type "proven" or "tes
 async function addMassMessage(when){
   const modelId=(document.getElementById('msg-model')||{}).value; if(!modelId){alert('Pick a model first.');return;}
   const tone=prompt('Tone / vibe (e.g. flirty, dominant, girlfriend, playful):',''); if(tone===null) return;
-  const tod=(when==='morning'||when==='evening')?when:msgTimePrompt('');
+  const tod=(when==='morning'||when==='evening')?when:null;   // 'all' = All day
   const bodyv=prompt('Mass message text:',''); if(bodyv===null||!bodyv.trim()) return;
   const r=await sb.from('mass_messages').insert({model_id:modelId,tone:(tone.trim()||null),time_of_day:tod,body:bodyv.trim()}).select();
   if(r.error||!r.data){alert('Could not save: '+(r.error&&r.error.message));return;}
