@@ -418,6 +418,7 @@
   .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
   .lf-foot button:disabled { opacity:.4; cursor:default; }
   .lf-foot .lf-bin { color:#f87171; }
+  .lf-newset { width:100%; border:1px dashed rgba(244,63,94,.55); background:none; color:#fb7185; border-radius:10px; padding:8px; font-weight:800; font-size:12.5px; cursor:pointer; margin:-2px 0 8px; }
   .lf-foot .lf-sort { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; color:#fff; font-weight:800; }
   .lf-mode { border:1px solid var(--border); background:var(--surface2); color:var(--text2); border-radius:10px; padding:9px 12px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap; }
   .lf-mode.on { background:rgba(34,197,94,.15); border-color:#22c55e; color:#4ade80; }
@@ -5298,6 +5299,135 @@ function libSetSort(a,b){
   if(x&&y&&x.id===y.id) return x.n-y.n;
   return String(b.created_at||'').localeCompare(String(a.created_at||''));
 }
+
+// ── Sexting sets ──────────────────────────────────────────────────────────────
+// A file is in a set when its tags carry "set:<id> clip:<n>/<total>" (the same format the
+// model's own Upload uses). Sets are numbered per model, oldest first: Set 1, Set 2, …
+// Clips run in camera-roll order (the number in the file name, e.g. IMG_7341 < IMG_7344);
+// a clip with no number keeps its place. ↑↓ in the Sexting folder fine-tunes the order.
+function libTagsNoSet(tags){ return String(tags||'').replace(/\s*set:\S+\s+clip:\d+\/\d+/g,'').trim(); }
+function libTagsWithSet(tags,id,n,of){ var t=libTagsNoSet(tags); return (t?t+' ':'')+'set:'+id+' clip:'+n+'/'+of; }
+function libCamKey(i){
+  var name=String(i.title||'').replace(/\.[a-z0-9]{2,5}$/i,'');
+  if(/^sexting set /i.test(name)) return null;
+  var m=name.match(/(\d{3,})(?!.*\d{3,})/); return m?parseInt(m[1],10):null;
+}
+function libNewSetId(){ return Date.now().toString(36); }
+function libSetMembers(modelId,setId,exceptId){
+  return (STATE.library||[]).filter(function(i){ var x=libSetInfo(i); return i.model_id===modelId && i.id!==exceptId && libInCat(i,'sexting') && x && x.id===setId; })
+    .sort(function(a,b){ return libSetInfo(a).n-libSetInfo(b).n; });
+}
+function libModelSets(modelId){
+  var by={};
+  (STATE.library||[]).forEach(function(i){ var x=libSetInfo(i); if(i.model_id===modelId&&x&&libInCat(i,'sexting')) (by[x.id]=by[x.id]||[]).push(i); });
+  return Object.keys(by).sort(function(a,b){ return (parseInt(a,36)||0)-(parseInt(b,36)||0); }).map(function(id,ix){
+    return {id:id, num:ix+1, items:by[id].sort(function(a,b){ return libSetInfo(a).n-libSetInfo(b).n; })};
+  });
+}
+function libSetNum(modelId,setId){ var s=libModelSets(modelId).find(function(x){return x.id===setId;}); return s?s.num:(libModelSets(modelId).length+1); }
+// Where a new clip slots into a set: before the first clip with a higher camera-roll number.
+function libSetInsertOrder(members,it){
+  var k=libCamKey(it), at=members.length;
+  if(k!=null) for(var i=0;i<members.length;i++){ var mk=libCamKey(members[i]); if(mk!=null&&mk>k){ at=i; break; } }
+  var arr=members.slice(); arr.splice(at,0,it); return arr;
+}
+// Write clip numbers for a whole set (only rows whose tags actually change).
+async function libSetWrite(ordered,setId){
+  var of=ordered.length;
+  await Promise.all(ordered.map(function(i,ix){
+    var t=libTagsWithSet(i.tags,setId,ix+1,of); if(t===i.tags) return null;
+    return sb.from('content_library').update({tags:t}).eq('id',i.id).select('id,tags').then(function(r){ if(!r.error&&r.data&&r.data.length) i.tags=t; });
+  }));
+}
+async function libSetRenumber(modelId,setId){ if(setId) await libSetWrite(libSetMembers(modelId,setId,null),setId); }
+// Put a list of files into one set (new or existing), in camera-roll order, after its current clips.
+async function libSetAddMany(list,setId){
+  if(!list.length) return; var modelId=list[0].model_id;
+  var ordered=libSetMembers(modelId,setId,null).filter(function(i){ return list.indexOf(i)<0; });
+  list.slice().sort(function(a,b){ var x=libCamKey(a),y=libCamKey(b); return (x==null||y==null)?String(a.created_at).localeCompare(String(b.created_at)):x-y; })
+    .forEach(function(it){ ordered=libSetInsertOrder(ordered,it); });
+  var olds={}; list.forEach(function(i){ var x=libSetInfo(i); if(x&&x.id!==setId) olds[x.id]=1; });
+  await libSetWrite(ordered,setId);
+  for(var o in olds) await libSetRenumber(modelId,o);
+}
+// ↑ / ↓ inside a set
+async function libSetNudge(id,dir){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); var x=it&&libSetInfo(it); if(!x) return;
+  var m=libSetMembers(it.model_id,x.id,null), at=m.indexOf(it), to=at+dir; if(to<0||to>=m.length) return;
+  m.splice(at,1); m.splice(to,0,it);
+  await libSetWrite(m,x.id); renderLibraryList();
+}
+async function libSetMoveTo(id,sel){
+  var v=sel.value; sel.value=''; if(!v) return;
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  await libSetAddMany([it], v==='new'?libNewSetId():v); renderLibraryList();
+}
+async function libSetFromUnsorted(){
+  var list=(STATE.library||[]).filter(function(i){ return i.model_id===LIB_F.model && libInCat(i,'sexting') && !libSetInfo(i); });
+  if(!list.length) return;
+  if(!confirm('Put these '+list.length+' clips into a new set, in camera-roll order?')) return;
+  await libSetAddMany(list,libNewSetId()); renderLibraryList();
+}
+// ⬇ Zip: one set, or every set (a folder per set). Built in the browser, stored uncompressed
+// (videos don't shrink anyway) so it's quick. Clip files are named "Set 3 - 01.mp4" etc.
+var LIB_JSZIP=null;
+function libLoadZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  if(LIB_JSZIP) return LIB_JSZIP;
+  LIB_JSZIP=new Promise(function(res,rej){ var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    sc.onload=function(){ res(window.JSZip); }; sc.onerror=function(){ LIB_JSZIP=null; rej(new Error('Could not load the zip tool')); }; document.head.appendChild(sc); });
+  return LIB_JSZIP;
+}
+async function libSetZip(setId){
+  var modelId=LIB_F.model, mdl=(STATE.models||[]).find(function(m){return m.id===modelId;}), mname=(mdl&&mdl.name)||'Model';
+  var sets=libModelSets(modelId).filter(function(s){ return !setId||s.id===setId; }); if(!sets.length) return;
+  var total=sets.reduce(function(t,s){return t+s.items.length;},0), done=0;
+  var st=document.getElementById('cl-upload-status'), say=function(t){ if(st){ st.style.display='block'; st.textContent=t; } };
+  try{
+    var JSZip=await libLoadZip(), zip=new JSZip();
+    for(var si=0;si<sets.length;si++){
+      var s=sets[si], folder=sets.length>1?zip.folder('Set '+s.num):zip;
+      for(var k=0;k<s.items.length;k++){
+        var it=s.items[k]; say('🗜 Zipping '+(++done)+'/'+total+' · Set '+s.num+' clip '+(k+1));
+        var res=await fetch(await libItemUrl(it)); if(!res.ok) throw new Error('could not fetch '+(it.title||it.id));
+        var ext=((it.r2_key||'').match(/\.([a-z0-9]{2,5})$/i)||[])[1]||'bin';
+        folder.file('Set '+s.num+' - '+String(k+1).padStart(2,'0')+'.'+ext.toLowerCase(), await res.blob());
+      }
+    }
+    say('🗜 Building the zip…');
+    var blob=await zip.generateAsync({type:'blob',compression:'STORE'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=mname+' - '+(sets.length>1?'All sexting sets':'Sexting Set '+sets[0].num)+'.zip';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); },60000);
+    say('✅ Downloaded '+a.download+' ('+total+' clips)');
+  }catch(e){ say('⚠ Zip failed — '+e.message); alert('Could not build the zip: '+e.message); }
+}
+// The Sexting folder, grouped: Set 1, Set 2 … then anything not in a set yet.
+function libSextingHtml(items){
+  var isStaff=['admin','va'].includes(STATE.profile?.role), modelId=LIB_F.model;
+  var sets=libModelSets(modelId), shown={}; items.forEach(function(i){ shown[i.id]=1; });
+  var opts=function(cur){ return '<option value="">Move to set…</option>'+sets.filter(function(s){return s.id!==cur;}).map(function(s){return '<option value="'+s.id+'">💬 Set '+s.num+'</option>';}).join('')+'<option value="new">＋ New set</option>'; };
+  var clip=function(i,ix,n,setId){
+    return '<div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;align-items:center;gap:6px;font-size:12px;">'
+      +(setId?'<b style="background:rgba(244,63,94,.18);color:#fb7185;border-radius:6px;padding:2px 8px;">#'+(ix+1)+'</b>':'')
+      +((isStaff&&setId)?'<button class="btn btn-sm btn-ghost" '+(ix===0?'disabled':'')+' onclick="libSetNudge(\''+i.id+'\',-1)" title="Earlier">↑</button><button class="btn btn-sm btn-ghost" '+(ix===n-1?'disabled':'')+' onclick="libSetNudge(\''+i.id+'\',1)" title="Later">↓</button>':'')
+      +(isStaff?'<select onchange="libSetMoveTo(\''+i.id+'\',this)" style="font-size:11.5px;padding:3px 6px;border-radius:7px;max-width:150px;margin-left:auto;">'+opts(setId)+'</select>':'')
+      +'</div>'+libCardHtml(i)+'</div>';
+  };
+  var grid=function(list,setId){ return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+list.map(function(i,ix){return clip(i,ix,list.length,setId);}).join('')+'</div>'; };
+  var html=sets.length>1?'<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="libSetZip(null)">⬇ Download all sets (.zip)</button></div>':'';
+  sets.forEach(function(s){
+    var list=s.items.filter(function(i){return shown[i.id];}); if(!list.length) return;
+    html+='<div class="card" style="margin:0 0 14px;padding:12px 14px;"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<div style="font-size:16px;font-weight:800;">💬 Set '+s.num+'</div><span style="font-size:12px;color:var(--text2);">'+s.items.length+' clip'+(s.items.length===1?'':'s')+' · in order</span>'
+      +'<button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="libSetZip(\''+s.id+'\')">⬇ Download Set '+s.num+' (.zip)</button></div>'+grid(list,s.id)+'</div>';
+  });
+  var loose=items.filter(function(i){ return !libSetInfo(i); });
+  if(loose.length) html+='<div class="card" style="margin:0 0 14px;padding:12px 14px;border-style:dashed;"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+    +'<div style="font-size:15px;font-weight:800;">Not in a set yet</div><span style="font-size:12px;color:var(--text2);">'+loose.length+'</span>'
+    +(isStaff?'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libSetFromUnsorted()">＋ Make these a new set</button>':'')+'</div>'+grid(loose,null)+'</div>';
+  return html||'<div class="empty" style="margin-top:24px;"><div class="empty-icon">💬</div><p>No sexting sets yet.</p></div>';
+}
 // Everything matching the current filters (used by the list, select-all and bulk actions).
 function libFiltered(){
   var items=(STATE.library||[]);
@@ -5493,7 +5623,7 @@ function renderLibraryList(){
     +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
 
   wrap.innerHTML=bar+(items.length
-    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>'
+    ? (LIB_F.category==='sexting'&&LIB_F.model&&LIB_F.model!=='agency' ? libSextingHtml(items) : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>')
     : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
 }
 function libOpenModel(key){ LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
@@ -5517,7 +5647,7 @@ function libFocusOpen(){
   var items=libFiltered();
   if(!items.length){ alert('Nothing in this folder to go through.'); return; }
   var multi=false; try{ multi=localStorage.getItem('lf_multi')==='1'; }catch(e){}
-  LF={from:LIB_F.category, queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
+  LF={setId:null, from:LIB_F.category, queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
   var ov=document.getElementById('lf-overlay');
   if(!ov){ ov=document.createElement('div'); ov.id='lf-overlay'; document.body.appendChild(ov); }
   ov.style.display='block'; document.body.style.overflow='hidden';
@@ -5570,8 +5700,8 @@ function libFocusPaint(){
     LF.pick=[it.category].concat(it.categories||[]).filter(function(k,ix,a){ return k&&!libIsToSort(k)&&LIB_CATEGORIES[k]&&a.indexOf(k)===ix; });
   }
   var btn=function(k){ n++; var c=LIB_CATEGORIES[k], on=LF.multi&&LF.pick.indexOf(k)>=0;
-    return '<button class="lf-dest'+(LF.multi?' lf-multi':'')+(on?' on':'')+'" data-key="'+n+'" onclick="'+(LF.multi?'libFocusPick':'libFocusMove')+'(\''+k+'\')">'+(LF.multi?'<i class="lf-tick">'+(on?'✓':'')+'</i>':'')+c.icon+' <span>'+escapeHtml(c.label)+(c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
-  var col=function(v){ return d[v].length?'<div class="lf-col lf-'+v+'"><div class="lf-lab">'+LIB_VAULTS[v].icon+' '+(v==='model'?'Keep · ':'Post · ')+LIB_VAULTS[v].label+'</div>'+d[v].map(btn).join('')+'</div>':'<div></div>'; };
+    return '<button class="lf-dest'+(LF.multi?' lf-multi':'')+(on?' on':'')+'" data-key="'+n+'" onclick="'+(LF.multi?'libFocusPick':'libFocusMove')+'(\''+k+'\')">'+(LF.multi?'<i class="lf-tick">'+(on?'✓':'')+'</i>':'')+c.icon+' <span>'+escapeHtml(k==='sexting'?'Sexting · Set '+libFocusSetLabel(it).num:c.label)+(k==='sexting'?'<small>'+libFocusSetLabel(it).n+' clip'+(libFocusSetLabel(it).n===1?'':'s')+' in this set so far</small>':c.ofOnly?'<small>OnlyFans only</small>':k==='social'?'<small>Phones post these as they are</small>':k==='raw'?'<small>Factory adds caption + sound</small>':'')+'</span><kbd>'+n+'</kbd></button>'; };
+  var col=function(v){ return d[v].length?'<div class="lf-col lf-'+v+'"><div class="lf-lab">'+LIB_VAULTS[v].icon+' '+(v==='model'?'Keep · ':'Post · ')+LIB_VAULTS[v].label+'</div>'+d[v].map(function(k){ return btn(k)+(k==='sexting'?'<button class="lf-newset" onclick="libFocusNewSet()">＋ Start a new set</button>':''); }).join('')+'</div>':'<div></div>'; };
   var left=col('model'), right=col('factory');
   var cur=LIB_CATEGORIES[it.category];
   var dims=(it.width&&it.height)?it.width+'×'+it.height:'';
@@ -5610,6 +5740,32 @@ function libFocusVideo(box,u){
   var p=v.play();
   if(p&&p.catch) p.catch(function(){ v._auto=true; v.muted=true; v.play().catch(function(){}); if(!LF_MUTED) b.style.display='block'; });
 }
+// Focus keeps adding to the model's current set; "＋ Start a new set" begins the next one.
+function libFocusSetId(modelId){
+  if(LF.setId&&LF.setModel===modelId) return LF.setId;
+  var sets=libModelSets(modelId); LF.setModel=modelId;
+  LF.setId=sets.length?sets[sets.length-1].id:libNewSetId(); return LF.setId;
+}
+function libFocusSetLabel(it){ var id=libFocusSetId(it.model_id); return {num:libSetNum(it.model_id,id), n:libSetMembers(it.model_id,id,it.id).length}; }
+function libFocusNewSet(){
+  var it=libFocusItem(); if(!it) return;
+  LF.setId=libNewSetId(); LF.setModel=it.model_id;
+  if(LF.multi){ if(LF.pick.indexOf('sexting')<0) LF.pick.push('sexting'); libFocusPaint(); }
+  else libFocusMove('sexting');
+}
+// Tags for a file going into / out of the Sexting folder; returns {tags, after()} to renumber.
+function libFocusSetPatch(it,goesToSexting){
+  var old=libSetInfo(it), modelId=it.model_id;
+  if(goesToSexting){
+    var setId=libFocusSetId(modelId);
+    if(old&&old.id===setId&&libInCat(it,'sexting')) return {tags:it.tags, setId:setId, after:function(){}};
+    var ordered=libSetInsertOrder(libSetMembers(modelId,setId,it.id),it);
+    return {tags:libTagsWithSet(it.tags,setId,ordered.indexOf(it)+1,ordered.length), setId:setId, oldSet:old&&old.id,
+      after:async function(){ await libSetWrite(ordered,setId); if(old&&old.id!==setId) await libSetRenumber(modelId,old.id); }};
+  }
+  if(old) return {tags:libTagsNoSet(it.tags), oldSet:old.id, after:async function(){ await libSetRenumber(modelId,old.id); }};
+  return null;
+}
 function libFocusToast(html){
   var t=document.getElementById('lf-toast'); if(!t) return;
   t.innerHTML=html; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; },2600);
@@ -5624,11 +5780,14 @@ async function libFocusMove(cat){
   // and moving it releases it back to Fresh (same as Move to… on the card). Undo restores it.
   var patch=libMovePatch(it,cat,LF.from);
   if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
+  prev.tags=it.tags;
+  var sp=libFocusSetPatch(it,cat==='sexting'||(patch.categories||[]).indexOf('sexting')>=0); if(sp) patch.tags=sp.tags;
   var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
   LF_BUSY=false;
   if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not move — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
   Object.assign(it,r.data[0]);
-  LF.hist.push({type:'move',id:it.id,prev:prev,label:LIB_CATEGORIES[cat].label});
+  if(sp) await sp.after();
+  LF.hist.push({type:'move',id:it.id,prev:prev,sets:sp?[sp.setId,sp.oldSet].filter(Boolean):[],label:LIB_CATEGORIES[cat].label});
   LF.i++; libFocusPaint();
   libFocusToast('✓ Moved to '+LIB_CATEGORIES[cat].icon+' '+escapeHtml(LIB_CATEGORIES[cat].label)+' <a onclick="libFocusUndo()">Undo</a>');
 }
@@ -5654,11 +5813,14 @@ async function libFocusSort(){
   var prev={category:it.category, categories:(it.categories||[]).slice(), state:it.state, state_changed_at:it.state_changed_at};
   var patch={category:picks[0], categories:picks.slice(1)};
   if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
+  prev.tags=it.tags;
+  var sp=libFocusSetPatch(it,picks.indexOf('sexting')>=0); if(sp) patch.tags=sp.tags;
   var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
   LF_BUSY=false;
   if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not sort — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
   Object.assign(it,r.data[0]);
-  LF.hist.push({type:'move',id:it.id,prev:prev,label:picks.length+' folders'});
+  if(sp) await sp.after();
+  LF.hist.push({type:'move',id:it.id,prev:prev,sets:sp?[sp.setId,sp.oldSet].filter(Boolean):[],label:picks.length+' folders'});
   LF.i++; LF.pickFor=null; LF.pick=[]; libFocusPaint();
   libFocusToast('✓ Sorted into '+picks.map(function(k){return LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].short);}).join(' + ')+' <a onclick="libFocusUndo()">Undo</a>');
 }
@@ -5688,6 +5850,7 @@ async function libFocusUndo(){
       var r=await sb.from('content_library').update(h.prev).eq('id',h.id).select();
       if(r.error||!r.data||!r.data.length) throw new Error(r.error?r.error.message:'no permission');
       var it=(STATE.library||[]).find(function(x){return x.id===h.id;}); if(it) Object.assign(it,r.data[0]);
+      if(it&&h.sets) for(var hs=0;hs<h.sets.length;hs++) await libSetRenumber(it.model_id,h.sets[hs]);
     } else if(h.type==='bin'){
       var r2=await sb.from('content_library').insert(h.row).select();
       if(r2.error||!r2.data||!r2.data.length) throw new Error(r2.error?r2.error.message:'no permission');
@@ -5804,6 +5967,8 @@ async function libCardAction(id,sel){
     var r=await sb.from('content_library').update(mp).eq('id',id).select();
     if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
     Object.assign(cur,r.data[0]);
+    if(cat==='sexting'){ var ls=libModelSets(cur.model_id); await libSetAddMany([cur], ls.length?ls[ls.length-1].id:libNewSetId()); }
+    else if(libSetInfo(cur)){ var os=libSetInfo(cur).id; await sb.from('content_library').update({tags:libTagsNoSet(cur.tags)}).eq('id',cur.id); cur.tags=libTagsNoSet(cur.tags); await libSetRenumber(cur.model_id,os); }
     renderLibraryList();
     var stt=document.getElementById('cl-upload-status'); if(stt){ stt.style.display='block'; stt.textContent='Moved 1 file → '+LIB_CATEGORIES[cat].label; }
   }
@@ -5887,6 +6052,7 @@ async function libBulkMoveTo(sel){
     if(r1.error) err=r1.error; else if(r1.data&&r1.data.length){ Object.assign(fancy[fi],r1.data[0]); moved++; }
   }
   if(!moved){ alert('Could not move — '+(err?err.message:'no permission')); return; }
+  if(cat==='sexting'){ var byM={}; picked.forEach(function(i){ (byM[i.model_id]=byM[i.model_id]||[]).push(i); }); for(var bm in byM) await libSetAddMany(byM[bm],libNewSetId()); }   // a ticked batch becomes one new set
   var r={data:{length:moved}};
   LIB_SEL={}; renderLibraryList();
   var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
