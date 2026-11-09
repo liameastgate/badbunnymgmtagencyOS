@@ -15452,8 +15452,9 @@ function renderBestTimeHeatmap(){
 // Supabase Storage bucket, so there's a permanent, un-editable copy independent of this table.
 var _contractSettings={governing_state:'',payment_method:'',payout_schedule:''};
 
-function defaultContractSections(){
-  return [
+function defaultContractSections(record){
+  record=record||{};
+  const out=[
     {h:'1. Purpose', b:`The Model hereby engages the Manager to provide account management and promotional services for the Model's OnlyFans account, and the Manager agrees to provide such services under the terms set forth in this Agreement.`},
     {h:'2. Services Provided by Manager', b:`The Manager shall:\na. Manage and operate the Model's OnlyFans account on behalf of the Model.\nb. Provide advertising and promotional services to drive traffic and subscribers to the account, at the Manager's expense.\nc. Oversee subscriber interactions, pay-per-view (PPV) messaging, promotions, and content posting strategy (subject to the Model's consent for content provided).\nd. Provide reporting of account performance and revenues to the Model.`},
     {h:'3. Responsibilities of Model', b:`The Model shall:\na. Provide original content (photos, videos, and related materials) for use on the OnlyFans platform.\nb. Retain all intellectual property rights in their content.\nc. Cooperate with Manager in ensuring timely provision of content.\nd. Maintain compliance with OnlyFans' Terms of Service and applicable laws.`},
@@ -15463,13 +15464,28 @@ function defaultContractSections(){
     {h:'7. Intellectual Property of Agency Materials', b:`All chatting scripts, standard operating procedures, marketing materials, growth strategies, and other work product created by or on behalf of the Manager in the course of providing services under this Agreement ("Agency Materials") are and remain the sole property of the Manager. The Model is granted a limited license to use the Agency Materials solely in connection with the Model's account during the term of this Agreement, and shall not copy, retain, distribute, or use the Agency Materials for any purpose after termination of this Agreement.`},
     {h:'8. Non-Solicitation', b:`During the term of this Agreement, the Model shall not directly or indirectly solicit, hire, engage, or encourage any chatter, staff member, or contractor of the Manager to leave their engagement with the Manager or to provide similar services to the Model or any competing agency.`},
     {h:'9. Non-Disparagement', b:`Neither Party shall make any public statement, whether written or verbal, that is intended to or reasonably likely to disparage, defame, or harm the reputation or goodwill of the other Party, both during the term of this Agreement and after its termination. This clause does not limit either Party's right to make truthful statements required by law or in connection with a legal proceeding.`},
-    {h:'10. Representations & Warranties', b:`The Model represents and warrants that:\na. She is at least eighteen (18) years of age as of the date of this Agreement, and will remain the minimum legal age required under applicable law for the duration of this Agreement.\nb. She owns or holds all necessary rights, licenses, and consents (including from any other individuals appearing in her content) to provide the content supplied to the Manager for use under this Agreement.\nc. All information she provides to the Manager, including identity and age verification documents, is true, accurate, and not misleading.`},
+    {h:'10. Representations & Warranties', b:`The Model represents and warrants that:\na. The Model is at least eighteen (18) years of age as of the date of this Agreement, and will remain the minimum legal age required under applicable law for the duration of this Agreement.\nb. The Model owns or holds all necessary rights, licenses, and consents (including from any other individuals appearing in the Model's content) to provide the content supplied to the Manager for use under this Agreement.\nc. All information the Model provides to the Manager, including identity and age verification documents, is true, accurate, and not misleading.`},
     {h:'11. Indemnification', b:`The Model agrees to indemnify and hold harmless the Manager from and against any claims, losses, damages, liabilities, and expenses (including reasonable legal fees) arising out of or related to any breach of the Model's representations and warranties under this Agreement, or the Model's violation of any applicable law or third party's rights.`},
     {h:'12. Term & Termination', b:`a. This Agreement shall commence on the date first written above and shall remain in effect until terminated by either Party.\nb. Either Party may terminate this Agreement by providing seven (7) days' written notice to the other Party.\nc. Upon termination, the Manager shall return full access and control of the OnlyFans account to the Model within five (5) business days of the effective date of termination, including all account credentials and any content or materials belonging to the Model.\nd. Sections 6 (Confidentiality), 7 (Intellectual Property of Agency Materials), 9 (Non-Disparagement), and 11 (Indemnification) shall survive termination of this Agreement.`},
     {h:'13. Independent Contractor Relationship', b:`The Parties agree that the Manager is acting as an independent contractor. Nothing in this Agreement shall be construed as creating a partnership, joint venture, or employer-employee relationship.`},
     {h:'14. Governing Law & Dispute Resolution', b:`a. This Agreement shall be governed by and construed in accordance with the laws of {{governing_state}}, Australia.\nb. In the event of any dispute arising out of or relating to this Agreement, the Parties shall first attempt to resolve the dispute through good-faith negotiation. If the dispute cannot be resolved within thirty (30) days, either Party may pursue mediation before resorting to formal legal proceedings, which shall be brought exclusively in the courts of {{governing_state}}, Australia.`},
     {h:'15. Entire Agreement', b:`This Agreement constitutes the entire understanding between the Parties and supersedes all prior agreements, whether written or oral.`}
   ];
+  // Nov: bank details, when either side's are filled in, go under Revenue Sharing.
+  if(record.model_bank_details||record.agency_bank_details){
+    const rs=out.find(x=>x.h==='4. Revenue Sharing');
+    if(rs) rs.b+=`\ne. Payments under this Agreement are made between the following accounts. Model${record.entity_name?' (paid to the Company)':''}: {{model_bank_details}}. Management: {{agency_bank_details}}.`;
+  }
+  return out;
+}
+// Who the Model is. A model can contract through their own company (e.g. an LLC that owns the
+// OnlyFans account): the company is the party, the person signs for it and stays personally
+// bound too (age, rights to the content etc. are about the person).
+function contractPartyLines(record){
+  if(record&&record.entity_name) return [
+    'Model: {{entity_name}}{{entity_details_sep}} (the "Company"), represented by its owner {{model_legal_name}} ("{{model_stage_name}}").',
+    'In this Agreement "the Model" means the Company and {{model_legal_name}} together, and each is responsible for the Model\'s obligations.'];
+  return ['Model: {{model_legal_name}} ("{{model_stage_name}}")'];
 }
 
 // Replaces {{token}} placeholders in already-escaped text with either the real value (styled
@@ -15485,6 +15501,10 @@ function contractTokenMap(record){
     payment_method: record.payment_method||null,
     payout_schedule: record.payout_schedule||null,
     governing_state: record.governing_state||null,
+    entity_name: record.entity_name||null,
+    entity_details_sep: record.entity_details?(', '+record.entity_details):'',
+    model_bank_details: record.model_bank_details||null,
+    agency_bank_details: record.agency_bank_details||null,
     signed_date: record.signed_date?fmtDate(record.signed_date):null
   };
 }
@@ -15502,10 +15522,10 @@ function buildContractDocHtml(record){
   const partiesHtml=`
     <div class="cd-parties">
       <div>Manager: Liam Eastgate / BadBunnyMGMT</div>
-      <div>Model: ${contractSubst('{{model_legal_name}}',record)} ("${contractSubst('{{model_stage_name}}',record)}")</div>
+      ${contractPartyLines(record).map(l=>'<div>'+contractSubst(escapeHtml(l),record)+'</div>').join('')}
       <div>Collectively referred to as the "Parties."</div>
     </div>`;
-  const bodyHtml=defaultContractSections().map(s=>
+  const bodyHtml=defaultContractSections(record).map(s=>
     `<h3>${escapeHtml(s.h)}</h3><p>${contractSubst(escapeHtml(s.b),record).replace(/\n/g,'<br>')}</p>`
   ).join('');
   const signed=record.status==='signed';
@@ -15513,7 +15533,7 @@ function buildContractDocHtml(record){
     <div class="cd-sign-block">
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.</div>
       <div>Manager: Liam Eastgate &nbsp; Name: Liam Eastgate &nbsp; Date: ${contractSubst('{{agreement_date}}',record)}</div>
-      <div style="margin-top:4px;">Model: ${contractSubst('{{model_stage_name}}',record)} &nbsp; Name: ${contractSubst('{{model_legal_name}}',record)} &nbsp; Date: ${contractSubst('{{signed_date}}',record)}</div>
+      <div style="margin-top:4px;">Model: ${record.entity_name?contractSubst('{{entity_name}}',record)+' — signed by':''} ${contractSubst('{{model_stage_name}}',record)} &nbsp; Name: ${contractSubst('{{model_legal_name}}',record)}${record.entity_name?' (for the Company and personally)':''} &nbsp; Date: ${contractSubst('{{signed_date}}',record)}</div>
       <div style="margin-top:10px;">Signature:<br>${signed&&record.signature_data?`<img src="${record.signature_data}">`:'<span class="contract-field blank">[awaiting signature]</span>'}</div>
     </div>`;
   return `<div class="contract-doc">
@@ -15657,6 +15677,10 @@ async function openContractForModel(modelId){
           <div class="form-group"><label>Revenue Split</label><input type="text" value="${data.model_split_pct??'—'}% Model / ${data.agency_split_pct??'—'}% Agency" disabled title="Pulled live from this model's split in Model Settings — change it there, not here."></div>
           <div class="form-group"><label>Governing State/Territory</label><input type="text" id="cf-gov-state" value="${escapeHtml(data.governing_state||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','governing_state',this.value)"></div>
           <div class="form-group"><label>Payment Method</label><input type="text" id="cf-payment-method" value="${escapeHtml(data.payment_method||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payment_method',this.value)"></div>
+          <div class="form-group"><label>Contracting Company (optional)</label><input type="text" id="cf-entity-name" value="${escapeHtml(data.entity_name||'')}" placeholder="e.g. Dyamond Media LLC — leave blank if signing personally" ${locked?'disabled':''} onchange="saveContractField('${modelId}','entity_name',this.value)"></div>
+          <div class="form-group"><label>Company Details</label><input type="text" id="cf-entity-details" value="${escapeHtml(data.entity_details||'')}" placeholder="e.g. a Wyoming LLC, reg. no. …, address …" ${locked?'disabled':''} onchange="saveContractField('${modelId}','entity_details',this.value)"></div>
+          <div class="form-group full"><label>Model Bank Details (receives the model's share)</label><input type="text" id="cf-model-bank" value="${escapeHtml(data.model_bank_details||'')}" placeholder="Account name, bank, account / IBAN, SWIFT, currency" ${locked?'disabled':''} onchange="saveContractField('${modelId}','model_bank_details',this.value)"></div>
+          <div class="form-group full"><label>Agency Bank Details (receives the agency's share)</label><input type="text" id="cf-agency-bank" value="${escapeHtml(data.agency_bank_details||'')}" placeholder="Account name, bank, account / IBAN, SWIFT, currency" ${locked?'disabled':''} onchange="saveContractField('${modelId}','agency_bank_details',this.value)"></div>
           <div class="form-group full"><label>Payout Schedule Wording</label><input type="text" id="cf-payout-schedule" value="${escapeHtml(data.payout_schedule||'')}" ${locked?'disabled':''} onchange="saveContractField('${modelId}','payout_schedule',this.value)"></div>
         </div>
         ${locked
@@ -15847,10 +15871,10 @@ async function generateContractPdf(record){
     doc.text('BadBunnyMGMT Management Agreement',297.5,y,{align:'center'}); y+=28;
     doc.setFont('times','normal'); doc.setFontSize(10);
     addLine('Manager: Liam Eastgate / BadBunnyMGMT');
-    addLine(`Model: ${plain('{{model_legal_name}}')} ("${plain('{{model_stage_name}}')}")`);
+    contractPartyLines(record).forEach(l=>addLine(plain(l)));
     addLine('Collectively referred to as the "Parties."');
     y+=6;
-    defaultContractSections().forEach(s=>{
+    defaultContractSections(record).forEach(s=>{
       if(y>740){doc.addPage();y=50;}
       doc.setFont('times','bold'); addLine(s.h);
       doc.setFont('times','normal');
@@ -15861,7 +15885,7 @@ async function generateContractPdf(record){
     doc.setFont('times','bold'); addLine('IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.');
     doc.setFont('times','normal');
     addLine(`Manager: Liam Eastgate     Name: Liam Eastgate     Date: ${plain('{{agreement_date}}')}`);
-    addLine(`Model: ${plain('{{model_stage_name}}')}     Name: ${plain('{{model_legal_name}}')}     Date: ${plain('{{signed_date}}')}`);
+    addLine(`Model: ${record.entity_name?plain('{{entity_name}}')+' — signed by ':''}${plain('{{model_stage_name}}')}     Name: ${plain('{{model_legal_name}}')}${record.entity_name?' (for the Company and personally)':''}     Date: ${plain('{{signed_date}}')}`);
     if(record.signature_data){
       y+=6; if(y>700){doc.addPage();y=50;}
       doc.text('Signature:',marginX,y); y+=8;
