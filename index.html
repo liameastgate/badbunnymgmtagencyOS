@@ -418,6 +418,10 @@
   .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
   .lf-foot button:disabled { opacity:.4; cursor:default; }
   .lf-foot .lf-bin { color:#f87171; }
+  .lf-cap { display:flex; gap:6px; width:100%; max-width:520px; margin:8px auto 0; }
+  .lf-cap textarea { flex:1; resize:none; background:var(--surface); color:#fff; border:1px solid var(--border); border-radius:10px; padding:8px 10px; font:inherit; font-size:13px; min-height:38px; }
+  .lf-cap textarea:focus { border-color:#facc15; outline:none; }
+  .lf-cap button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:0 12px; font-weight:700; font-size:12.5px; cursor:pointer; white-space:nowrap; }
   .lf-foot .lf-keep { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; }
   .lf-trim { width:100%; max-width:520px; margin:8px auto 0; }
   .lf-tr-bar { position:relative; height:46px; border-radius:10px; background:linear-gradient(90deg,#1b1d33,#262a48); touch-action:none; cursor:ew-resize; user-select:none; }
@@ -4543,7 +4547,7 @@ function libMovePatch(it,cat,from){
   return {category:cat, categories:ex};
 }
 function libSoundOnly(i){ return i.category==='sounds'; }
-var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical';
+var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical,caption';
 // ── Thumbnails on demand ─────────────────────────────────────────────────────
 // id -> data URL (or null = this file has no thumbnail). Filled from this device's cache
 // (IndexedDB) first, then from the database 40 at a time, three requests in parallel.
@@ -5912,6 +5916,8 @@ function libFocusPaint(){
     +'<div class="lf-mid"><div class="lf-prev" id="lf-prev">'+(it.thumb_data?'<img src="'+it.thumb_data+'" style="filter:blur(6px);opacity:.5;">':'')+'<div class="lf-load">Loading…</div></div>'
     +'<div class="lf-meta"><b>'+escapeHtml(it.title||'Untitled')+'</b><span class="lf-m2"><br>'+escapeHtml(meta)+'</span></div>'
     +'<div id="lf-trim" class="lf-trim" style="display:none;"></div>'
+    +(libFocusKind(it)==='video'?'<div class="lf-cap"><textarea id="lf-cap" rows="1" placeholder="📝 On-screen caption this clip needs (optional)" onchange="libFocusCaption(this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur();}">'+escapeHtml(it.caption||'')+'</textarea>'
+      +((STATE.verticals||[]).length?'<button onclick="libTagPrompt(\''+it.id+'\').then(function(){setTimeout(libFocusPaint,400);})" title="Tag this clip">🏷 '+(it.vertical?escapeHtml(vertLabel(it.vertical)):'Tag')+'</button>':'')+'</div>':'')
     +'<div class="lf-chips">'+((it.edit_spec&&it.edit_spec.trim)?'<span class="cscan cscan-grey" title="Trimmed '+libFmtT(it.edit_spec.trim.start)+' → '+libFmtT(it.edit_spec.trim.end)+'">✂ Trimmed'+(it.edit_spec.trim.from_key?' · <a style="cursor:pointer;text-decoration:underline;" onclick="libUndoTrim(\''+it.id+'\')">undo</a>':'')+'</span>':'')+(LIB_TRIMMING[it.id]?'<span class="cscan cscan-grey">✂ Trimming…</span>':'')+(cur?'<span class="cscan cscan-grey">Now in '+cur.icon+' '+escapeHtml(cur.label)+'</span>':'<span class="cscan cscan-red">⚠ Uncategorised</span>')+libStateChip(it)+(LIB_SHOW_SCANNER&&libIsVideo(it)?libCompliancePill(it):'')+'</div>'+held+'</div>'
     +right+'</div>'
     +'<div class="lf-foot">'+((!LF.multi&&!libIsToSort(it.category))?'<button class="lf-keep" onclick="libFocusKeep()" title="It\'s already in the right folder">✓ Keep<span class="lf-hs"> here</span> <kbd>K</kbd></button>':'')+(LF.multi?'<button class="lf-sort" onclick="libFocusSort()" '+(LF.pick.length?'':'disabled')+'>✓ Sort'+(LF.pick.length?' into '+LF.pick.length:'')+' <kbd>↵</kbd></button>':'')+'<button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
@@ -6141,6 +6147,10 @@ function libFocusToast(html){
   t.innerHTML=html; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; },2600);
 }
 var LF_BUSY=false;
+async function libFocusCaption(el){
+  var it=libFocusItem(); if(!it) return;
+  if(await libSetCaption(it.id,el.value)) libFocusToast(el.value.trim()?'📝 Caption saved — the Factory will burn this one':'📝 Caption removed');
+}
 // It's already in the right place: mark it sorted and move on.
 async function libFocusKeep(){
   if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it) return;
@@ -6298,7 +6308,7 @@ function libCardHtml(i){
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+libCaptionChip(i)+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +'<select class="lib-act" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
     +libCardActionOptions(i)
@@ -6314,6 +6324,7 @@ function libCardActionOptions(i){
   h+='<option value="phone">📲 Save to Photos</option><option value="download">⬇ Download</option><option value="edit">✏ Edit</option>';
   if(i.edit_spec&&i.edit_spec.trim&&i.edit_spec.trim.from_key) h+='<option value="untrim">↩ Undo trim</option>';
   if((STATE.verticals||[]).length) h+='<option value="tag">🏷 Tag…</option>';
+  if(libIsVideo(i)) h+='<option value="caption">📝 '+(i.caption?'Change':'Add')+' on-screen caption…</option>';
   h+='</optgroup>'+libMoveOptions('cat:',i.category).replace(/<optgroup label="/g,'<optgroup label="Move to → ')+'<optgroup label="Also in → (tick / untick)">';
   var extra=i.categories||[];
   Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k===i.category||k==='nsfw') return; var on=extra.indexOf(k)>=0; h+='<option value="also:'+k+'">'+(on?'☑':'☐')+' '+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
@@ -6333,6 +6344,7 @@ async function libCardAction(id,sel){
   if(v==='edit') return editLibraryItem(id);
   if(v==='untrim'){ if(confirm('Put the original (untrimmed) clip back?')) libUndoTrim(id); return; }
   if(v==='tag') return libTagPrompt(id);
+  if(v==='caption') return libCaptionPrompt(id);
   if(v==='delete') return deleteLibraryItem(id);
   if(v.indexOf('state:')===0) return libSetState(id,v.slice(6));
   if(v.indexOf('also:')===0){
@@ -6500,6 +6512,26 @@ async function libSetVertical(ids,key){
   (STATE.library||[]).forEach(function(i){ if(ids.indexOf(i.id)>=0) i.vertical=key||null; });
   renderLibraryList();
   var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent=(key?'Tagged '+r.data.length+' as '+vertLabel(key):'Removed the tag from '+r.data.length); }
+}
+// 📝 Caption: the exact on-screen text a clip needs (e.g. a reel whose audio only works with
+// one particular caption). The Content Factory burns THIS instead of a random caption-bank line
+// and keeps the clip's own audio.
+async function libSetCaption(id,text){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return false;
+  var v=String(text||'').trim()||null; if(v===(it.caption||null)) return true;
+  var r=await sb.from('content_library').update({caption:v}).eq('id',id).select('id');
+  if(r.error||!r.data||!r.data.length){ alert('Could not save the caption — '+(r.error?r.error.message:'no permission')); return false; }
+  it.caption=v; return true;
+}
+async function libCaptionPrompt(id){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  var t=prompt('On-screen caption for this clip (the Content Factory burns this exact text instead of a random one, and keeps the clip\'s own audio). Leave empty to remove.',it.caption||'');
+  if(t===null) return;
+  if(await libSetCaption(id,t)) renderLibraryList();
+}
+function libCaptionChip(i){
+  if(!i.caption) return '';
+  return '<span class="cscan" style="background:rgba(250,204,21,.14);color:#facc15;cursor:pointer;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="On-screen caption: '+escapeHtml(i.caption)+' — click to change" onclick="libCaptionPrompt(\''+i.id+'\')">📝 '+escapeHtml(i.caption)+'</span>';
 }
 async function libTagPrompt(id){
   var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
