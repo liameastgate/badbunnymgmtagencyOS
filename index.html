@@ -418,19 +418,21 @@
   .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
   .lf-foot button:disabled { opacity:.4; cursor:default; }
   .lf-foot .lf-bin { color:#f87171; }
-  .lf-trim { width:100%; max-width:520px; margin:8px auto 0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px; }
-  .lf-tr-bar { position:relative; height:10px; border-radius:6px; background:var(--surface2); overflow:hidden; margin:2px 0 4px; }
-  .lf-tr-bar i { position:absolute; top:0; bottom:0; background:rgba(239,68,68,.45); }
-  .lf-tr-bar b { position:absolute; top:0; bottom:0; background:linear-gradient(90deg,#22c55e,#16a34a); }
-  .lf-trim input[type=range] { width:100%; display:block; margin:2px 0; accent-color:#22c55e; }
-  .lf-tr-row { display:flex; gap:6px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:6px; }
-  .lf-tr-row button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:9px; padding:7px 11px; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .lf-trim { width:100%; max-width:520px; margin:8px auto 0; }
+  .lf-tr-bar { position:relative; height:46px; border-radius:10px; background:linear-gradient(90deg,#1b1d33,#262a48); touch-action:none; cursor:ew-resize; user-select:none; }
+  .lf-tr-off { position:absolute; top:0; bottom:0; background:rgba(0,0,0,.6); }
+  .lf-tr-off.l { left:0; border-radius:10px 0 0 10px; } .lf-tr-off.r { right:0; border-radius:0 10px 10px 0; }
+  .lf-tr-sel { position:absolute; top:0; bottom:0; border:3px solid #facc15; border-left-width:16px; border-right-width:16px; border-radius:10px; box-sizing:border-box; pointer-events:none; }
+  .lf-tr-h { position:absolute; top:0; bottom:0; width:30px; pointer-events:auto; cursor:ew-resize; }
+  .lf-tr-h.l { left:-24px; } .lf-tr-h.r { right:-24px; }
+  .lf-tr-h::after { content:''; position:absolute; top:50%; left:50%; width:3px; height:16px; margin:-8px 0 0 -1px; border-radius:2px; background:#000; opacity:.55; }
+  .lf-tr-play { position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; border-radius:1px; pointer-events:none; }
+  .lf-tr-row { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:8px; }
+  .lf-tr-row button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:9px; padding:8px 14px; font-weight:700; font-size:13px; cursor:pointer; }
   .lf-tr-row button:disabled { opacity:.4; cursor:default; }
-  .lf-tr-row .lf-tr-save { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; }
-  .lf-tr-row kbd { font-family:inherit; font-size:10.5px; color:var(--text2); border:1px solid var(--border); border-radius:5px; padding:0 5px; }
-  .lf-tr-t { font-size:13px; font-weight:800; text-align:center; width:100%; order:-1; } .lf-tr-t small { font-weight:600; color:var(--text2); font-size:11px; margin-left:4px; }
+  .lf-tr-row .lf-tr-save { background:#facc15; border-color:#facc15; color:#111; }
+  .lf-tr-t { font-size:13px; font-weight:800; text-align:center; flex:1; } .lf-tr-t small { font-weight:600; color:var(--text2); font-size:11.5px; }
   .lf-in.lf-trimming .lf-prev { max-height:40vh; }
-  .lf-in.lf-trimming { padding-bottom:90px; }
   .lf-newset { width:100%; border:1px dashed rgba(244,63,94,.55); background:none; color:#fb7185; border-radius:10px; padding:8px; font-weight:800; font-size:12.5px; cursor:pointer; margin:-2px 0 8px; }
   .lf-foot .lf-sort { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; color:#fff; font-weight:800; }
   .lf-mode { border:1px solid var(--border); background:var(--surface2); color:var(--text2); border-radius:10px; padding:9px 12px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap; }
@@ -5936,38 +5938,50 @@ function libFocusTrimOpen(){
   libFF().catch(function(){});   // start downloading the trimmer now
   libFocusTrimPaint();
 }
+// One bar, two handles — drag them in. The clip plays on a loop between them so what you see is
+// what you keep.
 function libFocusTrimPaint(){
   var box=document.getElementById('lf-trim'), t=LF&&LF.trim; if(!box) return;
   var inn=document.querySelector('#lf-overlay .lf-in'); if(inn) inn.classList.toggle('lf-trimming',!!t);
   if(!t){ box.innerHTML=''; box.style.display='none'; return; }
-  var l=t.start/t.dur*100, r=t.end/t.dur*100;
   box.style.display='block';
-  box.innerHTML='<div class="lf-tr-bar"><i style="left:0;width:'+l+'%"></i><b style="left:'+l+'%;width:'+(r-l)+'%"></b><i style="left:'+r+'%;right:0"></i></div>'
-    +'<input type="range" min="0" max="'+t.dur+'" step="0.05" value="'+t.start+'" oninput="libFocusTrimSet(\'start\',+this.value,true)" aria-label="Start">'
-    +'<input type="range" min="0" max="'+t.dur+'" step="0.05" value="'+t.end+'" oninput="libFocusTrimSet(\'end\',+this.value,true)" aria-label="End">'
-    +'<div class="lf-tr-row"><button onclick="libFocusTrimSet(\'start\')">⏮ Start here <kbd>[</kbd></button>'
-    +'<span class="lf-tr-t">'+libFmtT(t.start)+' → '+libFmtT(t.end)+' <small>('+libFmtT(t.end-t.start)+' kept · '+(t.dur-(t.end-t.start)).toFixed(1)+'s cut)</small></span>'
-    +'<button onclick="libFocusTrimSet(\'end\')">End here ⏭ <kbd>]</kbd></button></div>'
-    +'<div class="lf-tr-row"><button onclick="libFocusTrimPreview()">▶ Preview</button><button class="lf-tr-save" onclick="libFocusTrimSave()" '+((t.start>0.05||t.end<t.dur-0.05)?'':'disabled')+'>✂ Save trim</button><button onclick="libFocusTrimClose()">Cancel</button></div>';
+  box.innerHTML='<div class="lf-tr-bar" id="lf-tr-bar"><i class="lf-tr-off l"></i><i class="lf-tr-off r"></i><div class="lf-tr-sel"><span class="lf-tr-h l" data-h="start"></span><span class="lf-tr-h r" data-h="end"></span></div><em class="lf-tr-play"></em></div>'
+    +'<div class="lf-tr-row"><button onclick="libFocusTrimClose()">Cancel</button><span class="lf-tr-t"></span><button class="lf-tr-save" onclick="libFocusTrimSave()">✂ Save</button></div>';
+  libFocusTrimDraw();
+  var bar=document.getElementById('lf-tr-bar');
+  bar.onpointerdown=function(e){
+    var rc=bar.getBoundingClientRect(), x=(e.clientX-rc.left)/rc.width*t.dur;
+    var h=e.target.getAttribute('data-h') || (Math.abs(x-t.start)<Math.abs(x-t.end)?'start':'end');   // grab the nearest handle
+    bar.setPointerCapture(e.pointerId); e.preventDefault();
+    var v=document.querySelector('#lf-prev video'); if(v) v.pause();
+    var move=function(ev){ libFocusTrimSet(h,(ev.clientX-rc.left)/rc.width*t.dur); };
+    var up=function(){ bar.removeEventListener('pointermove',move); bar.removeEventListener('pointerup',up); bar.removeEventListener('pointercancel',up);
+      if(v){ v.currentTime=t.start; v.play().catch(function(){}); } };
+    bar.addEventListener('pointermove',move); bar.addEventListener('pointerup',up); bar.addEventListener('pointercancel',up);
+    move(e);
+  };
+  var v=document.querySelector('#lf-prev video');
+  if(v&&!v._trimLoop){ v._trimLoop=true; v.addEventListener('timeupdate',function(){
+    var tt=LF&&LF.trim; if(!tt||tt.id!==(libFocusItem()||{}).id) return;
+    var pl=document.querySelector('#lf-tr-bar .lf-tr-play'); if(pl) pl.style.left=(v.currentTime/tt.dur*100)+'%';
+    if(!v.paused&&(v.currentTime>=tt.end||v.currentTime<tt.start-0.3)) v.currentTime=tt.start;   // loop the kept part
+  }); }
 }
-// set from the slider (val) or from where the video is right now
-function libFocusTrimSet(which,val,fromSlider){
+function libFocusTrimDraw(){
+  var t=LF&&LF.trim, bar=document.getElementById('lf-tr-bar'); if(!t||!bar) return;
+  var l=t.start/t.dur*100, r=t.end/t.dur*100;
+  bar.querySelector('.lf-tr-off.l').style.width=l+'%'; bar.querySelector('.lf-tr-off.r').style.left=r+'%';
+  var sel=bar.querySelector('.lf-tr-sel'); sel.style.left=l+'%'; sel.style.width=(r-l)+'%';
+  var cut=t.dur-(t.end-t.start);
+  document.querySelector('#lf-trim .lf-tr-t').innerHTML=(cut<0.05?'Drag the ends in':libFmtT(t.end-t.start)+' kept <small>· '+cut.toFixed(1)+'s cut</small>');
+  document.querySelector('#lf-trim .lf-tr-save').disabled=cut<0.05;
+}
+function libFocusTrimSet(which,val){
   var t=LF&&LF.trim, v=document.querySelector('#lf-prev video'); if(!t) return;
   var x=val!=null?val:(v?v.currentTime:0);
   if(which==='start') t.start=Math.max(0,Math.min(x,t.end-0.5)); else t.end=Math.min(t.dur,Math.max(x,t.start+0.5));
-  if(v&&fromSlider){ v.pause(); v.currentTime=which==='start'?t.start:t.end; }
-  if(fromSlider){   // don't rebuild the sliders while one is being dragged
-    var box=document.getElementById('lf-trim'), l=t.start/t.dur*100, r=t.end/t.dur*100, bar=box.querySelector('.lf-tr-bar');
-    bar.innerHTML='<i style="left:0;width:'+l+'%"></i><b style="left:'+l+'%;width:'+(r-l)+'%"></b><i style="left:'+r+'%;right:0"></i>';
-    box.querySelector('.lf-tr-t').innerHTML=libFmtT(t.start)+' → '+libFmtT(t.end)+' <small>('+libFmtT(t.end-t.start)+' kept · '+(t.dur-(t.end-t.start)).toFixed(1)+'s cut)</small>';
-    box.querySelector('.lf-tr-save').disabled=!(t.start>0.05||t.end<t.dur-0.05);
-  } else libFocusTrimPaint();
-}
-function libFocusTrimPreview(){
-  var t=LF&&LF.trim, v=document.querySelector('#lf-prev video'); if(!t||!v) return;
-  v.loop=false; v.currentTime=t.start; v.play().catch(function(){});
-  var stop=function(){ if(v.currentTime>=t.end){ v.pause(); v.removeEventListener('timeupdate',stop); v.loop=true; } };
-  v.addEventListener('timeupdate',stop);
+  if(v){ if(val!=null) v.currentTime=which==='start'?t.start:t.end; }
+  libFocusTrimDraw();
 }
 function libFocusTrimClose(){ if(LF) LF.trim=null; libFocusTrimPaint(); }
 // Save: runs in the background so you can keep sorting.
