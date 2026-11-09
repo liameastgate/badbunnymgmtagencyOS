@@ -702,6 +702,7 @@
       <div class="form-group" style="margin-bottom:14px;"><label>Email</label><input type="email" id="login-email" placeholder="you@gmail.com"></div>
       <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()"></div>
       <button class="btn btn-primary btn-block" onclick="signIn()">Sign In →</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" onclick="forgotPassword();return false;" style="font-size:12.5px;color:var(--accent2);">Forgot your password?</a></div>
     </div>
     <div id="signup-form" style="display:none;">
       <div class="form-group" style="margin-bottom:14px;"><label>Full Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
@@ -768,6 +769,7 @@
       </div>
       <div class="user-email" id="user-email-display"></div>
       <span class="user-role" id="user-role-display"></span>
+      <button class="btn-signout" onclick="openPasswordBox()" style="margin-bottom:6px;">🔑 Change password</button>
       <button class="btn-signout" onclick="signOut()">Sign out</button>
     </div>
   </div>
@@ -3397,6 +3399,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   else { hide('loading-overlay'); show('auth-screen'); }
 
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') { PW_RECOVERY=true; setTimeout(function(){ openPasswordBox(true); },400); }
     if (event === 'SIGNED_IN' && session) await initApp(session.user);
     if (event === 'SIGNED_OUT') { hide('app'); show('auth-screen'); }
   });
@@ -3428,6 +3431,7 @@ async function initApp(user) {
   document.getElementById('user-email-display').textContent = profile.email;
   document.getElementById('user-role-display').textContent = profile.role;
   buildNav(profile.role);
+  if (PW_RECOVERY) setTimeout(function(){ openPasswordBox(true); },300);
   await loadAllData();
   setTimeout(function(){ libResumeJobs(); },1500);   // finish uploads left over from last time
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
@@ -4039,6 +4043,52 @@ function switchAuthTab(tab) {
   document.getElementById('pending-screen').style.display = 'none';
 }
 
+// ── Passwords ────────────────────────────────────────────────
+// "Forgot your password?" emails a reset link (Supabase). Opening that link signs them in and
+// fires PASSWORD_RECOVERY, which pops the "Set a new password" box. Anyone signed in can also
+// change theirs from the sidebar, and admins can send a reset link from Team Access.
+var PW_RECOVERY=/type=recovery/.test(location.hash||'');
+async function sendResetLink(email){
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  return error;
+}
+async function forgotPassword(){
+  const email=document.getElementById('login-email').value.trim();
+  if(!email) return showAuthMsg('Type your email above first, then tap "Forgot your password?" again.','error');
+  const err=await sendResetLink(email);
+  if(err) return showAuthMsg(err.message,'error');
+  showAuthMsg('Check your inbox (and spam) for a link to set a new password.','success');
+}
+async function sendResetFor(email){
+  if(!confirm('Email a "set a new password" link to '+email+'?')) return;
+  const err=await sendResetLink(email);
+  if(err) return showAlert('team-alert','Could not send — '+err.message,'error');
+  showAlert('team-alert','Reset link sent to '+email+'. Tell them to check spam if it isn\'t in their inbox.','success');
+}
+function openPasswordBox(recovery){
+  let ov=document.getElementById('pw-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='pw-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;'; document.body.appendChild(ov); }
+  ov.innerHTML='<div class="card" style="width:100%;max-width:380px;margin:0;">'
+    +'<div class="card-title">'+(recovery?'🔑 Set a new password':'🔑 Change password')+'</div>'
+    +(recovery?'<div style="font-size:12.5px;color:var(--text2);margin-bottom:12px;">You\'re signed in from the reset link. Pick a new password to finish.</div>':'')
+    +'<div class="form-group" style="margin-bottom:12px;"><label>New password</label><input type="password" id="pw-new" placeholder="At least 8 characters" autocomplete="new-password"></div>'
+    +'<div class="form-group" style="margin-bottom:12px;"><label>Type it again</label><input type="password" id="pw-new2" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')savePassword()"></div>'
+    +'<div id="pw-msg" style="font-size:12.5px;min-height:18px;margin-bottom:10px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'+(recovery?'':'<button class="btn btn-ghost" onclick="closePasswordBox()">Cancel</button>')+'<button class="btn btn-primary" onclick="savePassword()">Save password</button></div></div>';
+  ov.style.display='flex'; setTimeout(function(){ const i=document.getElementById('pw-new'); if(i) i.focus(); },50);
+}
+function closePasswordBox(){ const ov=document.getElementById('pw-overlay'); if(ov) ov.style.display='none'; }
+async function savePassword(){
+  const a=document.getElementById('pw-new').value, b=document.getElementById('pw-new2').value, msg=document.getElementById('pw-msg');
+  const say=function(t,ok){ msg.style.color=ok?'var(--green,#4ade80)':'var(--red,#f87171)'; msg.textContent=t; };
+  if(a.length<8) return say('Use at least 8 characters.');
+  if(a!==b) return say('The two passwords don\'t match.');
+  const { error } = await sb.auth.updateUser({ password: a });
+  if(error) return say(error.message);
+  say('✓ Password saved',true);
+  if(PW_RECOVERY){ PW_RECOVERY=false; try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+  setTimeout(closePasswordBox,900);
+}
 async function signIn() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
@@ -12420,7 +12470,7 @@ async function loadTeam(){
       <td><button class="btn btn-sm ${hasCustom?'btn-primary':'btn-ghost'}" onclick="openPermEditor('${u.id}','${u.name||u.email}','${u.role}',${JSON.stringify(u.permissions||[]).replace(/"/g,"'")})">
         ${hasCustom?'✏ Custom':'+ Set'}
       </button></td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteMember('${u.id}','${(u.email||'').replace(/'/g,"\\'")}')">✕</button></td>
+      <td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" title="Email them a link to set a new password" onclick="sendResetFor('${(u.email||'').replace(/'/g,"\\'")}')">🔑</button> <button class="btn btn-sm btn-danger" onclick="deleteMember('${u.id}','${(u.email||'').replace(/'/g,"\\'")}')">✕</button></td>
     </tr>`;
   });
 }
