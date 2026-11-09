@@ -418,6 +418,7 @@
   .lf-foot button { border:1px solid var(--border); background:var(--surface2); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; }
   .lf-foot button:disabled { opacity:.4; cursor:default; }
   .lf-foot .lf-bin { color:#f87171; }
+  .lf-foot .lf-keep { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; }
   .lf-trim { width:100%; max-width:520px; margin:8px auto 0; }
   .lf-tr-bar { position:relative; height:46px; border-radius:10px; background:linear-gradient(90deg,#1b1d33,#262a48); touch-action:none; cursor:ew-resize; user-select:none; }
   .lf-tr-off { position:absolute; top:0; bottom:0; background:rgba(0,0,0,.6); }
@@ -4478,6 +4479,12 @@ async function loadContentLibrary(){
 // Sounds only ever show inside the Sounds folder -- never in "All" or a model's file count.
 // Folders that are a to-do list, not a destination.
 function libIsToSort(k){ return k==='inbox'||k==='unsure'; }
+// 10 Nov: once a file has been sorted by hand (Focus, a card's Move to, a bulk move, or ✓ Keep
+// here) it's marked done (edit_spec.sorted) and Focus stops showing it. Anything sitting in
+// New uploads / Unsure always counts as unsorted.
+function libIsSorted(i){ return !libIsToSort(i.category) && !!(i.edit_spec&&i.edit_spec.sorted); }
+function libSortedSpec(i){ return Object.assign({},i.edit_spec||{},{sorted:{at:new Date().toISOString(),by:STATE.profile?.email||null}}); }
+function libFocusQueue(){ return libFiltered().filter(function(i){ return !libIsSorted(i); }); }
 // A MOVE takes the file out of the folder you moved it from -- including when that folder
 // was one of its extra "Also in" folders (that was the bug: the main folder changed but the
 // file still showed in the old one through its extras). Any other extras are kept.
@@ -5711,7 +5718,7 @@ function renderLibraryList(){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
     +catTab('','All','')+libVaultKeys(LIB_F.vault).map(function(c){return catTab(c,LIB_CATEGORIES[c].label,LIB_CATEGORIES[c].icon);}).join('')
     +(mine.some(function(i){return !i.category||!LIB_CATEGORIES[i.category];})?catTab('none','Uncategorised','⚠'):'')
-    +'<button class="lf-go" onclick="libFocusOpen()" title="Go through this folder one file at a time">🎯 Focus'+(function(){ var n=libFiltered().length; return n?' · '+n:''; })()+'</button></div>'
+    +'<button class="lf-go" onclick="libFocusOpen()" title="Go through this folder one file at a time">🎯 Focus'+(function(){ var n=libFocusQueue().length; return n?' · '+n:' ✓'; })()+'</button></div>'
     +(LIB_SHOW_SCANNER?''+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'
     +'<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-right:2px;">Scan result</span>'
     +(function(){
@@ -5780,9 +5787,14 @@ function libFocusTitle(){
   var f=LIB_F.category&&LIB_CATEGORIES[LIB_F.category]?LIB_CATEGORIES[LIB_F.category].label:(LIB_F.category==='none'?'Uncategorised':LIB_VAULTS[LIB_F.vault].label);
   return libOwnerName(LIB_F.model)+' · '+f;
 }
-function libFocusOpen(){
-  var items=libFiltered();
-  if(!items.length){ alert('Nothing in this folder to go through.'); return; }
+function libFocusOpen(again){
+  var items=again?libFiltered():libFocusQueue();
+  if(!items.length){
+    var all=libFiltered().length;
+    if(all&&confirm('Everything here is already sorted ✓\n\nGo through all '+all+' again anyway?')) return libFocusOpen(true);
+    if(!all) alert('Nothing in this folder to go through.');
+    return;
+  }
   var multi=false; try{ multi=localStorage.getItem('lf_multi')==='1'; }catch(e){}
   LF={setId:null, from:LIB_F.category, queue:items.map(function(i){return i.id;}), i:0, hist:[], binned:[], urls:{}, token:0, title:libFocusTitle(), multi:multi, pickFor:null, pick:[]};
   var ov=document.getElementById('lf-overlay');
@@ -5852,7 +5864,7 @@ function libFocusPaint(){
     +'<div id="lf-trim" class="lf-trim" style="display:none;"></div>'
     +'<div class="lf-chips">'+((it.edit_spec&&it.edit_spec.trim)?'<span class="cscan cscan-grey" title="Trimmed '+libFmtT(it.edit_spec.trim.start)+' → '+libFmtT(it.edit_spec.trim.end)+'">✂ Trimmed'+(it.edit_spec.trim.from_key?' · <a style="cursor:pointer;text-decoration:underline;" onclick="libUndoTrim(\''+it.id+'\')">undo</a>':'')+'</span>':'')+(LIB_TRIMMING[it.id]?'<span class="cscan cscan-grey">✂ Trimming…</span>':'')+(cur?'<span class="cscan cscan-grey">Now in '+cur.icon+' '+escapeHtml(cur.label)+'</span>':'<span class="cscan cscan-red">⚠ Uncategorised</span>')+libStateChip(it)+(LIB_SHOW_SCANNER&&libIsVideo(it)?libCompliancePill(it):'')+'</div>'+held+'</div>'
     +right+'</div>'
-    +'<div class="lf-foot">'+(LF.multi?'<button class="lf-sort" onclick="libFocusSort()" '+(LF.pick.length?'':'disabled')+'>✓ Sort'+(LF.pick.length?' into '+LF.pick.length:'')+' <kbd>↵</kbd></button>':'')+'<button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
+    +'<div class="lf-foot">'+((!LF.multi&&!libIsToSort(it.category))?'<button class="lf-keep" onclick="libFocusKeep()" title="It\'s already in the right folder">✓ Keep<span class="lf-hs"> here</span> <kbd>K</kbd></button>':'')+(LF.multi?'<button class="lf-sort" onclick="libFocusSort()" '+(LF.pick.length?'':'disabled')+'>✓ Sort'+(LF.pick.length?' into '+LF.pick.length:'')+' <kbd>↵</kbd></button>':'')+'<button onclick="libFocusUndo()" '+(LF.hist.length?'':'disabled')+'>↶ Undo <kbd>Z</kbd></button><button onclick="libFocusSkip()">Skip <kbd>→</kbd></button>'
     +(libFocusKind(it)==='video'?'<button onclick="libFocusTrimOpen()">✂<span class="lf-hs"> Trim</span> <kbd>T</kbd></button>':'')+'<button onclick="downloadLibraryItem(\''+it.id+'\')">⬇<span class="lf-hs"> Download</span></button><button class="lf-bin" onclick="libFocusBin()">🗑 Bin</button></div>'
     +'<div class="lf-toast" id="lf-toast"></div></div>';
   var tok=++LF.token;
@@ -6079,6 +6091,21 @@ function libFocusToast(html){
   t.innerHTML=html; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; },2600);
 }
 var LF_BUSY=false;
+// It's already in the right place: mark it sorted and move on.
+async function libFocusKeep(){
+  if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it) return;
+  if(libIsToSort(it.category)){ libFocusToast('Pick a folder for this one — it\'s still in '+escapeHtml(LIB_CATEGORIES[it.category].label)); return; }
+  LF_BUSY=true;
+  var prev={edit_spec:it.edit_spec||null}, patch={edit_spec:libSortedSpec(it)};
+  if(it.state==='needs_review'){ prev.state=it.state; prev.state_changed_at=it.state_changed_at; patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
+  var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
+  LF_BUSY=false;
+  if(r.error||!r.data||!r.data.length){ libFocusToast('⚠ Could not save — '+escapeHtml(r.error?r.error.message:'no permission')); return; }
+  Object.assign(it,r.data[0]);
+  LF.hist.push({type:'move',id:it.id,prev:prev,label:'kept'});
+  LF.i++; libFocusPaint();
+  libFocusToast('✓ Kept in '+escapeHtml((LIB_CATEGORIES[it.category]||{}).label||'')+' <a onclick="libFocusUndo()">Undo</a>');
+}
 async function libFocusMove(cat){
   if(LF_BUSY||!LF) return; var it=libFocusItem(); if(!it||!LIB_CATEGORIES[cat]) return;
   if(libOfOnly(it.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
@@ -6088,7 +6115,7 @@ async function libFocusMove(cat){
   // and moving it releases it back to Fresh (same as Move to… on the card). Undo restores it.
   var patch=libMovePatch(it,cat,LF.from);
   if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
-  prev.tags=it.tags;
+  prev.tags=it.tags; prev.edit_spec=it.edit_spec||null; patch.edit_spec=libSortedSpec(it);
   var sp=libFocusSetPatch(it,cat==='sexting'||(patch.categories||[]).indexOf('sexting')>=0); if(sp) patch.tags=sp.tags;
   var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
   LF_BUSY=false;
@@ -6121,7 +6148,7 @@ async function libFocusSort(){
   var prev={category:it.category, categories:(it.categories||[]).slice(), state:it.state, state_changed_at:it.state_changed_at};
   var patch={category:picks[0], categories:picks.slice(1)};
   if(it.state==='needs_review'){ patch.state='fresh'; patch.state_changed_at=new Date().toISOString(); }
-  prev.tags=it.tags;
+  prev.tags=it.tags; prev.edit_spec=it.edit_spec||null; patch.edit_spec=libSortedSpec(it);
   var sp=libFocusSetPatch(it,picks.indexOf('sexting')>=0); if(sp) patch.tags=sp.tags;
   var r=await sb.from('content_library').update(patch).eq('id',it.id).select();
   LF_BUSY=false;
@@ -6180,6 +6207,7 @@ function libFocusKey(e){
   if(e.key==='ArrowRight'){ e.preventDefault(); return libFocusSkip(); }
   if(e.key==='Enter'&&LF.multi){ e.preventDefault(); return libFocusSort(); }
   if(e.key==='m'||e.key==='M'){ e.preventDefault(); return libFocusMulti(); }
+  if(e.key==='k'||e.key==='K'){ e.preventDefault(); return libFocusKeep(); }
   if(e.key==='t'||e.key==='T'){ e.preventDefault(); return LF.trim?libFocusTrimClose():libFocusTrimOpen(); }
   if(LF.trim&&(e.key==='['||e.key===']')){ e.preventDefault(); return libFocusTrimSet(e.key==='['?'start':'end'); }
   if(e.key==='z'||e.key==='Z'||e.key==='Backspace'){ e.preventDefault(); return libFocusUndo(); }
@@ -6262,9 +6290,10 @@ async function libCardAction(id,sel){
     if(libOfOnly(it2.category)&&!libOfOnly(k)&&!confirm('This is OnlyFans-only content. Adding it to '+LIB_CATEGORIES[k].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var list=(it2.categories||[]).slice(); var at=list.indexOf(k);
     if(at>=0) list.splice(at,1); else list.push(k);
-    var r2=await sb.from('content_library').update({categories:list}).eq('id',id).select();
+    var sp2=libSortedSpec(it2);
+    var r2=await sb.from('content_library').update({categories:list,edit_spec:sp2}).eq('id',id).select();
     if(r2.error||!r2.data||!r2.data.length){ alert('Could not update — '+(r2.error?r2.error.message:'no permission')); return; }
-    it2.categories=list; renderLibraryList();
+    it2.categories=list; it2.edit_spec=sp2; renderLibraryList();
     var s2=document.getElementById('cl-upload-status'); if(s2){ s2.style.display='block'; s2.textContent=(at>=0?'Removed from ':'Added to ')+LIB_CATEGORIES[k].label; }
     return;
   }
@@ -6274,7 +6303,7 @@ async function libCardAction(id,sel){
     if(cur0&&libOfOnly(cur0.category)&&!libOfOnly(cat)&&!confirm('This is OnlyFans-only content. Moving it to '+LIB_CATEGORIES[cat].label+' means it can be posted publicly.\n\nOnly do this if it is definitely safe. Continue?')) return;
     var cur=(STATE.library||[]).find(function(x){return x.id===id;});
     if(!cur) return;
-    var mp=libMovePatch(cur,cat,LIB_F.category);
+    var mp=libMovePatch(cur,cat,LIB_F.category); mp.edit_spec=libSortedSpec(cur);
     if(cur.state==='needs_review'){ mp.state='fresh'; mp.state_changed_at=new Date().toISOString(); }   // moving a held file also releases it
     var r=await sb.from('content_library').update(mp).eq('id',id).select();
     if(r.error||!r.data||!r.data.length){ alert('Could not move — '+(r.error?r.error.message:'no permission')); return; }
@@ -6318,8 +6347,9 @@ async function libBulkMove(what){
     for(var x=0;x<ids.length;x++){
       var it=(STATE.library||[]).find(function(z){return z.id===ids[x];}); if(!it||it.category===addk) continue;
       var lst=(it.categories||[]).slice(); if(lst.indexOf(addk)<0) lst.push(addk);
-      var rr=await sb.from('content_library').update({categories:lst}).eq('id',ids[x]).select();
-      if(!rr.error&&rr.data&&rr.data.length){ it.categories=lst; okn++; }
+      var esx=libSortedSpec(it);
+      var rr=await sb.from('content_library').update({categories:lst,edit_spec:esx}).eq('id',ids[x]).select();
+      if(!rr.error&&rr.data&&rr.data.length){ it.categories=lst; it.edit_spec=esx; okn++; }
     }
     LIB_SEL={}; renderLibraryList();
     var st2=document.getElementById('cl-upload-status'); if(st2){ st2.style.display='block'; st2.textContent='Added '+okn+' file'+(okn===1?'':'s')+' to '+LIB_CATEGORIES[addk].label; }
@@ -6332,9 +6362,17 @@ async function libBulkMove(what){
     var si=parseInt(sp,10)-1; if(!sk[si]){ alert('No state '+sp); return; }
     patch={state:sk[si],state_changed_at:new Date().toISOString()}; label=LIB_STATES[sk[si]].label;
   }
-  var r=await sb.from('content_library').update(patch).in('id',ids).select();
+  var r;
+  if(what==='category'){
+    var okc=0, errc=null, sel=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]; });
+    for(var c2=0;c2<sel.length;c2++){ var pc=Object.assign({},patch,{edit_spec:libSortedSpec(sel[c2])}); var rc=await sb.from('content_library').update(pc).eq('id',sel[c2].id).select(); if(rc.error) errc=rc.error; else if(rc.data&&rc.data.length){ Object.assign(sel[c2],rc.data[0]); okc++; } }
+    if(!okc){ alert('Could not update — '+(errc?errc.message:'no permission')); return; }
+    r={data:{length:okc}};
+  } else {
+  r=await sb.from('content_library').update(patch).in('id',ids).select();
   if(r.error||!r.data||!r.data.length){ alert('Could not update — '+(r.error?r.error.message:'no permission')); return; }
   (STATE.library||[]).forEach(function(i){ if(LIB_SEL[i.id]) Object.assign(i,patch); });
+  }
   LIB_SEL={}; renderLibraryList();
   var st=document.getElementById('cl-upload-status'); if(st){ st.style.display='block'; st.textContent='Moved '+r.data.length+' file'+(r.data.length===1?'':'s')+' → '+label; }
 }
@@ -6353,14 +6391,14 @@ async function libBulkMoveTo(sel){
   }
   // Files with nothing extra to keep go in one request; the rest one by one (their extras differ).
   var from=LIB_F.category, plain=[], fancy=[];
-  picked.forEach(function(i){ (libMovePatch(i,cat,from).categories.length?fancy:plain).push(i); });
-  var moved=0, err=null;
+  picked.forEach(function(i){ ((libMovePatch(i,cat,from).categories.length||i.edit_spec)?fancy:plain).push(i); });
+  var moved=0, err=null, doneSpec={sorted:{at:new Date().toISOString(),by:STATE.profile?.email||null}};
   if(plain.length){
-    var r0=await sb.from('content_library').update({category:cat,categories:[]}).in('id',plain.map(function(i){return i.id;})).select();
+    var r0=await sb.from('content_library').update({category:cat,categories:[],edit_spec:doneSpec}).in('id',plain.map(function(i){return i.id;})).select();
     if(r0.error) err=r0.error; else (r0.data||[]).forEach(function(row){ var it=picked.find(function(i){return i.id===row.id;}); if(it) Object.assign(it,row); moved++; });
   }
   for(var fi=0;fi<fancy.length;fi++){
-    var r1=await sb.from('content_library').update(libMovePatch(fancy[fi],cat,from)).eq('id',fancy[fi].id).select();
+    var r1=await sb.from('content_library').update(Object.assign(libMovePatch(fancy[fi],cat,from),{edit_spec:libSortedSpec(fancy[fi])})).eq('id',fancy[fi].id).select();
     if(r1.error) err=r1.error; else if(r1.data&&r1.data.length){ Object.assign(fancy[fi],r1.data[0]); moved++; }
   }
   if(!moved){ alert('Could not move — '+(err?err.message:'no permission')); return; }
