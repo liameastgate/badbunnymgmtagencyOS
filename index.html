@@ -3413,6 +3413,7 @@ async function initApp(user) {
   document.getElementById('user-role-display').textContent = profile.role;
   buildNav(profile.role);
   await loadAllData();
+  setTimeout(function(){ libResumeJobs(); },1500);   // finish uploads left over from last time
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
   const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'fans' : profile.role === 'traffic' ? 'traffic' : 'overview';
   let savedPage=null;
@@ -4812,9 +4813,10 @@ function libUpBar(html,show){
   b.style.display=show===false?'none':'block';
 }
 async function libRetryFailed(){
-  var jobs=LIB_FAILED.splice(0); var groups=new Map();
-  jobs.forEach(function(j){ var g=groups.get(j.opt)||[]; g.push(j.file); groups.set(j.opt,g); });
-  for(const [opt,files] of groups){ await libUploadFiles(files,Object.assign({},opt,{skipHdAsk:true})); }
+  var jobs=LIB_FAILED.splice(0); if(!jobs.length) return;
+  jobs.forEach(function(j){ if(!j.uploaded){ var nk=j.row.r2_key.replace(/\/(\d+)_/,'/'+Date.now()+'_'); libJobDel(j.jid); j.jid=nk; j.row.r2_key=nk; j.saved=false; } });
+  libJobsSave(jobs);
+  var r=await libRunJobs(jobs,{}); r.forEach(function(x){ if(x.error) LIB_FAILED.push(x.job); });
   try{ if(typeof renderLibraryList==='function') renderLibraryList(); }catch(e){}
 }
 // Upload N files as library items. strictHd: reject outright (models) vs ask (agency).
@@ -4859,47 +4861,159 @@ async function libUploadFiles(files,opt){
   }
 
   // ── pass 2: upload ──
-  await libWakeOn();
-  let nOk=0, nBad=0;
-  const bar=function(i,pc,note){
-    libUpBar('<b>Uploading '+(i+1)+' of '+use.length+'</b> · '+Math.round((pc||0)*100)+'%'
-      +(note?' <span style="color:#fbbf24;">· '+escapeHtml(note)+'</span>':'')
-      +'<div style="color:var(--text2,#aaa);font-size:12px;margin-top:3px;">Keep this screen open until it says done — the screen is kept awake for you.</div>');
-  };
-  try{
-  for(let i=0;i<use.length;i++){
-    const file=use[i].file, probe=use[i].probe;
-    const label=(use.length>1?(i+1)+'/'+use.length+' · ':'')+file.name;
+  // 9 Nov: each file becomes a saved "job" (row details + the file itself, kept in this
+  // browser) BEFORE it uploads, so a closed tab / locked phone / dead battery no longer loses
+  // the rest of a batch: next time the app opens it carries on by itself. 3 files go up at once.
+  const jobs=use.map(function(x,i){
+    const file=x.file, probe=x.probe, meta=opt.perFile?opt.perFile(file)||{}:{};
     const safe=(file.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
     const key='library/'+(opt.modelId||'agency')+'/'+Date.now()+'_'+i+'_'+safe;
-    try{
-      bar(i,0);
-      await libUploadResumable(key,file,
-        function(pc){ bar(i,pc); opt.onStatus&&opt.onStatus(label,'Uploading…',pc); },
-        function(note){ bar(i,null,note); opt.onStatus&&opt.onStatus(label,note,0); });
-      const meta=opt.perFile?opt.perFile(file)||{}:{};
-      const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:meta.title||file.name,tags:meta.tags||opt.tags||null,r2_key:key,size_bytes:file.size,content_type:file.type||null,
-        uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
-        width:probe.width||null,height:probe.height||null,duration_sec:(probe.duration&&isFinite(probe.duration))?Math.round(probe.duration*10)/10:null,bitrate_kbps:probe.kbps||null,thumb_data:probe.thumb||null};
-      const vtag=meta.vertical||opt.vertical||null;
-      if(vtag) row.vertical=vtag;
-      const{data:ins,error}=await sb.from('content_library').insert(row).select();
-      if(error) throw new Error(error.message);
-      const item=ins&&ins[0];
-      if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(LIB_SHOW_SCANNER&&probe.kind==='video'&&autoScan&&!libOfOnly(opt.category)) scanLibraryItem(item.id); }
-      results.push({file,item,key}); nOk++;
-      opt.onStatus&&opt.onStatus(label,'Done ✓',1);
-    }catch(e){
-      results.push({file,error:e.message}); nBad++;
-      LIB_FAILED.push({file:file,opt:opt});
-      opt.onStatus&&opt.onStatus(label,'Failed: '+e.message,0);
-    }
-  }
+    const row={model_id:opt.modelId||null,owner_type:opt.ownerType||(opt.modelId?'model':'agency'),title:meta.title||file.name,tags:meta.tags||opt.tags||null,r2_key:key,size_bytes:file.size,content_type:file.type||null,
+      uploaded_by_email:STATE.profile?.email||null,category:opt.category||null,state:'fresh',storage_bucket:'r2',source_order_id:opt.sourceOrderId||null,
+      width:probe.width||null,height:probe.height||null,duration_sec:(probe.duration&&isFinite(probe.duration))?Math.round(probe.duration*10)/10:null,bitrate_kbps:probe.kbps||null,thumb_data:probe.thumb||null};
+    const vtag=meta.vertical||opt.vertical||null; if(vtag) row.vertical=vtag;
+    return {jid:key, owner:STATE.profile?.email||'', name:file.name, size:file.size, type:file.type||'', created:Date.now(), row:row, file:file, video:probe.kind==='video'};
+  });
+  libJobsSave(jobs);   // in the background — uploading doesn't wait for it
+  const r=await libRunJobs(jobs,{onStatus:opt.onStatus, autoScan:autoScan, ofOnly:libOfOnly(opt.category)});
+  r.forEach(function(x){ if(x.item) results.push({file:x.job.file,item:x.item,key:x.job.row.r2_key}); else { results.push({file:x.job.file,error:x.error}); LIB_FAILED.push(x.job); } });
+  return results;
+}
+// Upload a list of jobs, 3 at a time; inserts each library row as its file lands.
+var LIB_PARALLEL=3;
+async function libRunJobs(jobs,o){
+  o=o||{}; const out=[], frac=jobs.map(function(){return 0;}); let next=0, nOk=0, nBad=0, note='';
+  const total=jobs.reduce(function(t,j){return t+(j.size||1);},0);
+  const bar=function(){
+    const done=jobs.reduce(function(t,j,i){return t+(j.size||1)*frac[i];},0);
+    libUpBar('<b>Uploading '+jobs.length+' file'+(jobs.length===1?'':'s')+'</b> · '+(nOk+nBad)+' done · '+Math.round(done/total*100)+'%'
+      +(note?' <span style="color:#fbbf24;">· '+escapeHtml(note)+'</span>':'')
+      +'<div style="color:var(--text2,#aaa);font-size:12px;margin-top:3px;">Best to keep this screen open. If you do leave, it carries on next time you open the app.</div>');
+  };
+  await libWakeOn();
+  try{
+    bar();
+    const worker=async function(){
+      while(next<jobs.length){
+        const k=next++, j=jobs[k], label=(jobs.length>1?(k+1)+'/'+jobs.length+' · ':'')+j.name;
+        try{
+          if(!j.uploaded){
+            await libUploadResumable(j.row.r2_key,j.file,
+              function(pc){ frac[k]=pc; bar(); o.onStatus&&o.onStatus(label,'Uploading…',pc); },
+              function(n){ note=n; bar(); o.onStatus&&o.onStatus(label,n,0); });
+            j.uploaded=true; libJobMark(j.jid,{uploaded:true});
+          }
+          frac[k]=1;
+          const{data:ins,error}=await libWithRetry(async function(){ const r=await sb.from('content_library').insert(j.row).select(); if(r.error&&/fetch|network/i.test(r.error.message)) throw new Error(r.error.message); return r; });
+          if(error) throw new Error(error.message);
+          const item=ins&&ins[0];
+          if(item){ STATE.library=STATE.library||[]; STATE.library.unshift(item); if(LIB_SHOW_SCANNER&&j.video&&o.autoScan&&!o.ofOnly) scanLibraryItem(item.id); }
+          libJobDel(j.jid); out.push({job:j,item:item}); nOk++;
+          o.onStatus&&o.onStatus(label,'Done ✓',1);
+        }catch(e){
+          libJobMark(j.jid,{failed:e.message}); out.push({job:j,error:e.message}); nBad++;
+          o.onStatus&&o.onStatus(label,'Failed: '+e.message,0);
+        }
+        note=''; bar();
+      }
+    };
+    const ws=[]; for(let w=0;w<Math.min(LIB_PARALLEL,jobs.length);w++) ws.push(worker());
+    await Promise.all(ws);
   } finally { libWakeOff(); }
   if(nBad) libUpBar('<b>'+nOk+' uploaded · '+nBad+' failed</b> <button class="btn btn-primary" style="margin-left:8px;padding:4px 12px;" onclick="libRetryFailed()">Retry failed</button>'
     +' <button class="btn btn-ghost" style="padding:4px 10px;" onclick="libUpBar(null,false)">✕</button>');
   else { libUpBar('<b>Done ✓</b> · '+nOk+' uploaded',true); setTimeout(function(){ libUpBar(null,false); },4000); }
-  return results;
+  return out;
+}
+// ── Unfinished uploads, kept in this browser (IndexedDB) ─────────────────────
+// A job keeps the file itself when the phone has room; if it can't (storage full / cleared),
+// the job still remembers the file's name, size and set position, so "pick them again"
+// matches by name and every clip lands back in its exact place in the set.
+var LIB_IDB=null;
+function libIdb(){
+  if(LIB_IDB) return LIB_IDB;
+  LIB_IDB=new Promise(function(res,rej){
+    try{
+      const r=indexedDB.open('agencyos-uploads',1);
+      r.onupgradeneeded=function(){ r.result.createObjectStore('jobs',{keyPath:'jid'}); };
+      r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); };
+    }catch(e){ rej(e); }
+  });
+  LIB_IDB.catch(function(){ LIB_IDB=null; });
+  return LIB_IDB;
+}
+function libIdbDo(mode,fn){
+  return libIdb().then(function(db){ return new Promise(function(res,rej){
+    const tx=db.transaction('jobs',mode), st=tx.objectStore('jobs'); let out; const r=fn(st); if(r) r.onsuccess=function(){ out=r.result; };
+    tx.oncomplete=function(){ res(out); }; tx.onerror=function(){ rej(tx.error); }; tx.onabort=function(){ rej(tx.error); };
+  }); });
+}
+function libJobRecord(j,withFile){ return {jid:j.jid,owner:j.owner,name:j.name,size:j.size,type:j.type,created:j.created,row:j.row,video:j.video,uploaded:!!j.uploaded,file:withFile?j.file:null}; }
+async function libJobsSave(jobs){
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  for(const j of jobs){
+    if(j.saved) continue;
+    try{ await libIdbDo('readwrite',function(st){ return st.put(libJobRecord(j,true)); }); j.saved=true; }
+    catch(e){ try{ await libIdbDo('readwrite',function(st){ return st.put(libJobRecord(j,false)); }); j.saved=true; }catch(_){} }
+  }
+}
+function libJobDel(jid){ return libIdbDo('readwrite',function(st){ return st.delete(jid); }).catch(function(){}); }
+function libJobMark(jid,patch){
+  return libIdbDo('readwrite',function(st){ const g=st.get(jid); g.onsuccess=function(){ if(g.result) st.put(Object.assign(g.result,patch)); }; return null; }).catch(function(){});
+}
+function libJobsMine(){
+  const me=STATE.profile?.email||'';
+  return libIdbDo('readonly',function(st){ return st.getAll(); }).then(function(a){ return (a||[]).filter(function(j){ return j.owner===me; }); }).catch(function(){ return []; });
+}
+// On app open: finish anything left over from last time.
+var LIB_RESUMING=false;
+async function libResumeJobs(){
+  if(LIB_RESUMING||!window.indexedDB) return; LIB_RESUMING=true;
+  try{
+    const mine=await libJobsMine(); if(!mine.length) return;
+    // a row may already exist (insert landed but the tab closed before the job was cleared)
+    const keys=mine.map(function(j){return j.row.r2_key;});
+    const ex=await sb.from('content_library').select('r2_key').in('r2_key',keys);
+    const have=new Set(((ex&&ex.data)||[]).map(function(r){return r.r2_key;}));
+    for(const j of mine){ if(have.has(j.row.r2_key)) await libJobDel(j.jid); }
+    const left=mine.filter(function(j){ return !have.has(j.row.r2_key); });
+    const ready=left.filter(function(j){ return j.uploaded || (j.file&&j.file.size===j.size); }), lost=left.filter(function(j){ return ready.indexOf(j)<0; });
+    if(ready.length){
+      // a fresh key per attempt: a half-finished multipart under the old key is abandoned
+      ready.forEach(function(j){ if(!j.uploaded){ const nk=j.row.r2_key.replace(/\/(\d+)_/,'/'+Date.now()+'_'); libJobDel(j.jid); j.jid=nk; j.row.r2_key=nk; libJobsSave([Object.assign(j,{saved:false})]); } });
+      await libRunJobs(ready,{});
+      try{ if(typeof renderLibraryList==='function'&&document.getElementById('cu-body')) renderLibraryList(); }catch(e){}
+      try{ if(document.getElementById('mu-body')) renderModelUpload(); }catch(e){}
+    }
+    if(lost.length) libLostBar(lost);
+  } finally { LIB_RESUMING=false; }
+}
+function libLostBar(lost){
+  libUpBar('<b>⚠ '+lost.length+' upload'+(lost.length===1?'':'s')+' didn\'t finish last time</b>'
+    +'<div style="font-size:12px;color:var(--text2,#aaa);margin:3px 0 6px;">'+lost.slice(0,6).map(function(j){return escapeHtml(j.name);}).join(', ')+(lost.length>6?' +'+(lost.length-6)+' more':'')+'</div>'
+    +'<button class="btn btn-primary" style="padding:5px 12px;" onclick="libRepickJobs()">📤 Pick them again</button> '
+    +'<button class="btn btn-ghost" style="padding:5px 10px;" onclick="libForgetJobs()">Forget them</button>');
+}
+// Pick the missing files again: matched to their jobs by file name, so each keeps its set + clip number.
+async function libRepickJobs(){
+  const mine=(await libJobsMine()).filter(function(j){ return !j.uploaded; }); if(!mine.length){ libUpBar(null,false); return; }
+  const files=await libPickFiles('video/*,image/*',true); if(!files.length) return;
+  const use=[], unmatched=[];
+  files.forEach(function(f){
+    const j=mine.find(function(x){ return !x._m && x.name===f.name && (!x.size||x.size===f.size); })||mine.find(function(x){ return !x._m && x.name===f.name; });
+    if(j){ j._m=1; const nk=j.row.r2_key.replace(/\/(\d+)_/,'/'+Date.now()+'_'); libJobDel(j.jid); j.jid=nk; j.row.r2_key=nk; j.file=f; j.size=f.size; j.saved=false; use.push(j); } else unmatched.push(f.name);
+  });
+  if(unmatched.length) alert(unmatched.length+' of those weren\'t in the unfinished list, so they were skipped:\n'+unmatched.slice(0,8).join('\n'));
+  if(!use.length) return;
+  libJobsSave(use);
+  await libRunJobs(use,{});
+  const still=(await libJobsMine()).filter(function(j){ return !j.uploaded; }); if(still.length) libLostBar(still);
+  try{ if(document.getElementById('mu-body')) renderModelUpload(); else if(document.getElementById('cu-body')) renderLibraryList(); }catch(e){}
+}
+async function libForgetJobs(){
+  if(!confirm('Forget the unfinished uploads? They won\'t be in the library unless they\'re uploaded again.')) return;
+  for(const j of await libJobsMine()) await libJobDel(j.jid);
+  libUpBar(null,false);
 }
 function libPickFiles(accept,multiple){
   return new Promise(function(res){
@@ -5306,7 +5420,7 @@ function libSetSort(a,b){
 // Clips run in camera-roll order (the number in the file name, e.g. IMG_7341 < IMG_7344);
 // a clip with no number keeps its place. ↑↓ in the Sexting folder fine-tunes the order.
 function libTagsNoSet(tags){ return String(tags||'').replace(/\s*set:\S+\s+clip:\d+\/\d+/g,'').trim(); }
-function libTagsWithSet(tags,id,n,of){ var t=libTagsNoSet(tags); return (t?t+' ':'')+'set:'+id+' clip:'+n+'/'+of; }
+function libTagsWithSet(tags,id,n,of){ var cur=String(tags||'').match(/set:(\S+)/); if(cur&&cur[1]!==id) tags=String(tags).replace(/\s*want:\d+/,''); var t=libTagsNoSet(tags); return (t?t+' ':'')+'set:'+id+' clip:'+n+'/'+of; }
 function libCamKey(i){
   var name=String(i.title||'').replace(/\.[a-z0-9]{2,5}$/i,'');
   if(/^sexting set /i.test(name)) return null;
@@ -5323,6 +5437,12 @@ function libModelSets(modelId){
   return Object.keys(by).sort(function(a,b){ return (parseInt(a,36)||0)-(parseInt(b,36)||0); }).map(function(id,ix){
     return {id:id, num:ix+1, items:by[id].sort(function(a,b){ return libSetInfo(a).n-libSetInfo(b).n; })};
   });
+}
+// How many clips a set was meant to have (model uploads say so: "want:9" tag, or "… of 9" in the title).
+function libSetWant(items){
+  var w=0, t=0, tn=0; items.forEach(function(i){ var m=String(i.tags||'').match(/\bwant:(\d+)/); if(m) w=Math.max(w,+m[1]); var mt=String(i.title||'').match(/clip \d+ of (\d+)\s*$/); if(mt){ tn++; t=Math.max(t,+mt[1]); } });
+  if(!w && tn*2>=items.length) w=t;   // older uploads only say it in the title
+  return w;
 }
 function libSetNum(modelId,setId){ var s=libModelSets(modelId).find(function(x){return x.id===setId;}); return s?s.num:(libModelSets(modelId).length+1); }
 // Where a new clip slots into a set: before the first clip with a higher camera-roll number.
@@ -5420,6 +5540,7 @@ function libSextingHtml(items){
     var list=s.items.filter(function(i){return shown[i.id];}); if(!list.length) return;
     html+='<div class="card" style="margin:0 0 14px;padding:12px 14px;"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
       +'<div style="font-size:16px;font-weight:800;">💬 Set '+s.num+'</div><span style="font-size:12px;color:var(--text2);">'+s.items.length+' clip'+(s.items.length===1?'':'s')+' · in order</span>'
+      +(libSetWant(s.items)>s.items.length?'<span style="font-size:12px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border-radius:7px;padding:2px 8px;" title="The upload said this set had '+libSetWant(s.items)+' clips">⚠ Only '+s.items.length+' of '+libSetWant(s.items)+' arrived</span>':'')
       +'<button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="libSetZip(\''+s.id+'\')">⬇ Download Set '+s.num+' (.zip)</button></div>'+grid(list,s.id)+'</div>';
   });
   var loose=items.filter(function(i){ return !libSetInfo(i); });
@@ -6384,7 +6505,7 @@ async function muUploadCategory(cat){
     orderNote=ord.by==='filmed'?'Ordered by when you filmed them.':ord.by==='number'?'Ordered by your camera roll order.':'Kept in the order you tapped them.';
     const setId=Date.now().toString(36), day=new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}), total=files.length;
     const pos=new Map(); ord.files.forEach(function(f,i){ pos.set(f,i+1); });
-    perFile=function(f){ const n=pos.get(f); return {title:'Sexting set '+day+' — clip '+n+' of '+total, tags:'set:'+setId+' clip:'+n+'/'+total}; };
+    perFile=function(f){ const n=pos.get(f); return {title:'Sexting set '+day+' — clip '+n+' of '+total, tags:'want:'+total+' set:'+setId+' clip:'+n+'/'+total}; };
   }
   const res=await libUploadFiles(files,{modelId:me.id,ownerType:'model',category:cat,strictHd:true,perFile:perFile,vertical:vtag,onStatus:function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }});
   const ok=res.filter(function(r){return r.item;}).length, bad=res.filter(function(r){return r.error||r.skipped;});
