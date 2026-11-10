@@ -4665,18 +4665,26 @@ var LIB_CATEGORIES={
   raw:     {vault:'factory', label:'Raw reels',          short:'Raw',     icon:'🎞️', accept:'video/*',         hint:'Trimmed clips with no caption or sound yet — the Content Factory finishes them into reels'},
   social:  {vault:'factory', label:'Ready to post',      short:'Ready',   icon:'✅', accept:'video/*,image/*', hint:'Finished reels only, captioned or not — the phones post from here'},
   stories: {vault:'factory', label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
+  // Hector (John) only: his Spanish-speaking clips, kept out of the US-targeted reels. Nothing posts from here.
+  spanish: {vault:'factory', label:'Spanish reels',      short:'Spanish', icon:'🇪🇸', accept:'video/*',         onlyModel:'cf292803-dbd1-45ce-a975-2d5eb2457fdc', hint:'Hector\'s clips where he speaks Spanish — kept apart from the US-targeted reels. The phones never post from here.'},
+  // Hector (John) only: his Spanish-speaking clips, kept out of the US-targeted reels. Nothing posts from here.
+  spanish: {vault:'factory', label:'Spanish reels',      short:'Spanish', icon:'🇪🇸', accept:'video/*',         onlyModel:'cf292803-dbd1-45ce-a975-2d5eb2457fdc', hint:'Hector\'s clips where he speaks Spanish — kept apart from the US-targeted reels. The phones never post from here.'},
   sounds:  {vault:'factory', label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'}
 };
 var LIB_VAULTS={
   model:  {label:'Model Vault',           icon:'🔐', hint:'What the model sends. Never posted to phones.', grad:'#ec4899,#8b5cf6'},
   factory:{label:'Content Factory Vault', icon:'🏭', hint:'What we make and post. Models never see this.',   grad:'#06b6d4,#3b82f6'}
 };
-function libVaultKeys(v){ return Object.keys(LIB_CATEGORIES).filter(function(k){ return LIB_CATEGORIES[k].vault===v; }); }
+// A category with onlyModel only exists for that model (e.g. Hector's 🇪🇸 Spanish reels).
+// mid defaults to the model the Library is filtered to.
+function libSelModel(){ var ms={}; (STATE.library||[]).forEach(function(i){ if(LIB_SEL[i.id]) ms[i.model_id||'']=1; }); var k=Object.keys(ms); return k.length===1?(k[0]||null):null; }
+function libCatFor(k,mid){ var c=LIB_CATEGORIES[k]; if(!c) return false; if(!c.onlyModel) return true; if(mid===undefined) mid=LIB_F.model; return mid===c.onlyModel; }
+function libVaultKeys(v,mid){ return Object.keys(LIB_CATEGORIES).filter(function(k){ return LIB_CATEGORIES[k].vault===v&&libCatFor(k,mid); }); }
 function libInVault(i,v){ if(LIB_CATEGORIES[i.category]&&LIB_CATEGORIES[i.category].vault===v) return true; return (i.categories||[]).some(function(k){ return LIB_CATEGORIES[k]&&LIB_CATEGORIES[k].vault===v; }); }
 // "Move to" options grouped by vault, for the card menu and the bulk bar.
-function libMoveOptions(prefix,skip){
+function libMoveOptions(prefix,skip,mid){
   return ['model','factory'].map(function(v){
-    return '<optgroup label="'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'">'+libVaultKeys(v).filter(function(k){return k!==skip;}).map(function(k){ return '<option value="'+prefix+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; }).join('')+'</optgroup>';
+    return '<optgroup label="'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'">'+libVaultKeys(v,mid).filter(function(k){return k!==skip;}).map(function(k){ return '<option value="'+prefix+k+'">'+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; }).join('')+'</optgroup>';
   }).join('');
 }
 // The six cards a model sees on the Upload page, in order.
@@ -5783,7 +5791,7 @@ function renderLibraryList(){
         var bytes=mine.reduce(function(s,i){return s+(i.size_bytes||0);},0);
         var cats=['model','factory'].map(function(v){
           return '<div style="font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--text2);margin:8px 0 2px;">'+LIB_VAULTS[v].icon+' '+LIB_VAULTS[v].label+'</div>'
-            +libVaultKeys(v).map(function(c){
+            +libVaultKeys(v,key).map(function(c){
               var n=mine.filter(function(i){return libInCat(i,c);}).length;
               var hot=(libIsToSort(c)&&n);
               return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:'+(hot?'#e6b428':n?'var(--text)':'var(--text2)')+';"><span>'+LIB_CATEGORIES[c].icon+' '+LIB_CATEGORIES[c].label+'</span><b>'+(hot?n+' to sort':n)+'</b></div>';
@@ -5872,7 +5880,7 @@ function renderLibraryList(){
   var bar=libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
     +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
-    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+libMoveOptions('','')+'</select>'
+    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+libMoveOptions('','',libSelModel())+'</select>'
     +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
     +((STATE.verticals||[]).length?'<select class="btn btn-sm btn-ghost" style="cursor:pointer;" onchange="libBulkTag(this)"><option value="">🏷 Tag as…</option>'+vertList('').map(function(v){return '<option value="'+v.key+'">'+escapeHtml(v.label)+'</option>';}).join('')+'<option value="__none">✕ Remove tag</option></select>':'')
     +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
@@ -5931,6 +5939,7 @@ function libFocusDests(it){
   var kind=libFocusKind(it), out={model:[],factory:[]};
   Object.keys(LIB_CATEGORIES).forEach(function(k){
     var c=LIB_CATEGORIES[k]; if(k===it.category&&!(LF&&LF.multi&&!libIsToSort(k))) return;
+    if(!libCatFor(k,it.model_id)) return;
     if((c.accept||'').indexOf(kind+'/*')<0) return;   // only folders that take this kind of file
     out[c.vault].push(k);
   });
@@ -6933,9 +6942,9 @@ function libCardActionOptions(i){
   if(i.edit_spec&&i.edit_spec.trim&&i.edit_spec.trim.from_key) h+='<option value="untrim">↩ Undo '+(i.edit_spec.edit?'edit':'trim')+' (back to original)</option>';
   if((STATE.verticals||[]).length) h+='<option value="tag">🏷 Tag…</option>';
   if(libIsVideo(i)) h+='<option value="caption">📝 '+(i.caption?'Change':'Add')+' on-screen caption…</option>';
-  h+='</optgroup>'+libMoveOptions('cat:',i.category).replace(/<optgroup label="/g,'<optgroup label="Move to → ')+'<optgroup label="Also in → (tick / untick)">';
+  h+='</optgroup>'+libMoveOptions('cat:',i.category,i.model_id).replace(/<optgroup label="/g,'<optgroup label="Move to → ')+'<optgroup label="Also in → (tick / untick)">';
   var extra=i.categories||[];
-  Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k===i.category||k==='nsfw') return; var on=extra.indexOf(k)>=0; h+='<option value="also:'+k+'">'+(on?'☑':'☐')+' '+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
+  Object.keys(LIB_CATEGORIES).forEach(function(k){ if(k===i.category||k==='nsfw'||!libCatFor(k,i.model_id)) return; var on=extra.indexOf(k)>=0; h+='<option value="also:'+k+'">'+(on?'☑':'☐')+' '+LIB_CATEGORIES[k].icon+' '+escapeHtml(LIB_CATEGORIES[k].label)+'</option>'; });
   h+='</optgroup><optgroup label="State">';
   if(st==='needs_review') h+='<option value="state:fresh">✓ Clear review → Fresh</option>';
   if(st==='retired') h+='<option value="state:fresh">↩ Back to Fresh</option>'; else h+='<option value="state:retired">💤 Retire</option>';
@@ -6998,7 +7007,7 @@ async function libBulkMove(what){
     if(n===0){ patch={model_id:null}; label='Agency'; }
     else { var m=(STATE.models||[])[n-1]; if(!m){ alert('No model '+pick); return; } patch={model_id:m.id}; label=m.name; }
   } else if(what==='category'){
-    var keys=Object.keys(LIB_CATEGORIES);
+    var keys=Object.keys(LIB_CATEGORIES).filter(function(k){ return libCatFor(k,libSelModel()); });
     var co=keys.map(function(k,n){return (n+1)+' = '+LIB_CATEGORIES[k].label;}).join('\n');
     var cp=prompt('Set the category for '+ids.length+' file'+(ids.length===1?'':'s')+':\n\n'+co,'1');
     if(cp===null) return;
@@ -7007,7 +7016,7 @@ async function libBulkMove(what){
     var ofSel=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]&&libOfOnly(i.category); }).length;
     if(ofSel&&!libOfOnly(keys[ci])&&!confirm(ofSel+' of these are OnlyFans-only. Moving them to '+label+' means they can be posted publicly.\n\nOnly do this if they are definitely safe. Continue?')) return;
   } else if(what==='also'){
-    var ak=Object.keys(LIB_CATEGORIES).filter(function(k){return k!=='nsfw';});
+    var ak=Object.keys(LIB_CATEGORIES).filter(function(k){return k!=='nsfw'&&libCatFor(k,libSelModel());});
     var ao=ak.map(function(k,n){return (n+1)+' = '+LIB_CATEGORIES[k].label;}).join('\n');
     var ap=prompt('ALSO put '+ids.length+' file'+(ids.length===1?'':'s')+' in which category? (they stay where they are too)\n\n'+ao,'4');
     if(ap===null) return;
@@ -7054,6 +7063,7 @@ async function libBulkMoveTo(sel){
   var ids=Object.keys(LIB_SEL); if(!ids.length) return;
   var label=LIB_CATEGORIES[cat].label;
   var picked=(STATE.library||[]).filter(function(i){ return LIB_SEL[i.id]; });
+  if(!picked.every(function(i){ return libCatFor(cat,i.model_id); })){ alert(label+' is only for one model — select just that model\'s files.'); return; }
   var ofSel=picked.filter(function(i){ return libOfOnly(i.category); }).length;
   if(ofSel&&!libOfOnly(cat)&&!confirm(ofSel+' of these are OnlyFans-only. Moving them to '+label+' means they can be posted publicly.\n\nOnly do this if they are definitely safe. Continue?')) return;
   if(cat==='social'){
