@@ -14190,8 +14190,9 @@ function fhListFor(){
 function fhRenderModel(){
   var el=document.getElementById('fans-hub'); if(!el) return;
   var c=FH.creator, k=fhCounts(c), list=fhListFor(), me=nqMe();
-  var h='<div class="fh-top"><button class="btn btn-ghost" onclick="FH.view=\'home\';FH.sel=null;fhRenderHome()">← All models</button><div class="fh-av" style="width:44px;height:44px;border-radius:12px;font-size:18px;">'+escapeHtml(c[0].toUpperCase())+'</div><div><div style="font-size:20px;font-weight:800;">'+escapeHtml(c)+'</div><div class="fh-mut">'+FH.rows.length+' fans on the lists</div></div></div>'
-    +'<div class="fh-search">🔎<input placeholder="Search '+escapeHtml(c)+'’s fans…" value="'+fhAttr(FH.mq||'')+'" oninput="FH.mq=this.value.trim();FH.show=40;fhPaintList()"></div>'
+  var mm=(STATE.models||[]).find(function(m){ return fhCreatorFor(m,[c])===c; }), shown=mm?mm.name:c;
+  var h='<div class="fh-top"><button class="btn btn-ghost" onclick="FH.view=\'home\';FH.sel=null;fhRenderHome()">← All models</button><div class="fh-av" style="width:44px;height:44px;border-radius:12px;font-size:18px;">'+escapeHtml(shown[0].toUpperCase())+'</div><div><div style="font-size:20px;font-weight:800;">'+escapeHtml(shown)+'</div><div class="fh-mut">'+(shown!==c?'Infloww: '+escapeHtml(c)+' · ':'')+FH.rows.length+' fans on the lists</div></div></div>'
+    +'<div class="fh-search">🔎<input placeholder="Search '+escapeHtml(shown)+'’s fans…" value="'+fhAttr(FH.mq||'')+'" oninput="FH.mq=this.value.trim();FH.show=40;fhPaintList()"></div>'
     +'<div class="fh-tabs"><button class="u'+(FH.tab==='urgent'?' on':'')+'" onclick="FH.tab=\'urgent\';FH.show=40;fhRenderModel()">🚨 Urgent '+(k.urgent+k.gentle)+'</button>'
     +'<button class="'+(FH.tab==='today'?'on':'')+'" onclick="FH.tab=\'today\';FH.show=40;fhRenderModel()">🎯 Today '+(k.event+k.bump+k.welcome)+'</button>'
     +'<button class="'+(FH.tab==='vips'?'on':'')+'" onclick="FH.tab=\'vips\';FH.show=40;fhRenderModel()">💎 VIPs '+k.vip+'</button></div>'
@@ -14278,7 +14279,8 @@ function fhPaintFan(){
   }
   // 📝 Infloww notes
   var filled=FH_KEYS.filter(function(k){return N[k];}).length;
-  h+='<div class="fh-card fh-notes"><div class="fh-lab">📝 Infloww notes · permanent facts · '+filled+'/12<button class="fh-mini" style="margin-left:auto;" onclick="fhCopyNotes()">📋 Copy for Infloww</button></div>';
+  h+='<div class="fh-card fh-notes"><div class="fh-lab">📝 Infloww notes · permanent facts · '+filled+'/12<button class="fh-mini" style="margin-left:auto;" onclick="fhPasteToggle()" title="Paste an old conversation from the inbox — the AI fills in these notes">📥 Paste old chat</button><button class="fh-mini" onclick="fhCopyNotes()">📋 Copy for Infloww</button></div>'
+    +'<div id="fh-paste" style="display:none;margin-bottom:10px;"><textarea id="fh-paste-t" rows="3" placeholder="Paste his old chat here (copy it from his inbox, any language). The AI reads it and fills in the notes in English." style="width:100%;font-size:12.5px;padding:6px 8px;border-radius:8px;"></textarea><div style="display:flex;gap:8px;align-items:center;margin-top:4px;"><button class="btn btn-sm btn-primary" id="fh-paste-go" onclick="fhPasteRun()">Read it</button><span id="fh-paste-msg" class="fh-mut"></span></div></div>';
   if(filled<4) h+='<div class="fh-warn">⚠ We barely know him. BUILD RAPPORT: ask about his day, job, city and hobbies, and fill these in as you learn them. Every chatter after you depends on it.</div>';
   h+='<div class="fh-nf"><label>Nickname</label><div><input value="'+fhAttr(P.nickname||'')+'" placeholder="what he likes to be called (searchable)" onchange="fhSaveNick(this.value)"></div>'
     +FH_KEYS.map(function(k){ var v=N[k]||'';
@@ -14303,6 +14305,31 @@ function fhPaintFan(){
   FS.profile=Object.assign({},P,{facts:[],loops:[],care:null}); FS.hub=true;
   h+=fsCard(f); FS.hub=false;
   box.innerHTML=h;
+}
+function fhPasteToggle(){ var b=document.getElementById('fh-paste'); if(!b) return; b.style.display=b.style.display==='none'?'block':'none'; if(b.style.display==='block') document.getElementById('fh-paste-t').focus(); }
+async function fhPasteRun(){
+  var t=document.getElementById('fh-paste-t'), msg=document.getElementById('fh-paste-msg'), btn=document.getElementById('fh-paste-go');
+  var text=(t&&t.value||'').trim(); if(text.length<40){ msg.textContent='Paste a bit more of the chat first.'; return; }
+  var sel=FH.sel; btn.disabled=true; msg.textContent='Reading it…';
+  try{
+    var s=(await sb.auth.getSession()).data.session;
+    var res=await fetch(SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/fan-paste',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token},
+      body:JSON.stringify({fan_id:sel.fan_id,fan_name:(FH.stat&&FH.stat.fan_name)||'',text:text})});
+    var out=await res.json().catch(function(){return {};});
+    if(!out.ok){ msg.textContent='⚠ '+(out.error||'Could not read it'); btn.disabled=false; return; }
+    var p=await sb.from('fan_profiles').select('*').eq('fan_id',sel.fan_id).maybeSingle();
+    if(!FH.sel||FH.sel.fan_id!==sel.fan_id) return;
+    FH.prof=p.data||FH.prof;
+    // fill the empty template fields from what the chat said, and dated follow-ups become events
+    var N=Object.assign({},FH.prof.infloww_notes||{}), sug=fhSuggest(FH.prof), filled=0;
+    Object.keys(sug).forEach(function(k){ if(!N[k]){ N[k]=sug[k]; filled++; } });
+    var today=new Date().toISOString().slice(0,10), ev=(FH.prof.events||[]).slice();
+    (FH.prof.loops||[]).forEach(function(l){ if(/^\d{4}-\d{2}-\d{2}$/.test(l.when||'')&&l.when>=today&&!ev.some(function(e){return e.text===l.what;})) ev.push({date:l.when,text:l.what,by:'from chat'}); });
+    await fhSaveProf({infloww_notes:N,events:ev.length?ev:null});
+    if(FH.home) FH.home.at=0;
+    fhPaintFan();
+    var m2=document.getElementById('fh-paste-msg'); if(m2){ document.getElementById('fh-paste').style.display='block'; m2.textContent='✓ Done — '+filled+' note'+(filled===1?'':'s')+' filled'+(out.added?', '+out.added+' new fact'+(out.added===1?'':'s'):'')+(out.care?' · ⚠ marked '+out.care:'')+'. Check them below.'; }
+  }catch(e){ msg.textContent='⚠ Could not read it'; btn.disabled=false; }
 }
 async function fhSaveProf(patch,msg){
   var P=FH.prof||{}; var row=Object.assign({fan_id:P.fan_id},patch);
