@@ -14057,7 +14057,11 @@ var FH_REASON=[[/hospital|sick|ill\b|cancer|surgery|died|passed away|funeral|str
   [/angry|upset|pissed|rude|complain|annoyed|mad at/i,'😡 Upset / complaint','a']];
 function fhReason(c){ var t=((c&&c.what)||'')+' '+((c&&c.quote)||''); for(var i=0;i<FH_REASON.length;i++) if(FH_REASON[i][0].test(t)) return FH_REASON[i]; return [null,c&&c.level==='gentle'?'💛 Go gently':'🚨 Serious','g']; }
 function fhTag(q){ return q==='care'?['🚨 Care','red']:q==='cold'?['👋 Welcome','new']:q==='event'?['🎉 Event','whale']:['🔁 Bump','reg']; }
-function fhCreatorFor(m,creators){ var n=(m.name||'').toLowerCase().trim(); return creators.find(function(c){return c.toLowerCase()===n;})||creators.find(function(c){return c.toLowerCase().indexOf(n)===0&&n.length>=3;})||null; }
+// Infloww creator names that differ from the AgencyOS model name.
+var FH_ALIAS={john:['dyamond']};
+function fhCreatorFor(m,creators){ var n=(m.name||'').toLowerCase().trim(), al=FH_ALIAS[n]||[];
+  var hit=creators.find(function(c){ return al.indexOf(c.toLowerCase().trim())>=0; }); if(hit) return hit;
+  return creators.find(function(c){return c.toLowerCase()===n;})||creators.find(function(c){return c.toLowerCase().indexOf(n)===0&&n.length>=3;})||null; }
 function fhCss(){
   if(document.getElementById('fh-css')) return; var s=document.createElement('style'); s.id='fh-css';
   s.textContent='.fh-search{display:flex;align-items:center;gap:10px;background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:10px 14px;margin-bottom:12px}.fh-search input{flex:1;background:none;border:0;color:var(--text);font:inherit;font-size:15px;outline:none;min-width:0}'
@@ -14255,7 +14259,7 @@ function fhPaintFan(){
   // His language: profiles are written in English, quotes stay in his words. If he writes in
   // another language the reply has to be in it (absolute rule) — John's Spanish is Spain Spanish.
   if(P.lang&&!/^english$/i.test(P.lang)){
-    var spain=/spanish/i.test(P.lang)&&/^john$/i.test(String(f&&f.creator||'').trim());
+    var spain=/spanish/i.test(P.lang)&&/^(john|dyamond)$/i.test(String(f&&f.creator||'').trim());
     h+='<div class="fh-card" style="border-color:rgba(107,143,255,.6);background:rgba(107,143,255,.08);font-size:13.5px;line-height:1.5;"><b>🌍 He writes in '+escapeHtml(P.lang)+'</b> — reply to him in '+escapeHtml(P.lang)+(spain?' (<b>Spain</b> Spanish: tío, vale, guapo — not Latin American)':'')+'. Everything on this page is translated into English for you; hover a message to see what he actually wrote.<div id="fh-tr" class="fh-mut" style="margin-top:4px;"></div></div>';
   }
   if(!P.lang||/^english$/i.test(P.lang)) h+='<div id="fh-tr" class="fh-mut" style="margin:-4px 0 8px;"></div>';
