@@ -642,6 +642,13 @@
   .co-note { width:100%; box-sizing:border-box; background:transparent; color:var(--text); border:1px solid transparent; border-radius:7px; padding:5px 7px; font:inherit; font-size:12px; resize:none; overflow:hidden; min-height:30px; line-height:1.35; transition:border-color .2s; }
   .co-note:hover { border-color:var(--border); } .co-note:focus { outline:none; border-color:var(--accent); background:var(--surface2); }
   .co-note::placeholder { color:var(--text2); opacity:.7; }
+  .co-nc { display:flex; align-items:center; gap:4px; min-width:0; }
+  .co-nrow { flex:1; min-width:0; cursor:text; padding:4px 6px; border-radius:7px; border:1px solid transparent; }
+  .co-nrow:hover { border-color:var(--border); }
+  .co-nl { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+  .co-ne { color:var(--text2); opacity:.7; }
+  .co-ni { flex:none; width:24px; height:24px; border-radius:50%; border:1px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; font-size:13px; line-height:1; padding:0; }
+  .co-pop { position:absolute; z-index:9999; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13px; box-shadow:0 12px 30px rgba(0,0,0,.45); }
 </style>
 </head>
 <body>
@@ -7744,7 +7751,7 @@ function contentOrderRowHtml(o,isAdmin,hidden){
       <td><strong>${num?`<span style="color:var(--accent2);">${num}</span> · `:''}${o.model_name||'—'}</strong></td><td>${pl}</td>
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
-      <td style="min-width:150px;max-width:240px;">${canEdit?`<textarea class="co-note" rows="1" placeholder="+ note…" data-id="${o.id}" onfocus="this.dataset.was=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.value=this.dataset.was||'';this.blur();}" oninput="coNoteGrow(this)" onblur="coNoteSave(this)">${escapeHtml(o.notes||'')}</textarea>`:(o.notes?escapeHtml(o.notes):'—')}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
+      <td style="min-width:150px;max-width:220px;">${coNoteCell(o,canEdit)}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span>${(function(){var c=compliancePillHtml(o);return c?'<div style="margin-top:5px;">'+c+'</div>':'';})()}</td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="min-width:230px;"><div style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -7759,14 +7766,36 @@ function contentOrderRowHtml(o,isAdmin,hidden){
 
 // Inline notes: type straight into the Notes cell — Enter (or clicking away) saves, Esc undoes,
 // Shift+Enter adds a new line. No need to open Edit.
+// Notes cell: one tidy line (ⓘ shows the whole note). Click the line to edit in place.
+function coNoteCell(o,canEdit){
+  const n=(o.notes||'').trim();
+  const line=n?`<span class="co-nl" title="${fhAttr(n)}">${escapeHtml(n.replace(/\s+/g,' '))}</span>`:`<span class="co-nl co-ne">${canEdit?'+ add note':'—'}</span>`;
+  return `<div class="co-nc" id="co-nc-${o.id}">${canEdit?`<div class="co-nrow" onclick="coNoteEdit('${o.id}')">`:'<div class="co-nrow">'}${line}</div>${n?`<button class="co-ni" title="Show full note" onclick="event.stopPropagation();coNoteInfo('${o.id}',this)">ⓘ</button>`:''}</div>`;
+}
+function coNoteEdit(id){
+  const o=(STATE.contentOrders||[]).find(x=>x.id===id), box=document.getElementById('co-nc-'+id); if(!o||!box) return;
+  box.innerHTML=`<textarea class="co-note" rows="2" data-id="${id}" placeholder="Type a note…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.dataset.cancel=1;this.blur();}" oninput="coNoteGrow(this)" onblur="coNoteSave(this)">${escapeHtml(o.notes||'')}</textarea>`;
+  const t=box.querySelector('textarea'); coNoteGrow(t); t.focus(); t.setSelectionRange(t.value.length,t.value.length);
+}
+function coNoteInfo(id,btn){
+  document.querySelectorAll('.co-pop').forEach(x=>x.remove());
+  const o=(STATE.contentOrders||[]).find(x=>x.id===id); if(!o) return;
+  const r=btn.getBoundingClientRect(), pop=document.createElement('div'); pop.className='co-pop';
+  pop.innerHTML=`<div style="font-weight:700;margin-bottom:6px;">📝 Notes · ${o.order_number?'#'+String(o.order_number).padStart(3,'0'):''}</div><div style="white-space:pre-wrap;">${escapeHtml(o.notes||'')}</div>`;
+  document.body.appendChild(pop);
+  const w=Math.min(320,window.innerWidth-24); pop.style.width=w+'px';
+  pop.style.left=Math.max(12,Math.min(window.innerWidth-w-12,r.left-w/2))+'px'; pop.style.top=(r.bottom+window.scrollY+6)+'px';
+  setTimeout(()=>document.addEventListener('click',function h(e){ if(!pop.contains(e.target)){ pop.remove(); document.removeEventListener('click',h); } }),0);
+}
 function coNoteGrow(t){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,160)+'px'; }
 async function coNoteSave(t){
   const id=t.dataset.id, val=t.value.trim(), o=(STATE.contentOrders||[]).find(x=>x.id===id); if(!o) return;
-  if(val===(o.notes||'').trim()) return;
+  const back=()=>{ const box=document.getElementById('co-nc-'+id); if(box) box.outerHTML=coNoteCell(o,true); };
+  if(t.dataset.cancel||val===(o.notes||'').trim()) return back();
   t.style.borderColor='var(--accent)';
   const{data,error}=await sb.from('content_orders').update({notes:val||null}).eq('id',id).select('id');
   if(error||!data||!data.length){ t.style.borderColor='var(--red)'; alert('Could not save the note — '+(error?error.message:'no permission')); return; }
-  o.notes=val||null; t.style.borderColor='var(--green)'; setTimeout(()=>{ t.style.borderColor=''; },1200);
+  o.notes=val||null; back();
 }
 function renderContentOrders(filtered) {
   const orders = filtered!==undefined ? filtered : STATE.contentOrders;
@@ -7787,7 +7816,6 @@ function renderContentOrders(filtered) {
     html+=done.map(o=>contentOrderRowHtml(o,isAdmin,!showDone)).join('');
   }
   tbody.innerHTML=html;
-  tbody.querySelectorAll('.co-note').forEach(coNoteGrow);
   updateOrderBulkBar();
 }
 
