@@ -8153,16 +8153,24 @@ function clearBulkThumbs(){ _bulkThumbDataUrls=[]; document.getElementById('bulk
 // Calls our own /api/oembed relay (server-side call to TikTok/Instagram's
 // public oEmbed endpoints -- browsers can't call those directly due to CORS).
 // Fails silently on any error so it never blocks manual thumbnail upload.
+// Instagram's /media/?size=l link always redirects to the post's current cover image, so it
+// works as a permanent thumbnail even when our server gets blocked by Instagram.
+function igMediaThumb(url){
+  const m=String(url||'').match(/instagram\.com\/(?:[^/?#]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+  return m?`https://www.instagram.com/p/${m[1]}/media/?size=l`:null;
+}
 async function fetchOEmbed(url){
+  const ig=igMediaThumb(url);
+  const fallback=ig?{ok:true,platform:'instagram',thumbnail_url:ig}:null;
   try{
     const r=await fetch(`/api/oembed?url=${encodeURIComponent(url)}`);
     const j=await r.json();
-    if(!(j&&j.ok)) return null;
+    if(!(j&&j.ok&&(j.thumbnail_data||j.thumbnail_url))) return fallback;
     // Shrink the inlined image to the same 320px JPEG we store for manual thumbnails, so the
     // stored value is small and permanent (the CDN URL alone expires within days).
     if(j.thumbnail_data){ try{ j.thumbnail_url=await shrinkDataUrl(j.thumbnail_data); }catch(e){} }
     return j;
-  }catch(e){ return null; }
+  }catch(e){ return fallback; }
 }
 function shrinkDataUrl(dataUrl){
   return new Promise(function(res,rej){
