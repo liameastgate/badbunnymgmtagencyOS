@@ -2627,6 +2627,7 @@
     <div class="page" id="page-fans">
       <div class="page-title">Fans</div>
       <div class="page-sub">New subs waiting for a first message, and everything we know about the ones who talk.</div>
+      <div id="fans-fresh"></div>
       <div id="fans-tabs"></div>
       <div id="today-body"></div>
       <div id="new-subs-body"></div>
@@ -3438,6 +3439,7 @@ async function initApp(user) {
   if (PW_RECOVERY) setTimeout(function(){ openPasswordBox(true); },300);
   await loadAllData();
   setTimeout(function(){ libResumeJobs(); },1500);   // finish uploads left over from last time
+  setTimeout(function(){ freshAdminBanner(); },2500);  // remind Liam when the chat export is stale
   // Restore whichever page was open before a refresh, instead of always dropping back to Overview.
   const defaultPage = profile.role === 'model' ? 'model-home' : profile.role === 'chatter' ? 'fans' : profile.role === 'traffic' ? 'traffic' : 'overview';
   let savedPage=null;
@@ -14176,7 +14178,49 @@ async function wlDone(creator, fanId, queue, outcome){
   wlPaint();
 }
 
+// ── How fresh is the chat data? ─────────────────────────────────────────────
+// Fan cards are built from the Infloww Message Dashboard export, so they are only as new as
+// the last export. Chatters see how old it is on the Fans page; admins also get a banner on
+// every page once it's more than a day old, with the date range to export.
+var FRESH={at:0,data:null};
+async function fansFreshness(force){
+  if(!force&&FRESH.data&&Date.now()-FRESH.at<5*60e3) return FRESH.data;
+  var r=await Promise.all([
+    sb.from('fan_messages').select('ts').order('ts',{ascending:false}).limit(1),
+    sb.from('fan_messages').select('created_at').order('created_at',{ascending:false}).limit(1)]);
+  var d={msgTs:(r[0].data&&r[0].data[0])?r[0].data[0].ts:null, importedAt:(r[1].data&&r[1].data[0])?r[1].data[0].created_at:null};
+  d.hours=d.msgTs?(Date.now()-new Date(d.msgTs).getTime())/36e5:null;
+  d.level=d.hours==null?'red':d.hours<24?'green':d.hours<72?'yellow':'red';
+  FRESH={at:Date.now(),data:d}; return d;
+}
+function freshWhen(ts){ return new Date(ts).toLocaleString('en-GB',{timeZone:'Asia/Makassar',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true})+' (UTC+8)'; }
+function freshAgo(h){ return h<1?'under an hour ago':h<48?Math.round(h)+'h ago':Math.round(h/24)+' days ago'; }
+var FRESH_COL={green:['#4ade80','rgba(34,197,94,.10)'],yellow:['#facc15','rgba(250,204,21,.10)'],red:['#f87171','rgba(239,68,68,.12)']};
+async function renderFansFresh(){
+  var el=document.getElementById('fans-fresh'); if(!el) return;
+  var d=await fansFreshness(true), c=FRESH_COL[d.level], admin=['admin','va'].includes(STATE.profile?.role);
+  el.innerHTML='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid '+c[0]+'55;background:'+c[1]+';border-radius:10px;padding:9px 13px;margin-bottom:12px;font-size:13px;">'
+    +'<span style="width:9px;height:9px;border-radius:50%;background:'+c[0]+';flex-shrink:0;"></span>'
+    +(d.msgTs?'<span>💬 Chats in AgencyOS are up to <b>'+freshWhen(d.msgTs)+'</b> · '+freshAgo(d.hours)+'</span>':'<span>💬 No chat export uploaded yet</span>')
+    +'<span style="color:var(--text2);font-size:12px;">'+(d.level==='green'?'Anything newer than this is only in Infloww.':'⚠ This is out of date — check the full chat in Infloww before you message.')+'</span>'
+    +(admin&&d.level!=='green'?'<button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="navigate(\'overview\')">📥 Upload a new export</button>':'')
+    +'</div>';
+}
+// Admin reminder: one banner across the app when the chat export is over a day old.
+async function freshAdminBanner(){
+  if(STATE.profile?.role!=='admin') return;
+  var d=await fansFreshness(true); if(d.level==='green') return;
+  var key='fresh_dismiss_'+new Date().toISOString().slice(0,10);
+  try{ if(localStorage.getItem(key)) return; }catch(e){}
+  var b=document.getElementById('fresh-banner');
+  if(!b){ b=document.createElement('div'); b.id='fresh-banner'; b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:9000;max-width:min(680px,calc(100% - 24px));background:#1b1405;border:1px solid #facc15;color:#fde68a;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:flex;gap:10px;align-items:center;flex-wrap:wrap;'; document.body.appendChild(b); }
+  var from=d.msgTs?new Date(new Date(d.msgTs).getTime()+8*36e5).toISOString().slice(0,10):null;
+  b.innerHTML='<span>📥 <b>Time to export.</b> Chatters are working off '+(d.hours!=null?'chats last updated '+freshAgo(d.hours):'no chat export at all')+'. Export the Infloww <b>Message Dashboard</b>'+(from?' from <b>'+exShort(from)+'</b> to today':'')+' (and the Sales Record).</span>'
+    +'<button class="btn btn-sm btn-primary" onclick="document.getElementById(\'fresh-banner\').remove();navigate(\'overview\')">Upload</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="try{localStorage.setItem(\''+key+'\',\'1\')}catch(e){};document.getElementById(\'fresh-banner\').remove()">Later today</button>';
+}
 function renderFans(){
+  renderFansFresh();
   var el=document.getElementById('fans-tabs'); if(!el) return;
   el.innerHTML='<div class="tabs" style="margin-bottom:14px;">'
     +'<div class="tab'+(FANS_TAB==='today'?' active':'')+'" onclick="FANS_TAB=\'today\';WL.tier=\'field\';WL.q=\'\';WL.show=25;renderFans()">🎯 Today</div>'
