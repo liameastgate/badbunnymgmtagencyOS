@@ -16421,6 +16421,8 @@ function renderBestTimeHeatmap(){
 // (signature baked in) is generated client-side via jsPDF and pushed to the 'contract-files'
 // Supabase Storage bucket, so there's a permanent, un-editable copy independent of this table.
 var _contractSettings={governing_state:'',payment_method:'',payout_schedule:''};
+// The agency signs every contract with Liam's printed legal name (no drawn signature).
+const CONTRACT_MANAGER_NAME='Liam David Eastgate';
 
 function defaultContractSections(record){
   record=record||{};
@@ -16491,7 +16493,7 @@ function contractSubst(escapedText,record){
 function buildContractDocHtml(record){
   const partiesHtml=`
     <div class="cd-parties">
-      <div>Manager: Liam Eastgate / BadBunnyMGMT</div>
+      <div>Manager: ${CONTRACT_MANAGER_NAME} / BadBunnyMGMT</div>
       ${contractPartyLines(record).map(l=>'<div>'+contractSubst(escapeHtml(l),record)+'</div>').join('')}
       <div>Collectively referred to as the "Parties."</div>
     </div>`;
@@ -16502,8 +16504,8 @@ function buildContractDocHtml(record){
   const sigHtml=`
     <div class="cd-sign-block">
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.</div>
-      <div>Manager: Liam Eastgate &nbsp; Name: Liam Eastgate &nbsp; Date: ${record.manager_signed_date?fmtDate(record.manager_signed_date):contractSubst('{{agreement_date}}',record)}</div>
-      <div style="margin:4px 0 10px;">Signature:<br>${record.manager_signature_data?`<img src="${record.manager_signature_data}">`:'<span class="contract-field blank">[awaiting manager signature]</span>'}</div>
+      <div>Manager: ${CONTRACT_MANAGER_NAME} &nbsp; Name: ${CONTRACT_MANAGER_NAME} &nbsp; Date: ${contractSubst('{{agreement_date}}',record)}</div>
+      <div style="margin:4px 0 10px;">Signature: <span style="font-family:'Brush Script MT','Segoe Script','Snell Roundhand',cursive;font-size:22px;">${CONTRACT_MANAGER_NAME}</span> <span style="font-size:11px;color:var(--text2);">(signed by printed legal name)</span></div>
       <div style="margin-top:4px;">Model: ${record.entity_name?contractSubst('{{entity_name}}',record)+' — signed by':''} ${contractSubst('{{model_stage_name}}',record)} &nbsp; Name: ${contractSubst('{{model_legal_name}}',record)}${record.entity_name?' (for the Company and personally)':''} &nbsp; Date: ${contractSubst('{{signed_date}}',record)}</div>
       <div style="margin-top:10px;">Signature:<br>${signed&&record.signature_data?`<img src="${record.signature_data}">`:'<span class="contract-field blank">[awaiting signature]</span>'}</div>
     </div>`;
@@ -16566,7 +16568,7 @@ async function renderContractHub(){
     const signed=c?.status==='signed';
     return `<tr>
       <td>${escapeHtml(m.name)}</td>
-      <td><span class="badge ${signed?'signed':'unsigned'}">${signed?'Signed':'Unsigned'}</span>${c?.manager_signature_data?' <span class="badge signed" title="You\'ve signed as Manager">✍️ You</span>':(contractIsManager()?' <span class="badge unsigned" title="Your manager signature is missing">✍️ needs yours</span>':'')}</td>
+      <td><span class="badge ${signed?'signed':'unsigned'}">${signed?'Signed':'Unsigned'}</span></td>
       <td>${signed&&c.signed_date?fmtDate(c.signed_date):'—'}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="viewContractFromHub('${m.id}')">View</button></td>
     </tr>`;
@@ -16657,6 +16659,7 @@ async function openContractForModel(modelId){
         ${locked
           ?`<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               ${data.pdf_url?`<button class="btn btn-ghost btn-sm" onclick="togglePdfPreview('contract-pdf-view',decodeURIComponent('${pdfUrlEscape(data.pdf_url)}'))">📄 View Locked PDF</button>`:''}
+              <button class="btn btn-ghost btn-sm" onclick="rebuildContractPdf('${modelId}')" title="Makes a fresh locked PDF with the current wording (e.g. the manager's signed name)">↻ Rebuild PDF</button>
               <button class="btn btn-ghost btn-sm" onclick="resetContract('${modelId}')" style="color:var(--red);">↺ Reset &amp; Allow Re-signing</button>
             </div>
             <div id="contract-pdf-view" style="display:none;margin-top:12px;"></div>`
@@ -16664,7 +16667,6 @@ async function openContractForModel(modelId){
       </div>`;
   }
 
-  if(isStaff&&contractIsManager()) adminPanel+=contractManagerCard(data,modelId);
   let modelPanel='';
   if(isOwnModel&&!locked){
     modelPanel=`
@@ -16699,99 +16701,8 @@ async function openContractForModel(modelId){
     <div id="contract-doc-container">${buildContractDocHtml(data)}</div>`;
 
   if(isOwnModel&&!locked) initSignatureCanvas();
-  if(document.getElementById('mgr-sig-canvas')) mgrSigInit();
 }
 
-// ── Manager (Liam) signature ────────────────────────────────
-// Liam signs his side of each contract here. His last signature is offered again so it's one
-// click per contract. Signing a contract the model already signed rebuilds the locked PDF with
-// both signatures; nothing else on a locked contract changes. A DB trigger stops anyone who
-// isn't an admin (e.g. the model on their own unsigned row) from touching these columns.
-const CONTRACT_MANAGER_EMAIL='liameastgate@hotmail.com';
-function contractIsManager(){ return STATE.profile?.role==='admin'&&String(STATE.profile?.email||'').toLowerCase()===CONTRACT_MANAGER_EMAIL; }
-var _mgrSavedSig=null;
-function contractManagerCard(data,modelId){
-  if(data.manager_signature_data){
-    return `<div class="card" style="max-width:760px;margin:0 auto 18px;">
-      <div class="card-title">Your signature (Manager) <span class="badge signed" style="margin-left:8px;">Signed ${fmtDate(data.manager_signed_date)}</span></div>
-      <div style="background:#fff;border-radius:8px;display:inline-block;padding:6px 10px;"><img src="${data.manager_signature_data}" style="height:60px;display:block;"></div>
-      <div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" onclick="mgrSigRemove('${modelId}')">↺ Remove my signature</button></div>
-    </div>`;
-  }
-  return `<div class="card" style="max-width:760px;margin:0 auto 18px;">
-    <div class="card-title">✍️ Sign as Manager</div>
-    <div id="mgr-sig-saved" style="display:none;margin-bottom:12px;"></div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Draw your signature${data.status==='signed'?' — the model has already signed, so the locked PDF is rebuilt with both signatures':' — you can sign before or after the model'}.</div>
-    <div class="sig-pad-wrap"><canvas id="mgr-sig-canvas" style="width:100%;height:160px;touch-action:none;background:#fff;border-radius:8px;"></canvas></div>
-    <div style="display:flex;gap:8px;margin-top:10px;">
-      <button class="btn btn-ghost btn-sm" onclick="mgrSigInit()">Clear</button>
-      <button class="btn btn-primary" id="mgr-sig-btn" onclick="mgrSigSubmit('${modelId}')">✍️ Sign as Manager</button>
-    </div>
-    <div id="mgr-sig-alert" class="alert" style="margin-top:10px;"></div>
-  </div>`;
-}
-var _mgrSig={ctx:null,has:false};
-function mgrSigInit(){
-  const c=document.getElementById('mgr-sig-canvas'); if(!c) return;
-  const ratio=window.devicePixelRatio||1, w=c.getBoundingClientRect().width||300;
-  c.width=Math.round(w*ratio); c.height=Math.round(160*ratio);
-  const ctx=c.getContext('2d'); ctx.setTransform(ratio,0,0,ratio,0,0);
-  ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#111'; ctx.fillStyle='#111';
-  _mgrSig={ctx:ctx,has:false};
-  let last=null, down=false;
-  const pos=e=>{ const r=c.getBoundingClientRect(); return {x:(e.clientX-r.left)*(w/(r.width||w)), y:(e.clientY-r.top)*(160/(r.height||160))}; };
-  c.onpointerdown=e=>{ e.preventDefault(); down=true; last=pos(e); ctx.beginPath(); ctx.arc(last.x,last.y,1.1,0,Math.PI*2); ctx.fill(); _mgrSig.has=true; try{c.setPointerCapture(e.pointerId);}catch(_){} };
-  c.onpointermove=e=>{ if(!down) return; e.preventDefault(); const p=pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
-  c.onpointerup=c.onpointercancel=()=>{ down=false; };
-  mgrSigOfferSaved();
-}
-async function mgrSigOfferSaved(){
-  const box=document.getElementById('mgr-sig-saved'); if(!box) return;
-  if(_mgrSavedSig===null){
-    const r=await sb.from('model_contracts').select('manager_signature_data,manager_signed_at').not('manager_signature_data','is',null).order('manager_signed_at',{ascending:false}).limit(1);
-    _mgrSavedSig=(r.data&&r.data[0]&&r.data[0].manager_signature_data)||'';
-  }
-  if(!_mgrSavedSig) return;
-  box.style.display='block';
-  box.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Use your saved signature:</div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><div style="background:#fff;border-radius:8px;padding:6px 10px;"><img src="${_mgrSavedSig}" style="height:50px;display:block;"></div>
-    <button class="btn btn-primary btn-sm" onclick="mgrSigSubmit(window._currentContract.model_id,true)">✍️ Sign with this</button></div>
-    <div style="font-size:11px;color:var(--text2);margin-top:8px;">…or draw a new one below.</div>`;
-}
-function _mgrMsg(m,t){ const el=document.getElementById('mgr-sig-alert'); if(!el) return alert(m); el.className='alert alert-'+(t==='success'?'success':'error'); el.textContent=m; el.style.display='block'; }
-async function mgrSigSubmit(modelId,useSaved){
-  if(!contractIsManager()) return;
-  const btn=document.getElementById('mgr-sig-btn'); if(btn&&btn.disabled) return;
-  let sig;
-  if(useSaved) sig=_mgrSavedSig;
-  else { if(!_mgrSig.has) return _mgrMsg('Draw your signature in the white box first.','error'); sig=document.getElementById('mgr-sig-canvas').toDataURL('image/png'); }
-  if(!sig) return;
-  if(btn){ btn.disabled=true; btn.textContent='Signing…'; }
-  try{
-    const{data:cur}=await sb.from('model_contracts').select('*').eq('model_id',modelId).maybeSingle();
-    if(!cur) throw new Error('contract not found');
-    const upd={manager_signature_data:sig, manager_signed_date:toLocalISO(new Date()), manager_signed_at:new Date().toISOString()};
-    if(cur.status==='signed'){
-      _mgrMsg('Rebuilding the locked PDF with both signatures…','success');
-      const url=await _withTimeout(generateContractPdf({...cur,...upd}),20000,null);
-      if(url) upd.pdf_url=url;
-    }
-    const{data:saved,error}=await sb.from('model_contracts').update(upd).eq('model_id',modelId).select('model_id');
-    if(error) throw new Error(error.message);
-    if(!saved||!saved.length) throw new Error('no permission to save');
-    _mgrSavedSig=sig;
-    openContractForModel(modelId);
-  }catch(e){ _mgrMsg('Could not sign — '+(e.message||e),'error'); if(btn){ btn.disabled=false; btn.textContent='✍️ Sign as Manager'; } }
-}
-async function mgrSigRemove(modelId){
-  if(!contractIsManager()||!confirm('Remove your signature from this contract?')) return;
-  const{data:cur}=await sb.from('model_contracts').select('*').eq('model_id',modelId).maybeSingle(); if(!cur) return;
-  const upd={manager_signature_data:null,manager_signed_date:null,manager_signed_at:null};
-  if(cur.status==='signed'){ const url=await _withTimeout(generateContractPdf({...cur,...upd}),20000,null); if(url) upd.pdf_url=url; }
-  const{error}=await sb.from('model_contracts').update(upd).eq('model_id',modelId);
-  if(error) return alert('Could not remove — '+error.message);
-  openContractForModel(modelId);
-}
 
 async function saveContractField(modelId,key,value){
   const r=await sb.from('model_contracts').update({[key]:value}).eq('model_id',modelId).select('model_id');
@@ -16911,6 +16822,15 @@ async function submitSignedContract(modelId){
   }
 }
 
+async function rebuildContractPdf(modelId){
+  const{data:cur}=await sb.from('model_contracts').select('*').eq('model_id',modelId).maybeSingle();
+  if(!cur||cur.status!=='signed') return;
+  const url=await _withTimeout(generateContractPdf(cur),20000,null);
+  if(!url) return alert('Could not build the PDF — try again.');
+  const{error}=await sb.from('model_contracts').update({pdf_url:url}).eq('model_id',modelId);
+  if(error) return alert('Could not save — '+error.message);
+  openContractForModel(modelId);
+}
 // Renders a real PDF (times-roman body text + the signature image baked in) and uploads it to
 // the contract-files Storage bucket -- this is the "copy they can't edit stored somewhere".
 // A failure here (e.g. bucket/network issue) doesn't block the sign -- the DB row still locks,
@@ -16934,7 +16854,7 @@ async function generateContractPdf(record){
     doc.setFont('times','bold'); doc.setFontSize(16);
     doc.text('BadBunnyMGMT Management Agreement',297.5,y,{align:'center'}); y+=28;
     doc.setFont('times','normal'); doc.setFontSize(10);
-    addLine('Manager: Liam Eastgate / BadBunnyMGMT');
+    addLine('Manager: '+CONTRACT_MANAGER_NAME+' / BadBunnyMGMT');
     contractPartyLines(record).forEach(l=>addLine(plain(l)));
     addLine('Collectively referred to as the "Parties."');
     y+=6;
@@ -16948,13 +16868,9 @@ async function generateContractPdf(record){
     if(y>700){doc.addPage();y=50;}
     doc.setFont('times','bold'); addLine('IN WITNESS WHEREOF, the Parties hereto have executed this Agreement as of the date first above written.');
     doc.setFont('times','normal');
-    addLine(`Manager: Liam Eastgate     Name: Liam Eastgate     Date: ${record.manager_signed_date||plain('{{agreement_date}}')}`);
-    if(record.manager_signature_data){
-      y+=2; if(y>700){doc.addPage();y=50;}
-      doc.text('Signature:',marginX,y); y+=8;
-      try{ doc.addImage(record.manager_signature_data,'PNG',marginX,y,180,55); }catch(e){}
-      y+=65;
-    }
+    addLine(`Manager: ${CONTRACT_MANAGER_NAME}     Name: ${CONTRACT_MANAGER_NAME}     Date: ${plain('{{agreement_date}}')}`);
+    doc.setFont('times','italic'); doc.setFontSize(15); addLine('Signature: /'+CONTRACT_MANAGER_NAME+'/'); doc.setFont('times','normal'); doc.setFontSize(10);
+    addLine('(signed by printed legal name)'); y+=4;
     addLine(`Model: ${record.entity_name?plain('{{entity_name}}')+' — signed by ':''}${plain('{{model_stage_name}}')}     Name: ${plain('{{model_legal_name}}')}${record.entity_name?' (for the Company and personally)':''}     Date: ${plain('{{signed_date}}')}`);
     if(record.signature_data){
       y+=6; if(y>700){doc.addPage();y=50;}
