@@ -8791,8 +8791,16 @@ async function runBulkImport(){
     }
   }
   showAlert('bulk-alert', done.length?('Imported: '+done.join(', ')+'.'):'Nothing to import.', done.length?'success':'error');
+  const hadMsgs=_bulkQueue.some(function(f){return f.kind==='messages';});
   _bulkQueue=[]; renderBulkQueue();
   renderImportCoverage();
+  // New chats in → build the English fan profiles straight away (no separate button press).
+  if(hadMsgs&&done.length){
+    if(typeof FRESH!=='undefined') FRESH.at=0;
+    if(typeof FH!=='undefined'&&FH.home) FH.home.at=0;
+    const lead='Imported: '+done.join(', ')+'. ';
+    fxRun(function(t,bad){ showAlert('bulk-alert',lead+t,bad?'error':'success'); });
+  }
 }
 
 function handleCsvDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])handleCsvFile(e.dataTransfer.files[0]);}
@@ -13739,8 +13747,9 @@ async function fxCheck(){
   }catch(e){ if(el) el.textContent='Could not check: '+e.message; }
 }
 
-async function fxRun(){
+async function fxRun(say){
   if(_fxBusy) return;
+  say=typeof say==='function'?say:null;
   _fxBusy=true;
   const btn=document.getElementById('fx-run'), log=document.getElementById('fx-log');
   if(btn){ btn.disabled=true; btn.textContent='Working…'; }
@@ -13752,11 +13761,13 @@ async function fxRun(){
       total+=(r.done||0); cost+=(r.cost_usd||0);
       if(r.urgent&&r.urgent.length) urgent.push.apply(urgent,r.urgent);
       if(log) log.textContent=total+' profile'+(total!==1?'s':'')+' built · '+(r.remaining||0)+' to go'+(cost?' · ~$'+cost.toFixed(2):'');
+      if(say) say('🧠 Building fan profiles (English notes): '+total+' done · '+(r.remaining||0)+' to go');
       if(r.ok===false){                       // billing, rate limit, anything upstream
+        if(say) say('⚠ Fan profiles stopped: '+(r.error||'unknown error')+' — '+total+' built. Press Build profiles on the Fans page to carry on.',true);
         if(log) log.innerHTML='<span style="color:var(--danger,#ff5c5c);">Stopped: '+escapeHtml(r.error||'unknown error')+'</span><br>'+total+' built before it stopped.';
         break;
       }
-      if(!r.remaining){ if(log) log.textContent='Done — '+total+' profile'+(total!==1?'s':'')+' built'+(cost?', ~$'+cost.toFixed(2):'')+'.'; break; }
+      if(!r.remaining){ if(log) log.textContent='Done — '+total+' profile'+(total!==1?'s':'')+' built'+(cost?', ~$'+cost.toFixed(2):'')+'.'; if(say) say('✅ Fan profiles updated: '+total+' fan'+(total!==1?'s':'')+(cost?' · ~$'+cost.toFixed(2):'')); break; }
     }
   }catch(e){
     if(log) log.innerHTML='<span style="color:var(--danger,#ff5c5c);">'+escapeHtml(e.message)+'</span>';
