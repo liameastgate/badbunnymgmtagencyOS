@@ -6127,8 +6127,25 @@ async function libTrimCleanup(){
 // same slot the trimmer uses) so "↩ Undo edit" and re-editing always start from the original.
 // Desktop-first: big preview + timeline + keyboard shortcuts. Still works on a phone.
 var VED=null, VED_MAX=700*1024*1024, VED_W=1080, VED_H=1920, VED_RENDERS={};
-var VED_FONT='"Inter","Helvetica Neue",Arial,sans-serif';
-var VED_STYLES={outline:'White + outline', box:'White box', plain:'Plain + shadow'};
+// Caption styles. Real web fonts (Google Fonts) so every VA's computer burns the exact same look.
+var VED_STYLES={
+  tiktok:   {label:'TikTok',          font:'"TikTok Sans"', weight:800, kind:'outline', size:64},   // white + black outline
+  tiktokbox:{label:'TikTok box',      font:'"TikTok Sans"', weight:700, kind:'box',     size:58},   // black text on a white box
+  plain:    {label:'Plain white',     font:'"Inter"',       weight:600, kind:'plain',   size:56}    // clean modern white, soft shadow
+};
+var VED_STYLE_OLD={outline:'tiktok',box:'tiktokbox'};
+function vedStyle(t){ var k=VED_STYLE_OLD[t.style]||t.style; return VED_STYLES[k]?k:'tiktok'; }
+var VED_FONTS_P=null;
+function vedFonts(){
+  if(VED_FONTS_P) return VED_FONTS_P;
+  VED_FONTS_P=(async function(){
+    if(!document.getElementById('ved-fonts')){ var l=document.createElement('link'); l.id='ved-fonts'; l.rel='stylesheet';
+      l.href='https://fonts.googleapis.com/css2?family=TikTok+Sans:wght@700;800&family=Inter:wght@600&display=swap'; document.head.appendChild(l);
+      await new Promise(function(r){ l.onload=r; l.onerror=r; setTimeout(r,4000); }); }
+    await Promise.all(Object.keys(VED_STYLES).map(function(k){ var st=VED_STYLES[k]; return document.fonts.load(st.weight+' 64px '+st.font,'Ab').catch(function(){}); }));
+  })();
+  return VED_FONTS_P;
+}
 
 function vedCss(){
   if(document.getElementById('ved-css')) return;
@@ -6199,6 +6216,7 @@ async function vedOpen(id){
     pendingSegs: prev&&prev.segs?prev.segs : (fromOrig&&tr&&tr.start!=null?[[tr.start,tr.end]]:null),
     sounds:null, raf:0, dirty:false};
   libFF().catch(function(){});                            // start downloading ffmpeg now
+  vedFonts().then(function(){ if(VED) vedDrawTexts(); });
   var el=document.createElement('div'); el.id='ved'; document.body.appendChild(el);
   el.innerHTML='<div class="vd-top"><span>🎬</span><b>'+escapeHtml(it.title||'Clip')+'</b>'
     +(fromOrig?'<span class="vd-hint">Editing the original'+(prev||tr?' — your last edit is loaded':'')+'</span>':'')
@@ -6397,19 +6415,19 @@ function vedPaint(ctx,texts,showSel){
   ctx.clearRect(0,0,VED_W,VED_H);
   texts.forEach(function(t,i){
     if(!String(t.text||'').trim()){ t._bb=null; return; }
-    var fs=t.size||64; ctx.font='800 '+fs+'px '+VED_FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+    var st=VED_STYLES[vedStyle(t)], fs=t.size||st.size; ctx.font=st.weight+' '+fs+'px '+st.font+',"Helvetica Neue",Arial,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
     var lines=vedWrap(ctx,t.text,VED_W*0.84), lh=fs*1.22, cx=t.x*VED_W, cy=t.y*VED_H, top=cy-lines.length*lh/2;
     var maxw=0; lines.forEach(function(l){ maxw=Math.max(maxw,ctx.measureText(l).width); });
     lines.forEach(function(l,j){
       var y=top+lh*j+lh/2;
-      if(t.style==='box'){
+      if(st.kind==='box'){
         if(!l) return; var w=ctx.measureText(l).width, pad=fs*0.32;
         ctx.fillStyle='#ffffff'; vedRoundRect(ctx,cx-w/2-pad,y-lh/2-1,w+pad*2,lh+2,fs*0.22); ctx.fill();
         ctx.fillStyle='#000000'; ctx.fillText(l,cx,y+fs*0.03);
-      } else if(t.style==='plain'){
-        ctx.save(); ctx.shadowColor='rgba(0,0,0,.75)'; ctx.shadowBlur=fs*0.22; ctx.shadowOffsetY=fs*0.04; ctx.fillStyle='#ffffff'; ctx.fillText(l,cx,y); ctx.restore();
+      } else if(st.kind==='plain'){
+        ctx.save(); ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=fs*0.18; ctx.shadowOffsetY=fs*0.03; ctx.fillStyle='#ffffff'; ctx.fillText(l,cx,y); ctx.restore();
       } else {
-        ctx.lineJoin='round'; ctx.lineWidth=fs*0.13; ctx.strokeStyle='#000000'; ctx.strokeText(l,cx,y); ctx.fillStyle='#ffffff'; ctx.fillText(l,cx,y);
+        ctx.lineJoin='round'; ctx.miterLimit=2; ctx.lineWidth=fs*0.12; ctx.strokeStyle='#000000'; ctx.strokeText(l,cx,y); ctx.fillStyle='#ffffff'; ctx.fillText(l,cx,y);
       }
     });
     t._bb=[cx-maxw/2-fs*0.35, top-4, cx+maxw/2+fs*0.35, top+lines.length*lh+4];
@@ -6418,11 +6436,12 @@ function vedPaint(ctx,texts,showSel){
 }
 function vedDrawTexts(){ if(VED&&VED.cv) vedPaint(VED.cv.getContext('2d'),VED.texts,true); }
 function vedAddText(txt){
-  VED.texts.push({text:txt||'Your text',x:0.5,y:0.3+0.08*(VED.texts.length%5),size:64,style:'outline'});
+  var last=VED.texts[VED.texts.length-1], sk=last?vedStyle(last):'tiktok';
+  VED.texts.push({text:txt||'Your text',x:0.5,y:0.3+0.08*(VED.texts.length%5),size:last?last.size:VED_STYLES[sk].size,style:sk});
   VED.tsel=VED.texts.length-1; vedDirty(); vedSide(); vedDrawTexts();
   setTimeout(function(){ var ta=document.getElementById('vd-ta'); if(ta){ ta.focus(); ta.select(); } },30);
 }
-function vedTextSet(k,val){ var t=VED.texts[VED.tsel]; if(!t) return; t[k]=(k==='size')?parseInt(val,10):val; vedDirty(); vedDrawTexts();
+function vedTextSet(k,val){ var t=VED.texts[VED.tsel]; if(!t) return; t[k]=(k==='size')?parseInt(val,10):val; if(k==='style') t.size=VED_STYLES[val].size; vedDirty(); vedDrawTexts();
   if(k==='style') vedSide(); else if(k==='text'){ var sp=document.querySelector('#ved .vd-layer.on span'); if(sp) sp.textContent=String(val).replace(/\n/g,' ')||'(empty)'; } }
 function vedTextSel(i){ VED.tsel=i; vedSide(); vedDrawTexts(); }
 function vedTextDel(i){ VED.texts.splice(i,1); VED.tsel=Math.min(VED.tsel,VED.texts.length-1); vedDirty(); vedSide(); vedDrawTexts(); }
@@ -6478,8 +6497,9 @@ function vedSide(){
   h+='<div class="vd-chips"><button onclick="vedAddText()">＋ Add text</button>'+(VED.it.caption?'<button onclick="vedAddText(VED.it.caption)" title="'+fhAttr(VED.it.caption)+'">📝 Use saved caption</button>':'')+'</div>';
   if(t){
     h+='<div style="margin-top:10px;"><textarea id="vd-ta" oninput="vedTextSet(\'text\',this.value)" placeholder="Type the text…">'+escapeHtml(t.text||'')+'</textarea>'
-      +'<div class="vd-row"><label>Size</label><input type="range" min="32" max="140" step="2" value="'+(t.size||64)+'" oninput="vedTextSet(\'size\',this.value)"></div>'
-      +'<div class="vd-chips" style="margin:6px 0;">'+Object.keys(VED_STYLES).map(function(s){ return '<button class="vd-chip'+((t.style||'outline')===s?' on':'')+'" onclick="vedTextSet(\'style\',\''+s+'\')">'+VED_STYLES[s]+'</button>'; }).join('')+'</div>'
+      +'<div class="vd-chips" style="margin:8px 0 4px;">'+Object.keys(VED_STYLES).map(function(s){ var st=VED_STYLES[s];
+          return '<button class="vd-chip'+(vedStyle(t)===s?' on':'')+'" onclick="vedTextSet(\'style\',\''+s+'\')" style="font-family:'+st.font.replace(/"/g,"'")+',sans-serif;font-weight:'+st.weight+';'+(st.kind==='box'?'background:#fff;color:#000;':st.kind==='outline'?'color:#fff;-webkit-text-stroke:.6px #000;paint-order:stroke;':'color:#fff;')+'">'+st.label+'</button>'; }).join('')+'</div>'
+      +'<div class="vd-row"><label>Size</label><input type="range" min="32" max="140" step="2" value="'+(t.size||VED_STYLES[vedStyle(t)].size)+'" oninput="vedTextSet(\'size\',this.value)"></div>'
       +'<div class="vd-chips"><button class="vd-chip" onclick="vedTextPos(\'top\')">Top</button><button class="vd-chip" onclick="vedTextPos(\'mid\')">Middle</button><button class="vd-chip" onclick="vedTextPos(\'bot\')">Bottom</button></div>'
       +'<small style="display:block;margin-top:6px;">Drag the text on the video to place it. It shows for the whole clip.</small></div>';
   }
@@ -6574,14 +6594,15 @@ function vedPill(id,html,pct){
 function vedBeforeUnload(e){ if(Object.keys(VED_RENDERS).length){ e.preventDefault(); e.returnValue='A video is still rendering.'; return e.returnValue; } }
 window.addEventListener('beforeunload',vedBeforeUnload);
 
-function vedSave(){
+async function vedSave(){
   if(!VED||!VED.dur) return;
+  await vedFonts(); if(!VED) return;
   var k=vedKept(); if(!k.length) return;
   var nothing=VED.b.length===2&&!VED.texts.some(function(t){return String(t.text||'').trim();})&&!VED.sound&&VED.origVol===1&&!VED.crop.fit&&VED.crop.z===1&&Math.abs(VED.W/VED.H-9/16)<0.01;
   if(nothing&&!confirm('You haven\'t changed anything. Save anyway (re-renders the clip at 1080×1920)?')) return;
   var g=vedGeom();
   var cv=document.createElement('canvas'); cv.width=VED_W; cv.height=VED_H;
-  var texts=VED.texts.filter(function(t){return String(t.text||'').trim();}).map(function(t){return {text:t.text,x:+t.x.toFixed(4),y:+t.y.toFixed(4),size:t.size||64,style:t.style||'outline'};});
+  var texts=VED.texts.filter(function(t){return String(t.text||'').trim();}).map(function(t){var sk=vedStyle(t); return {text:t.text,x:+t.x.toFixed(4),y:+t.y.toFixed(4),size:t.size||VED_STYLES[sk].size,style:sk};});
   vedPaint(cv.getContext('2d'),texts.map(function(t){return Object.assign({},t);}),false);
   var job={it:VED.it, srcKey:VED.srcKey, fromOrig:VED.fromOrig, segs:k, outDur:vedOutDur(), crop:{fit:VED.crop.fit,cw:g.cw,ch:g.ch,cx:g.cx,cy:g.cy},
     texts:texts, sound:VED.sound?{id:VED.sound.id,title:VED.sound.title,r2_key:VED.sound.r2_key,storage_bucket:VED.sound.storage_bucket,vol:VED.sound.vol,off:VED.sound.off||0}:null,
