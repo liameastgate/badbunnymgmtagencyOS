@@ -13880,8 +13880,8 @@ async function fsSearch(q){
 
 async function fsOpen(creator, fanId){
   FS.sel=FS.list.find(function(x){return x.creator===creator&&x.fan_id===fanId;})||FS.sel;
-  var m=await sb.from('fan_messages').select('ts,direction,sender,text,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40);
-  FS.msgs=(m.data||[]).reverse();
+  var m=await sb.from('fan_messages').select('ts,direction,sender,text,text_en,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40);
+  FS.msgs=fhEnglish(m.data||[]).reverse();
   var p=await sb.from('fan_profiles').select('*').eq('fan_id',fanId).maybeSingle();
   FS.profile=(p&&p.data)||null;
   var l=await sb.from('fan_ladder').select('*').eq('creator',creator).eq('fan_id',fanId).order('done_at',{ascending:false});
@@ -14008,7 +14008,7 @@ function fsCard(f){
   if(!FS.hub) h+='<div class="fs-card"><div class="fs-sec">Notes (yours — never overwritten)</div><textarea class="fs-notes" placeholder="Anything the exports can\'t know…" onchange="fsSaveNote(\''+f.fan_id+'\',this.value)">'+escapeHtml(P.notes||'')+'</textarea></div>';
 
   h+='<div class="fs-card"><div class="fs-sec">Recent messages</div><div class="fs-msgs">'+(FS.msgs.length?FS.msgs.map(function(m){
-    return '<div class="fs-m '+m.direction+(m.status==='Unsent'?' unsent':'')+'">'+(m.price>0?'<span class="ppv">PPV '+fsMoney(m.price)+(m.purchased?' · unlocked':' · not opened')+'</span><br>':'')+escapeHtml(m.text||'')+'<div class="meta">'+(m.direction==='out'?escapeHtml(m.sender||'')+' · ':'')+fmtDateTime(m.ts)+(m.status==='Unsent'?' · unsent':'')+'</div></div>';
+    return '<div class="fs-m '+m.direction+(m.status==='Unsent'?' unsent':'')+'"'+(m.tr?' title="He wrote: '+escapeHtml(m.orig||'').replace(/"/g,'&quot;')+'"':'')+'>'+(m.price>0?'<span class="ppv">PPV '+fsMoney(m.price)+(m.purchased?' · unlocked':' · not opened')+'</span><br>':'')+escapeHtml(m.text||'')+'<div class="meta">'+(m.direction==='out'?escapeHtml(m.sender||'')+' · ':'')+fmtDateTime(m.ts)+(m.status==='Unsent'?' · unsent':'')+(m.tr?' · 🌍 translated':'')+'</div></div>';
   }).join(''):'<div class="fs-sub">No messages stored for this fan yet.</div>')+'</div></div>';
   return h;
 }
@@ -14195,13 +14195,31 @@ async function fhOpenFan(creator,fanId){
   var r=await Promise.all([
     sb.from('fan_stats').select('*').eq('creator',creator).eq('fan_id',fanId).maybeSingle(),
     sb.from('fan_profiles').select('*').eq('fan_id',fanId).maybeSingle(),
-    sb.from('fan_messages').select('ts,direction,sender,text,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40),
+    sb.from('fan_messages').select('hash,ts,direction,sender,text,text_en,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40),
     sb.from('fan_ladder').select('*').eq('creator',creator).eq('fan_id',fanId).order('done_at',{ascending:false})]);
   if(!FH.sel||FH.sel.fan_id!==fanId) return;
   FH.stat=r[0].data||null; FH.prof=r[1].data||{fan_id:fanId};
-  FS.sel=FH.stat; FS.msgs=(r[2].data||[]).reverse(); FS.ladder=r[3].data||[];
+  FS.sel=FH.stat; FS.ladder=r[3].data||[];
+  FS.msgs=fhEnglish(r[2].data||[]).reverse();
   fhPaintFan();
+  // Everything on the Fans page is in English: translate any messages that don't have an
+  // English copy yet (done once per message, then cached), then repaint.
+  var need=(r[2].data||[]).some(function(m){ return m.text_en==null&&String(m.text||'').trim(); });
+  if(need&&!(FH.prof&&/^english$/i.test(FH.prof.lang||''))) fhTranslate(creator,fanId);
   if(window.innerWidth<900){ var b=document.getElementById('fh-fan'); if(b) b.scrollIntoView({behavior:'smooth',block:'start'}); }
+}
+function fhEnglish(rows){ return rows.map(function(m){ return Object.assign({},m,{orig:m.text, text:(m.text_en!=null&&m.text_en!=='')?m.text_en:m.text, tr:m.text_en!=null&&m.text_en!==m.text}); }); }
+async function fhTranslate(creator,fanId){
+  var box=document.getElementById('fh-tr'); if(box) box.textContent='🌍 Translating his messages to English…';
+  try{
+    var s=(await sb.auth.getSession()).data.session; if(!s) return;
+    var res=await fetch(SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/fan-translate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token},body:JSON.stringify({creator:creator,fan_id:fanId,limit:40})});
+    var out=await res.json().catch(function(){return {};});
+    if(!out.ok){ if(box) box.textContent='⚠ Could not translate right now'+(out.error?' — '+out.error:''); return; }
+    if(!FH.sel||FH.sel.fan_id!==fanId) return;
+    var m=await sb.from('fan_messages').select('hash,ts,direction,sender,text,text_en,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40);
+    FS.msgs=fhEnglish(m.data||[]).reverse(); fhPaintFan();
+  }catch(e){ if(box) box.textContent='⚠ Could not translate right now'; }
 }
 function fhSuggest(P){
   var out={}, facts=P.facts||[];
@@ -14224,8 +14242,9 @@ function fhPaintFan(){
   // another language the reply has to be in it (absolute rule) — John's Spanish is Spain Spanish.
   if(P.lang&&!/^english$/i.test(P.lang)){
     var spain=/spanish/i.test(P.lang)&&/^john$/i.test(String(f&&f.creator||'').trim());
-    h+='<div class="fh-card" style="border-color:rgba(107,143,255,.6);background:rgba(107,143,255,.08);font-size:13.5px;line-height:1.5;"><b>🌍 He writes in '+escapeHtml(P.lang)+'</b> — reply in '+escapeHtml(P.lang)+(spain?' (<b>Spain</b> Spanish: tío, vale, guapo — not Latin American)':'')+'. Everything below is in English; his quotes are in his own words.</div>';
+    h+='<div class="fh-card" style="border-color:rgba(107,143,255,.6);background:rgba(107,143,255,.08);font-size:13.5px;line-height:1.5;"><b>🌍 He writes in '+escapeHtml(P.lang)+'</b> — reply to him in '+escapeHtml(P.lang)+(spain?' (<b>Spain</b> Spanish: tío, vale, guapo — not Latin American)':'')+'. Everything on this page is translated into English for you; hover a message to see what he actually wrote.<div id="fh-tr" class="fh-mut" style="margin-top:4px;"></div></div>';
   }
+  if(!P.lang||/^english$/i.test(P.lang)) h+='<div id="fh-tr" class="fh-mut" style="margin:-4px 0 8px;"></div>';
   if(P.care&&P.care.level){ var R=fhReason(P.care), g=P.care.level==='gentle';
     h+='<div class="fh-why'+(g?' g':'')+'"><div class="lab">'+(g?'💛 Go gently with him':'🚨 Why he’s urgent')+' · '+R[1].replace(/^\S+\s/,'')+'</div>'
       +(P.care.at?'<div class="fh-mut">'+escapeHtml(fsStale(P.care.at))+'</div>':'')
