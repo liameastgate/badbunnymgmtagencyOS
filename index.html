@@ -662,6 +662,11 @@
   .mo-pill.mo-new { background:rgba(107,143,255,.18); color:#a5b0ff; } .mo-pill.mo-done { background:rgba(34,197,94,.15); color:#4ade80; }
   .mo-note { margin-top:8px; font-size:13px; line-height:1.4; background:var(--surface2); border-radius:10px; padding:8px 10px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; cursor:pointer; white-space:pre-wrap; }
   .mo-note.open { display:block; -webkit-line-clamp:unset; } .mo-note.mo-empty { color:var(--text2); cursor:default; }
+  .mo-trl { font-size:11px; color:var(--text2); margin-top:4px; } .mo-trl a { cursor:pointer; text-decoration:underline; }
+  .mo-tip { font-size:13px; line-height:1.45; background:rgba(107,143,255,.1); border:1px solid rgba(107,143,255,.3); border-radius:12px; padding:10px 12px; margin-bottom:12px; }
+  .mo-vers { display:flex; align-items:center; gap:5px; margin-top:12px; font-size:12px; color:var(--text2); }
+  .mo-vers i { width:22px; height:6px; border-radius:3px; background:var(--surface2); border:1px solid var(--border); } .mo-vers i.on { background:var(--green); border-color:var(--green); }
+  .mo-vers span { margin-left:6px; }
   .mo-watch { margin-top:auto; padding-top:8px; font-size:13px; font-weight:700; color:var(--accent2); text-decoration:none; }
   .mo-up { width:100%; margin-top:12px; border:0; border-radius:12px; padding:13px; font:inherit; font-size:14.5px; font-weight:800; color:#fff; background:var(--accent); cursor:pointer; }
   .mo-up.mo-up-again { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
@@ -3128,6 +3133,7 @@
       <div class="form-group"><label>Management Type</label><select id="model-mgmt-type"><option value="full_scale">Full Scale</option><option value="chatting">Chatting</option></select></div>
       <div class="form-group"><label>Agency Split % <span style="font-weight:400;color:var(--text2);">(agency's cut — model keeps the rest)</span></label><input type="number" id="model-split" placeholder="20" min="0" max="100"></div>
       <div class="form-group"><label>Gender <span style="font-weight:400;color:var(--text2);">(decides which Guides they see)</span></label><select id="model-gender"><option value="">Not set</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+      <div class="form-group"><label>Language <span style="font-weight:400;color:var(--text2);">(their order notes are auto-translated)</span></label><select id="model-lang"><option value="">English</option><option value="Spanish (Spain)">Spanish (Spain)</option><option value="Spanish (Latin America)">Spanish (Latin America)</option><option value="Portuguese (Brazil)">Portuguese (Brazil)</option><option value="French">French</option><option value="Italian">Italian</option><option value="German">German</option><option value="Russian">Russian</option><option value="Tagalog">Tagalog</option></select></div>
       <div class="form-group"><label>Niche</label><input type="text" id="model-niche" placeholder="e.g. Fitness, Cosplay, Gaming" list="niche-suggestions"></div>
       <datalist id="niche-suggestions"></datalist>
       <div class="form-group full"><label>Assigned Chatters (comma separated)</label><input type="text" id="model-chatters" placeholder="Chatter1, Chatter2"></div>
@@ -7291,15 +7297,17 @@ async function renderModelUpload(){
   const orderCard=function(o){
     const num=o.order_number?'#'+String(o.order_number).padStart(3,'0'):'';
     const done=!!o.video_path, url=o.url?escapeHtml(o.url):'';
+    const vers=all.filter(function(i){ return i.source_order_id===o.id; }).length;
     const age=Math.floor((Date.now()-new Date(o.created_at))/86400000);
-    const pill=done?'<span class="mo-pill mo-done">✅ Uploaded</span>':(age<=1?'<span class="mo-pill mo-new">New</span>':'<span class="mo-pill">To film</span>');
+    const pill=done?'<span class="mo-pill mo-done">✅ '+moT(me,'Uploaded','Subido')+'</span>':(age<=1?'<span class="mo-pill mo-new">'+moT(me,'New','Nuevo')+'</span>':'<span class="mo-pill">'+moT(me,'To film','Por grabar')+'</span>');
     const thumb='<div class="mo-th"'+(url?' role="button" onclick="window.open(\''+url+'\',\'_blank\')"':'')+'>'
       +(o.thumbnail_url?'<img src="'+o.thumbnail_url+'" alt="">':'<span>🎬</span>')+(url?'<i>▶</i>':'')+'</div>';
     return '<div class="mo-card'+(done?' is-done':'')+'">'
       +'<div class="mo-top">'+thumb+'<div class="mo-info"><div class="mo-h">'+pill+' <b>'+num+'</b></div>'
-      +(o.notes?'<div class="mo-note" onclick="this.classList.toggle(\'open\')">'+escapeHtml(o.notes)+'</div>':'<div class="mo-note mo-empty">Copy the example as closely as you can.</div>')
-      +(url?'<a class="mo-watch" href="'+url+'" target="_blank" rel="noopener">▶ Watch example</a>':'')+'</div></div>'
-      +'<button id="mu-ord-'+o.id+'" class="mo-up'+(done?' mo-up-again':'')+'" onclick="muUploadForOrder(\''+o.id+'\')">📤 '+(done?'Upload again':'Upload for this order')+'</button>'
+      +(o.notes?moNoteHtml(o,me):'<div class="mo-note mo-empty">Copy the example as closely as you can.</div>')
+      +(url?'<a class="mo-watch" href="'+url+'" target="_blank" rel="noopener">▶ '+moT(me,'Watch example','Ver ejemplo')+'</a>':'')+'</div></div>'
+      +'<div class="mo-vers">'+[1,2,3,4].map(function(k){ return '<i class="'+(k<=vers?'on':'')+'"></i>'; }).join('')+'<span>'+(vers?vers+' / 3–4 '+moT(me,'versions sent','versiones enviadas'):moT(me,'Film 3–4 versions','Graba 3–4 versiones'))+'</span></div>'
+      +'<button id="mu-ord-'+o.id+'" class="mo-up'+(vers>=3?' mo-up-again':'')+'" onclick="muUploadForOrder(\''+o.id+'\')">📤 '+(vers?moT(me,'Add another version','Subir otra versión'):moT(me,'Upload for this order','Subir para este pedido'))+'</button>'
       +'</div>';
   };
   const histRow=function(i){
@@ -7312,9 +7320,11 @@ async function renderModelUpload(){
   };
   el.innerHTML=
      '<div id="mu-status" style="display:none;background:rgba(107,143,255,.12);border:1px solid rgba(107,143,255,.35);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>'
-    +(openOrders.length?'<div class="mo-hd"><b>🎯 Your orders</b><span>'+openOrders.filter(function(o){return !o.video_path;}).length+' to film</span></div>'
+    +(openOrders.length?'<div class="mo-hd"><b>🎯 '+moT(me,'Your orders','Tus pedidos')+'</b><span>'+openOrders.filter(function(o){return !o.video_path;}).length+' '+moT(me,'to film','por grabar')+'</span></div>'
+      +'<div class="mo-tip">'+moT(me,'🎬 <b>Film 3–4 versions of every order.</b> Change one small thing each time: the background, the first line (hook) or your outfit. Experiment a little — we test the extras as trial reels.',
+        '🎬 <b>Graba 3–4 versiones de cada pedido.</b> Cambia una cosa pequeña cada vez: el fondo, la primera frase (el gancho) o la ropa. Experimenta un poco — usamos las extra como trial reels.')+'</div>'
       +openOrders.slice().sort(function(a,b){ return (!!a.video_path)-(!!b.video_path)||String(b.created_at).localeCompare(String(a.created_at)); }).map(orderCard).join('')
-      +'<button class="mo-other" onclick="document.getElementById(\'mu-cats\').scrollIntoView({behavior:\'smooth\'})">＋ Upload something else (no order)</button>':'')
+      +'<button class="mo-other" onclick="document.getElementById(\'mu-cats\').scrollIntoView({behavior:\'smooth\'})">＋ '+moT(me,'Upload something else (no order)','Subir otra cosa (sin pedido)')+'</button>':'')
     +'<div id="mu-cats"></div><div class="mu-sec">🔒 For OnlyFans <span class="mu-pill" style="background:rgba(236,72,153,.15);color:#f472b6;">Private · never posted publicly</span></div>'
     +'<div class="mu-grid">'+MU_CARDS.of.map(card).join('')+'</div>'
     +'<div class="mu-sec">📣 For marketing <span class="mu-pill" style="background:rgba(34,197,94,.14);color:#4ade80;">Public · must be safe</span></div>'
@@ -7324,6 +7334,35 @@ async function renderModelUpload(){
     +'<div style="font-size:12px;color:var(--text2);margin:0 0 18px;line-height:1.5;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;">📌 Always send the <b>original</b> from your camera roll — anything that went through WhatsApp or Messenger gets compressed and we can\'t use it. You can pick several at once.</div>'
     +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px;">Recent uploads</div>'
     +(mine.length?'<div class="card" style="padding:4px 12px;">'+mine.map(histRow).join('')+'</div>':'<div style="font-size:12px;color:var(--text2);">Nothing yet.</div>');
+  moTranslate(openOrders,me);
+}
+// Order notes in the model's own language (models.lang). Translated once by the
+// order-translate edge function and cached on the order; edited notes are re-translated.
+function moT(me,en,es){ return me&&/^spanish/i.test(me.lang||'')?es:en; }
+function moTrFresh(o,me){ return !!(me&&me.lang&&o.notes_tr&&o.notes_tr_lang===me.lang&&o.notes_tr_src===String(o.notes||'').trim()); }
+function moNoteHtml(o,me){
+  const tr=moTrFresh(o,me);
+  return '<div class="mo-note" id="mo-note-'+o.id+'" onclick="this.classList.toggle(\'open\')">'+escapeHtml(tr?o.notes_tr:o.notes)+'</div>'
+    +(me&&me.lang?'<div class="mo-trl" id="mo-trl-'+o.id+'">'+(tr?'<a onclick="moShowOrig(\''+o.id+'\',this)">'+moT(me,'🌐 Translated · show original','🌐 Traducido · ver original')+'</a>':'🌐 …')+'</div>':'');
+}
+function moShowOrig(id,a){
+  const o=(STATE.contentOrders||[]).find(x=>x.id===id), n=document.getElementById('mo-note-'+id), me=myOwnModel(); if(!o||!n) return;
+  const orig=a.dataset.orig!=='1'; a.dataset.orig=orig?'1':'0';
+  n.textContent=orig?o.notes:o.notes_tr; a.textContent=orig?moT(me,'🌐 Original · show translation','🌐 Original · ver traducción'):moT(me,'🌐 Translated · show original','🌐 Traducido · ver original');
+}
+async function moTranslate(orders,me){
+  if(!me||!me.lang) return;
+  const need=orders.filter(o=>String(o.notes||'').trim()&&!moTrFresh(o,me)); if(!need.length) return;
+  try{
+    const{data}=await sb.functions.invoke('order-translate',{body:{order_ids:need.map(o=>o.id)}});
+    const tr=(data&&data.translations)||{};
+    need.forEach(o=>{
+      if(tr[o.id]){ o.notes_tr=tr[o.id]; o.notes_tr_src=String(o.notes||'').trim(); o.notes_tr_lang=me.lang; }
+      const n=document.getElementById('mo-note-'+o.id), l=document.getElementById('mo-trl-'+o.id);
+      if(n&&tr[o.id]) n.textContent=tr[o.id];
+      if(l) l.innerHTML=tr[o.id]?'<a onclick="moShowOrig(\''+o.id+'\',this)">'+moT(me,'🌐 Translated · show original','🌐 Traducido · ver original')+'</a>':'';
+    });
+  }catch(e){ need.forEach(o=>{ const l=document.getElementById('mo-trl-'+o.id); if(l) l.innerHTML=''; }); }
 }
 function muStatus(text,show){ const s=document.getElementById('mu-status'); if(!s) return; s.style.display=show===false?'none':'block'; s.innerHTML=text; }
 // ── When was this filmed? ──────────────────────────────────────────────────
@@ -7412,18 +7451,21 @@ async function muUploadCategory(cat){
 async function muUploadForOrder(orderId){
   const o=(STATE.contentOrders||[]).find(function(x){return x.id===orderId;}); if(!o) return;
   const isModel=STATE.profile?.role==='model';
-  const files=await libPickFiles('video/*,image/*',false); if(!files.length) return;
+  const files=await libPickFiles('video/*,image/*',true); if(!files.length) return;   // several versions per order (trial reels)
   const btn=document.getElementById('mu-ord-'+orderId)||document.getElementById('co-up-'+orderId); const old=btn?btn.textContent:'';
   if(btn){ btn.textContent='Uploading…'; btn.disabled=true; }
   const statusFn=isModel?function(l,s,p){ muStatus('<b>'+escapeHtml(l)+'</b> — '+s+(p&&p<1?' <span style="color:var(--accent2);">'+Math.round(p*100)+'%</span>':'')); }:null;
   const res=await libUploadFiles(files,{modelId:o.model_id,ownerType:'model',category:(o.platform==='instagram'||o.platform==='tiktok')?'inbox':null,sourceOrderId:orderId,strictHd:isModel,onStatus:statusFn});
-  const r=res[0];
-  if(r&&r.item){
-    const vp='r2:'+r.key;
+  const good=res.filter(function(x){ return x.item; }), bad=res.filter(function(x){ return !x.item; });
+  const r=good[0]||res[0];
+  if(good.length){
+    const vp='r2:'+good[0].key;
     await sb.from('content_orders').update({video_path:vp}).eq('id',orderId);
     o.video_path=vp;
-    if(libIsVideo(r.item)) triggerScan(orderId,vp);
-    if(isModel) muStatus('✅ Received for order '+(o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')+' — thank you!');
+    if(libIsVideo(good[0].item)) triggerScan(orderId,vp);
+    if(isModel) muStatus('✅ '+good.length+' version'+(good.length===1?'':'s')+' received for order '+(o.order_number?'#'+String(o.order_number).padStart(3,'0'):'')+' — thank you!'
+      +(good.length<3?' <span style="color:var(--text2);">Send 3–4 versions if you can.</span>':'')
+      +(bad.length?'<div style="margin-top:6px;color:#e6b428;">'+bad.map(function(b){ return '⚠ '+escapeHtml(b.file.name)+': '+escapeHtml(b.error||b.skipped||''); }).join('<br>')+'</div>':''));
   } else if(r){ if(isModel) muStatus('⚠ <b>'+escapeHtml(r.file.name)+'</b>: '+escapeHtml(r.error||r.skipped)); else alert('Not uploaded: '+(r.error||r.skipped)); }
   if(btn){ btn.textContent=old; btn.disabled=false; }
   if(isModel) renderModelUpload().then(function(){ const s=document.getElementById('mu-status'); if(s&&r&&(r.item||r.error||r.skipped)) { s.style.display='block'; } });
@@ -12023,6 +12065,7 @@ function editModel(id){
   document.getElementById('model-split').value=m.split||20; document.getElementById('model-chatters').value=m.chatters||'';
   document.getElementById('model-niche').value=m.niche||'';
   document.getElementById('model-gender').value=m.gender||'';
+  document.getElementById('model-lang').value=m.lang||'';
   document.getElementById('model-email').value=m.email||'';
   document.getElementById('model-drive').value=m.drive_link||''; document.getElementById('model-ig-handles').value=(m.instagram_handles||[]).join(', '); openModal('model-modal');
 }
@@ -12052,6 +12095,7 @@ async function saveModel(){
     drive_link:document.getElementById('model-drive').value.trim()||null,
     niche:document.getElementById('model-niche').value.trim()||null,
     gender:document.getElementById('model-gender').value||null,
+    lang:document.getElementById('model-lang').value||null,
     instagram_handles:document.getElementById('model-ig-handles').value.split(',').map(s=>s.trim().replace(/^@/,'').toLowerCase()).filter(Boolean)
   };
   if(!p.name)return showAlert('model-alert','Name required.','error');
