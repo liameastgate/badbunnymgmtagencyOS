@@ -6792,6 +6792,136 @@ function vedPill(id,html,pct){
   var all=document.querySelectorAll('.ved-pill'); all.forEach(function(x,i){ x.style.bottom=(16+i*74)+'px'; });
   p.innerHTML=html+(pct!=null?'<div style="height:5px;background:#262a40;border-radius:3px;margin-top:6px;overflow:hidden;"><i style="display:block;height:100%;background:#5b6cff;width:'+Math.round(pct*100)+'%;"></i></div>':'');
 }
+// ── GPU render (Nov 2026) ───────────────────────────────────────────────────
+// Uses Chrome's built-in hardware video decoder/encoder (WebCodecs) for the picture: each kept
+// frame is decoded, drawn onto a 1080×1920 canvas with the crop and the text layer, and
+// re-encoded to H.264 on the GPU. Typically 5–10× faster than the one-core ffmpeg render.
+// The sound (original + song) is then mixed by ffmpeg in the background worker, copying the
+// GPU video untouched (a second or two). Anything unsupported falls back to the old engine.
+var VED_GPU_LIBS=null, VED_GPU_CODEC='avc1.640028', VED_NO_GPU=false;
+function vedGpuLibs(){
+  if(VED_GPU_LIBS) return VED_GPU_LIBS;
+  VED_GPU_LIBS=Promise.all([
+    window.MP4Box?1:libLoadScript('https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js'),
+    window.Mp4Muxer?1:libLoadScript('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js')
+  ]);
+  VED_GPU_LIBS.catch(function(){ VED_GPU_LIBS=null; });
+  return VED_GPU_LIBS;
+}
+async function vedGpuEncoderConfig(){
+  if(!window.VideoEncoder||!window.VideoDecoder||!window.VideoFrame) return null;
+  var base={codec:VED_GPU_CODEC,width:VED_W,height:VED_H,bitrate:10000000,framerate:30};
+  if(/^avc/.test(VED_GPU_CODEC)) base.avc={format:'avc'};
+  var tries=[Object.assign({},base,{hardwareAcceleration:'prefer-hardware'}),base];
+  for(var i=0;i<tries.length;i++){ try{ var r=await VideoEncoder.isConfigSupported(tries[i]); if(r.supported) return r.config; }catch(e){} }
+  return null;
+}
+function vedSleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+// Demux the source with mp4box: video track info, codec description and all samples.
+function vedDemux(u8){
+  return new Promise(function(res,rej){
+    var f=MP4Box.createFile(), info=null, samples=[];
+    f.onError=function(e){ rej(new Error('demux: '+e)); };
+    f.onReady=function(i){ info=i; };
+    f.onSamples=function(id,u,s){ for(var k=0;k<s.length;k++) samples.push(s[k]); };
+    var ab=u8.buffer.slice(u8.byteOffset,u8.byteOffset+u8.byteLength); ab.fileStart=0;
+    f.appendBuffer(ab); f.flush();
+    if(!info||!info.videoTracks||!info.videoTracks.length) return rej(new Error('no video track'));
+    var vt=info.videoTracks[0], trak=f.getTrackById(vt.id), entry=trak.mdia.minf.stbl.stsd.entries[0];
+    var box=entry.avcC||entry.hvcC||entry.vpcC||entry.av1C, desc=null;
+    if(box){ var DSt=window.DataStream||MP4Box.DataStream, ds=new DSt(undefined,0,DSt.BIG_ENDIAN); box.write(ds); desc=new Uint8Array(ds.buffer,8); }
+    f.setExtractionOptions(vt.id,null,{nbSamples:1e9}); f.start(); f.flush();
+    var m=vt.matrix||[65536,0,0,0,65536,0], rot=((Math.round(Math.atan2(m[1],m[0])*180/Math.PI)%360)+360)%360;
+    rot=Math.round(rot/90)*90%360;
+    res({vt:vt,desc:desc,samples:samples,rot:rot});
+  });
+}
+async function vedGpuRender(job,files,say){
+  if(VED_NO_GPU) throw new Error('gpu off');
+  var cfg=await vedGpuEncoderConfig(); if(!cfg) throw new Error('no hardware encoder');
+  await vedGpuLibs();
+  var src=files['in.'+job.srcExt], dm=await vedDemux(src), vt=dm.vt, ts=vt.timescale;
+  var dcfg={codec:vt.codec,codedWidth:vt.video.width,codedHeight:vt.video.height,hardwareAcceleration:'prefer-hardware'};
+  if(dm.desc) dcfg.description=dm.desc;
+  var ds=await VideoDecoder.isConfigSupported(dcfg).catch(function(){ return {supported:false}; });
+  if(!ds.supported){ delete dcfg.hardwareAcceleration; ds=await VideoDecoder.isConfigSupported(dcfg).catch(function(){ return {supported:false}; }); }
+  if(!ds.supported) throw new Error('cannot decode '+vt.codec);
+  var segs=job.segs, offs=[], acc=0; segs.forEach(function(s){ offs.push(acc); acc+=s[1]-s[0]; });
+  var muxer=new Mp4Muxer.Muxer({target:new Mp4Muxer.ArrayBufferTarget(),video:{codec:/^avc/.test(cfg.codec)?'avc':/^vp09/.test(cfg.codec)?'vp9':'av1',width:VED_W,height:VED_H},fastStart:'in-memory',firstTimestampBehavior:'offset'});
+  var err=null, nOut=0, lastOut=-1;
+  var enc=new VideoEncoder({output:function(ch,meta){ muxer.addVideoChunk(ch,meta); },error:function(e){ err=e; }});
+  enc.configure(cfg);
+  var oc=document.createElement('canvas'); oc.width=VED_W; oc.height=VED_H; var octx=oc.getContext('2d');
+  var uc=null, uctx=null;
+  var crop=job.crop, ov=job.canvas;
+  var dec=new VideoDecoder({error:function(e){ err=e; },output:function(fr){
+    try{
+      var t=fr.timestamp/1e6, si=-1;
+      for(var k=0;k<segs.length;k++){ if(t>=segs[k][0]-0.001&&t<segs[k][1]-0.0005){ si=k; break; } }
+      if(si<0){ fr.close(); return; }
+      var outT=offs[si]+(t-segs[si][0]); if(outT<=lastOut){ fr.close(); return; } lastOut=outT;
+      var fw=fr.displayWidth, fh=fr.displayHeight, srcImg=fr, W=fw, H=fh;
+      if(dm.rot){   // phone videos stored sideways: turn the frame upright first
+        W=dm.rot%180?fh:fw; H=dm.rot%180?fw:fh;
+        if(!uc){ uc=document.createElement('canvas'); uc.width=W; uc.height=H; uctx=uc.getContext('2d'); }
+        uctx.setTransform(1,0,0,1,0,0); uctx.translate(W/2,H/2); uctx.rotate(dm.rot*Math.PI/180); uctx.drawImage(fr,-fw/2,-fh/2,fw,fh); srcImg=uc;
+      }
+      octx.fillStyle='#000'; octx.fillRect(0,0,VED_W,VED_H);
+      if(crop.fit){ var s=Math.min(VED_W/W,VED_H/H), w=W*s, h=H*s; octx.drawImage(srcImg,0,0,W,H,(VED_W-w)/2,(VED_H-h)/2,w,h); }
+      else { var kx=W/(job.srcW||W), ky=H/(job.srcH||H); octx.drawImage(srcImg,crop.cx*kx,crop.cy*ky,crop.cw*kx,crop.ch*ky,0,0,VED_W,VED_H); }
+      if(ov) octx.drawImage(ov,0,0);
+      var vf=new VideoFrame(oc,{timestamp:Math.round(outT*1e6),duration:fr.duration||33333});
+      fr.close();
+      enc.encode(vf,{keyFrame:nOut%60===0}); vf.close(); nOut++;
+    }catch(e){ err=e; try{ fr.close(); }catch(x){} }
+  }});
+  dec.configure(dcfg);
+  // feed from the keyframe at/before the first kept moment to just past the last one
+  var S=dm.samples, first=segs[0][0], last=segs[segs.length-1][1], i0=0;
+  for(var i=0;i<S.length;i++){ if(S[i].is_sync&&S[i].cts/ts<=first+0.001) i0=i; }
+  for(var j=i0;j<S.length;j++){
+    var sm=S[j]; if(err) throw err;
+    if(sm.dts/ts>last+1.5) break;
+    dec.decode(new EncodedVideoChunk({type:sm.is_sync?'key':'delta',timestamp:Math.round(sm.cts*1e6/ts),duration:Math.round(sm.duration*1e6/ts),data:sm.data}));
+    while(dec.decodeQueueSize>12||enc.encodeQueueSize>8){ if(err) throw err; await vedSleep(2); }
+    if(j%15===0) say(Math.min(1,Math.max(0,(sm.cts/ts-first)/(last-first||1))));
+  }
+  await dec.flush(); await enc.flush(); dec.close(); enc.close();
+  if(err) throw err;
+  if(nOut<2) throw new Error('no frames came out');
+  muxer.finalize();
+  return new Uint8Array(muxer.target.buffer);
+}
+// Sound for the GPU video: input 0 = GPU video (copied), 1 = original clip, 2 = song.
+function vedAudioArgs(job,useOrig){
+  var f=[], ins=['-i','v.mp4','-i','in.'+job.srcExt], snd=-1;
+  if(job.sound){ snd=2; ins=ins.concat(['-stream_loop','-1','-i','snd.'+job.sndExt]); }
+  var k=job.segs, aout=null;
+  if(useOrig){
+    k.forEach(function(s,i){ f.push('[1:a]atrim=start='+s[0].toFixed(3)+':end='+s[1].toFixed(3)+',asetpts=PTS-STARTPTS[a'+i+']'); });
+    f.push(k.length>1?k.map(function(_,i){return '[a'+i+']';}).join('')+'concat=n='+k.length+':v=0:a=1[ac]':'[a0]anull[ac]');
+    f.push('[ac]volume='+job.origVol.toFixed(2)+'[ao]');
+  }
+  if(snd>=0) f.push('[2:a]atrim=start='+job.sound.off.toFixed(3)+':end='+(job.sound.off+job.outDur).toFixed(3)+',asetpts=PTS-STARTPTS,volume='+job.sound.vol.toFixed(2)+'[as]');
+  if(useOrig&&snd>=0){ f.push('[ao][as]amix=inputs=2:duration=first:dropout_transition=0,volume=2[aout]'); aout='[aout]'; }
+  else if(useOrig) aout='[ao]'; else if(snd>=0) aout='[as]';
+  if(!aout) return null;
+  return ins.concat(['-filter_complex',f.join(';'),'-map','0:v','-map',aout,'-c:v','copy','-c:a','aac','-b:a','192k','-ar','44100','-t',job.outDur.toFixed(3),'-movflags','+faststart','out.mp4']);
+}
+async function vedGpuFull(job,files,say){
+  var t0=performance.now();
+  var v=await vedGpuRender(job,files,function(p){ say('Rendering on GPU… '+Math.round(p*100)+'%',0.05+0.75*p); });
+  var useOrig=job.origVol>0;
+  if(!useOrig&&!job.sound) return v;
+  say('Adding sound…',0.85);
+  var mk=function(u){ var a=vedAudioArgs(job,u); if(!a) return null; var c={'v.mp4':v.slice()}; Object.keys(files).forEach(function(n){ if(n!=='ovl.png') c[n]=files[n].slice(); }); return {a:a,c:c}; };
+  var r=mk(useOrig), out;
+  try{ out=await vedFFRun(r.a,r.c,null); }
+  catch(e){ if(useOrig&&/matches no streams|Stream specifier ':a'|1:a/.test(e.log||'')){ var r2=mk(false); out=r2?await vedFFRun(r2.a,r2.c,null):v; } else throw e; }
+  console.log('GPU edit render',Math.round(performance.now()-t0)+'ms');
+  return out;
+}
+
 // Watch the finished edit straight away (to check the caption / sound came out right).
 async function vedPreview(id){
   var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
@@ -6816,7 +6946,7 @@ async function vedSave(){
   vedPaint(cv.getContext('2d'),texts.map(function(t){return Object.assign({},t);}),false);
   var job={it:VED.it, srcKey:VED.srcKey, fromOrig:VED.fromOrig, segs:k, outDur:vedOutDur(), crop:{fit:VED.crop.fit,cw:g.cw,ch:g.ch,cx:g.cx,cy:g.cy},
     texts:texts, sound:VED.sound?{id:VED.sound.id,title:VED.sound.title,r2_key:VED.sound.r2_key,storage_bucket:VED.sound.storage_bucket,vol:VED.sound.vol,off:VED.sound.off||0}:null,
-    origVol:VED.origVol, uiCrop:{z:VED.crop.z,px:VED.crop.px,py:VED.crop.py,fit:VED.crop.fit}, canvas:texts.length?cv:null};
+    origVol:VED.origVol, srcW:VED.W, srcH:VED.H, uiCrop:{z:VED.crop.z,px:VED.crop.px,py:VED.crop.py,fit:VED.crop.fit}, canvas:texts.length?cv:null};
   if(job.sound&&job.sound.vol<=0) job.sound=null;
   vedClose(true);
   vedRender(job);
@@ -6842,6 +6972,8 @@ async function vedRender(job){
     var go=function(u){ var copy={}; Object.keys(files).forEach(function(n){ copy[n]=files[n].slice(); });
       return vedFFRun(vedBuildArgs(job,u),copy,function(t){ say('Rendering… '+Math.min(99,Math.round(t/job.outDur*100))+'% · keep this tab open',0.05+0.85*Math.min(1,t/job.outDur)); }); };
     var job2=LIB_FF_Q.then(async function(){
+      try{ return await vedGpuFull(job,files,function(m,p){ say(m+' · keep this tab open',p); }); }
+      catch(e){ console.warn('GPU render not available, using the standard engine:',e&&e.message||e); say('Rendering…',0.05); }
       try{ return await go(useOrig); }
       catch(e){ if(useOrig&&/matches no streams|Stream specifier ':a'|0:a/.test(e.log||'')) return await go(false); throw e; }   // clip has no sound track
     });
