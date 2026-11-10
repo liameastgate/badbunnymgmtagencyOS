@@ -639,6 +639,9 @@
   .cp-call label { border:1px solid var(--border); border-radius:8px; padding:12px 14px; cursor:pointer; background:var(--surface2); font-size:13.5px; font-weight:600; display:flex; gap:8px; align-items:center; }
   .cp-call label:hover { border-color:var(--accent); }
   .cp-call input { width:auto; accent-color:var(--accent); }
+  .co-note { width:100%; box-sizing:border-box; background:transparent; color:var(--text); border:1px solid transparent; border-radius:7px; padding:5px 7px; font:inherit; font-size:12px; resize:none; overflow:hidden; min-height:30px; line-height:1.35; transition:border-color .2s; }
+  .co-note:hover { border-color:var(--border); } .co-note:focus { outline:none; border-color:var(--accent); background:var(--surface2); }
+  .co-note::placeholder { color:var(--text2); opacity:.7; }
 </style>
 </head>
 <body>
@@ -7741,7 +7744,7 @@ function contentOrderRowHtml(o,isAdmin,hidden){
       <td><strong>${num?`<span style="color:var(--accent2);">${num}</span> · `:''}${o.model_name||'—'}</strong></td><td>${pl}</td>
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
-      <td style="max-width:180px;">${o.notes||'—'}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
+      <td style="min-width:170px;max-width:240px;">${canEdit?`<textarea class="co-note" rows="1" placeholder="+ note…" data-id="${o.id}" onfocus="this.dataset.was=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.value=this.dataset.was||'';this.blur();}" oninput="coNoteGrow(this)" onblur="coNoteSave(this)">${escapeHtml(o.notes||'')}</textarea>`:(o.notes?escapeHtml(o.notes):'—')}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span>${(function(){var c=compliancePillHtml(o);return c?'<div style="margin-top:5px;">'+c+'</div>':'';})()}</td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -7754,6 +7757,17 @@ function contentOrderRowHtml(o,isAdmin,hidden){
       </td></tr>`;
 }
 
+// Inline notes: type straight into the Notes cell — Enter (or clicking away) saves, Esc undoes,
+// Shift+Enter adds a new line. No need to open Edit.
+function coNoteGrow(t){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,160)+'px'; }
+async function coNoteSave(t){
+  const id=t.dataset.id, val=t.value.trim(), o=(STATE.contentOrders||[]).find(x=>x.id===id); if(!o) return;
+  if(val===(o.notes||'').trim()) return;
+  t.style.borderColor='var(--accent)';
+  const{data,error}=await sb.from('content_orders').update({notes:val||null}).eq('id',id).select('id');
+  if(error||!data||!data.length){ t.style.borderColor='var(--red)'; alert('Could not save the note — '+(error?error.message:'no permission')); return; }
+  o.notes=val||null; t.style.borderColor='var(--green)'; setTimeout(()=>{ t.style.borderColor=''; },1200);
+}
 function renderContentOrders(filtered) {
   const orders = filtered!==undefined ? filtered : STATE.contentOrders;
   const tbody=document.getElementById('content-orders-body'); const empty=document.getElementById('content-empty');
@@ -7773,6 +7787,7 @@ function renderContentOrders(filtered) {
     html+=done.map(o=>contentOrderRowHtml(o,isAdmin,!showDone)).join('');
   }
   tbody.innerHTML=html;
+  tbody.querySelectorAll('.co-note').forEach(coNoteGrow);
   updateOrderBulkBar();
 }
 
