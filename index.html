@@ -7744,17 +7744,17 @@ function contentOrderRowHtml(o,isAdmin,hidden){
       <td><strong>${num?`<span style="color:var(--accent2);">${num}</span> · `:''}${o.model_name||'—'}</strong></td><td>${pl}</td>
       <td>${o.url?`<a href="${o.url}" target="_blank" style="color:var(--accent2);">View ↗</a>`:'—'}</td>
       <td>${o.drive_link?`<a href="${o.drive_link}" target="_blank" style="color:var(--blue);">Drive ↗</a>`:'—'}</td>
-      <td style="min-width:170px;max-width:240px;">${canEdit?`<textarea class="co-note" rows="1" placeholder="+ note…" data-id="${o.id}" onfocus="this.dataset.was=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.value=this.dataset.was||'';this.blur();}" oninput="coNoteGrow(this)" onblur="coNoteSave(this)">${escapeHtml(o.notes||'')}</textarea>`:(o.notes?escapeHtml(o.notes):'—')}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
+      <td style="min-width:150px;max-width:240px;">${canEdit?`<textarea class="co-note" rows="1" placeholder="+ note…" data-id="${o.id}" onfocus="this.dataset.was=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.value=this.dataset.was||'';this.blur();}" oninput="coNoteGrow(this)" onblur="coNoteSave(this)">${escapeHtml(o.notes||'')}</textarea>`:(o.notes?escapeHtml(o.notes):'—')}${hasVid?'<br><span style="color:var(--green);font-size:11px;">✅ Video uploaded</span>':''}</td>
       <td><span class="badge ${o.status||'pending'}">${o.status||'pending'}</span>${(function(){var c=compliancePillHtml(o);return c?'<div style="margin-top:5px;">'+c+'</div>':'';})()}</td>
       <td style="color:var(--text2);font-size:11px;">${fmtDate(o.created_at)}</td>
-      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+      <td style="min-width:230px;"><div style="display:flex;gap:4px;flex-wrap:wrap;">
         ${o.video_path?`<button class="btn btn-sm btn-ghost" onclick="openOrderVideo('${o.id}')" title="View uploaded video">🎬 Video</button>`:''}
         ${canEdit?`<button id="co-up-${o.id}" class="btn btn-sm btn-ghost" onclick="uploadOrderVideo('${o.id}')">📤 ${o.video_path?'Replace':'Upload'}</button>`:''}
         ${canEdit&&o.status!=='done'?`<button class="btn btn-sm btn-green" onclick="markDone('${o.id}')">✓ Done</button>`:''}
         ${canEdit&&o.status==='done'?`<button class="btn btn-sm btn-ghost" onclick="markPending('${o.id}')" style="font-size:11px;">↩ Undo</button>`:''}
         ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="editOrder('${o.id}')">✏ Edit</button>`:''}
         ${STATE.profile.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>`:''}
-      </td></tr>`;
+      </div></td></tr>`;
 }
 
 // Inline notes: type straight into the Notes cell — Enter (or clicking away) saves, Esc undoes,
