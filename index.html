@@ -2629,6 +2629,7 @@
       <div class="page-sub">New subs waiting for a first message, and everything we know about the ones who talk.</div>
       <div id="fans-fresh"></div>
       <div id="fans-tabs"></div>
+      <div id="fans-hub"></div>
       <div id="today-body"></div>
       <div id="new-subs-body"></div>
       <div id="fan-stats-body" hidden></div>
@@ -13995,7 +13996,8 @@ function fsCard(f){
     +'<div class="fs-axis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div></div>';
 
   // AI layer (piece 2) — shown when a profile exists
-  if(P.summary||P.facts||P.loops){
+  if(FS.hub){ if(P.summary) h+='<div class="fs-card fs-ai"><div class="fs-sec">Last conversation · '+(P.summary_at?fmtDate(P.summary_at):'')+'</div><div style="font-size:14px;line-height:1.55;">'+escapeHtml(P.summary)+'</div></div>'; }
+  else if(P.summary||P.facts||P.loops){
     h+='<div class="fs-card fs-ai"><div class="fs-sec">Last conversation · '+(P.summary_at?fmtDate(P.summary_at):'')+'</div><div style="font-size:14px;line-height:1.55;">'+escapeHtml(P.summary||'')+'</div></div>';
     if((P.loops||[]).length) h+='<div class="fs-card fs-ai"><div class="fs-sec">Open loops — ask him about these</div>'+P.loops.map(function(l){return '<div class="fs-loop"><span class="d">'+escapeHtml(l.when||'')+'</span><span>'+escapeHtml(l.what)+'<q style="display:block;color:var(--text2);font-size:12px;font-style:italic;">'+escapeHtml(l.quote||'')+'</q></span></div>';}).join('')+'</div>';
     if((P.facts||[]).length) h+='<div class="fs-card fs-ai"><div class="fs-sec">About him</div>'+P.facts.map(function(x){return '<div class="fs-fact"><b>'+escapeHtml(x.k)+'</b><span>'+escapeHtml(x.v)+(x.quote?'<q>'+escapeHtml(x.quote)+'</q>':'')+'</span></div>';}).join('')+'</div>';
@@ -14003,7 +14005,7 @@ function fsCard(f){
     h+='<div class="fs-card fs-ai"><div class="fs-sec">Profile · last conversation · open loops</div><div class="fs-sub">Built from his messages once the extraction step is on. Needs 3+ messages from him.</div></div>';
   }
 
-  h+='<div class="fs-card"><div class="fs-sec">Notes (yours — never overwritten)</div><textarea class="fs-notes" placeholder="Anything the exports can\'t know…" onchange="fsSaveNote(\''+f.fan_id+'\',this.value)">'+escapeHtml(P.notes||'')+'</textarea></div>';
+  if(!FS.hub) h+='<div class="fs-card"><div class="fs-sec">Notes (yours — never overwritten)</div><textarea class="fs-notes" placeholder="Anything the exports can\'t know…" onchange="fsSaveNote(\''+f.fan_id+'\',this.value)">'+escapeHtml(P.notes||'')+'</textarea></div>';
 
   h+='<div class="fs-card"><div class="fs-sec">Recent messages</div><div class="fs-msgs">'+(FS.msgs.length?FS.msgs.map(function(m){
     return '<div class="fs-m '+m.direction+(m.status==='Unsent'?' unsent':'')+'">'+(m.price>0?'<span class="ppv">PPV '+fsMoney(m.price)+(m.purchased?' · unlocked':' · not opened')+'</span><br>':'')+escapeHtml(m.text||'')+'<div class="meta">'+(m.direction==='out'?escapeHtml(m.sender||'')+' · ':'')+fmtDateTime(m.ts)+(m.status==='Unsent'?' · unsent':'')+'</div></div>';
@@ -14025,7 +14027,282 @@ async function fsSaveNote(fanId, val){
 }
 
 // ── Fans page: one nav item, the queue + the profiles ────────────────────────
-var FANS_TAB = 'today';
+var FANS_TAB = 'hub';
+// ── Fans hub (Nov): model tiles → a model's Urgent / Today / VIPs → one fan ─────
+// Home: chat freshness, a search across every model, the urgent list (with WHY), and a
+// big tile per model. A model: its urgent fans, Today's queue tagged 🎉 Event / 🔁 Bump /
+// 👋 Welcome with the reason, VIPs, and a search scoped to that model. A fan: why he's
+// urgent, today's job (claim / done), the 📝 Infloww notes in the agency template (filled
+// from the chats where we can, "build rapport" when empty), 🗓 events with ✓ Asked, ➕ extra
+// facts the chat reader found, then the full stats card.
+var FH={view:'home',creator:null,tab:'today',q:'',sel:null,home:null,rows:[],events:[],busy:false,show:40};
+var FH_KEYS=['Age','City','Job','Schedule','Preferences','Hard nos','Hobbies','Proud of','Nationality','Gender','GF','Others'];
+var FH_FROM={Age:['Age'],City:['Location'],Job:['Work'],Hobbies:['Hobbies'],Preferences:['Into'],GF:['Family']};
+var FH_REASON=[[/hospital|sick|ill\b|cancer|surgery|died|passed away|funeral|stroke|accident|depress|suicid|emergenc/i,'🏥 Health / emergency','h'],
+  [/refund|chargeback|dispute|scam|money back|report/i,'💳 Refund / chargeback risk','r'],
+  [/unsub|leav|cancel|last month|can'?t afford|money is tight|broke/i,'👋 Might leave','l'],
+  [/angry|upset|pissed|rude|complain|annoyed|mad at/i,'😡 Upset / complaint','a']];
+function fhReason(c){ var t=((c&&c.what)||'')+' '+((c&&c.quote)||''); for(var i=0;i<FH_REASON.length;i++) if(FH_REASON[i][0].test(t)) return FH_REASON[i]; return [null,c&&c.level==='gentle'?'💛 Go gently':'🚨 Serious','g']; }
+function fhTag(q){ return q==='care'?['🚨 Care','red']:q==='cold'?['👋 Welcome','new']:q==='event'?['🎉 Event','whale']:['🔁 Bump','reg']; }
+function fhCreatorFor(m,creators){ var n=(m.name||'').toLowerCase().trim(); return creators.find(function(c){return c.toLowerCase()===n;})||creators.find(function(c){return c.toLowerCase().indexOf(n)===0&&n.length>=3;})||null; }
+function fhCss(){
+  if(document.getElementById('fh-css')) return; var s=document.createElement('style'); s.id='fh-css';
+  s.textContent='.fh-search{display:flex;align-items:center;gap:10px;background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:10px 14px;margin-bottom:12px}.fh-search input{flex:1;background:none;border:0;color:var(--text);font:inherit;font-size:15px;outline:none;min-width:0}'
+   +'.fh-urg{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.5);border-radius:14px;padding:12px 14px;margin-bottom:14px}.fh-urg .t{font-weight:800;color:#f87171;margin-bottom:6px;font-size:14px}'
+   +'.fh-urow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.22);margin-top:6px;cursor:pointer;font-size:13px;line-height:1.45}.fh-urow:hover{background:rgba(239,68,68,.12)}'
+   +'.fh-rs{font-size:10.5px;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap;margin-top:1px;background:rgba(239,68,68,.22);color:#fca5a5}.fh-rs.g{background:rgba(250,204,21,.16);color:#fde68a}'
+   +'.fh-models{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}'
+   +'.fh-mc{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;position:relative;cursor:pointer;transition:.15s}.fh-mc:hover{border-color:var(--accent);transform:translateY(-2px)}.fh-mc.off{opacity:.55;cursor:default;transform:none}'
+   +'.fh-mc .ph{width:60px;height:60px;border-radius:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff}.fh-mc .n{font-size:20px;font-weight:800}.fh-mc .m{font-size:12.5px;color:var(--text2);margin-top:3px}'
+   +'.fh-mc .u{position:absolute;top:16px;right:16px;background:var(--red);color:#fff;font-weight:800;font-size:12px;border-radius:20px;padding:4px 10px}.fh-mc .bar{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.fh-mc .bar span{font-size:11.5px;font-weight:700;background:var(--surface2);border-radius:8px;padding:4px 8px}'
+   +'.fh-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}.fh-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}'
+   +'.fh-tabs button{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer}.fh-tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}.fh-tabs button.u.on{background:var(--red);border-color:var(--red)}'
+   +'.fh-split{display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start}@media(max-width:900px){.fh-split{grid-template-columns:1fr}}'
+   +'.fh-list{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px;max-height:75vh;overflow:auto}'
+   +'.fh-fan{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}.fh-fan:hover{background:var(--surface2)}.fh-fan.on{background:rgba(30,79,255,.15);border-color:var(--accent)}'
+   +'.fh-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6b8fff,#ec4899);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff}'
+   +'.fh-nm{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fh-mut{color:var(--text2);font-size:12px;line-height:1.35}'
+   +'.fh-tag{font-size:11px;font-weight:800;border-radius:20px;padding:2px 8px;margin-left:auto;white-space:nowrap}.fh-tag.whale{background:rgba(168,85,247,.2);color:#c084fc}.fh-tag.reg{background:rgba(34,197,94,.15);color:#4ade80}.fh-tag.new{background:rgba(107,143,255,.15);color:var(--accent2)}.fh-tag.red{background:rgba(239,68,68,.2);color:#f87171}'
+   +'.fh-why{border:1px solid rgba(239,68,68,.6);background:rgba(239,68,68,.1);border-radius:12px;padding:12px 14px;margin-bottom:12px}.fh-why.g{border-color:rgba(250,204,21,.5);background:rgba(250,204,21,.07)}.fh-why q{display:block;font-style:italic;margin:6px 0;font-size:13.5px}.fh-why .lab{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#f87171}.fh-why.g .lab{color:#fde68a}'
+   +'.fh-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}.fh-lab{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px}'
+   +'.fh-notes{border-color:rgba(250,204,21,.45);background:rgba(250,204,21,.035)}.fh-notes .fh-lab{color:#facc15}'
+   +'.fh-nf{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;align-items:center;font-size:13px}.fh-nf>label{color:var(--text2)}'
+   +'.fh-nf input{width:100%;background:transparent;border:1px solid transparent;border-bottom-color:var(--border);color:var(--text);font:inherit;font-size:13px;padding:4px 2px;border-radius:0}.fh-nf input:focus{outline:none;border-bottom-color:#facc15}.fh-nf input::placeholder{color:#fbbf24;opacity:.8}'
+   +'.fh-sug{font-size:11.5px;color:var(--accent2);margin-top:2px}.fh-sug button,.fh-mini{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:7px;padding:2px 8px;font-size:11.5px;font-weight:700;cursor:pointer;margin-left:6px;white-space:nowrap}'
+   +'.fh-warn{background:rgba(250,204,21,.12);border:1px dashed #facc15;border-radius:10px;padding:9px 12px;font-size:13px;color:#fde68a;font-weight:700;line-height:1.45;margin-bottom:10px}'
+   +'.fh-ev{display:flex;gap:10px;align-items:center;font-size:13px;padding:5px 0}.fh-ev i{font-style:normal;color:#facc15;font-weight:800;min-width:58px}.fh-ev.due i{color:#f87171}'
+   +'.fh-add{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px solid var(--border);line-height:1.45}.fh-add small{display:block;color:var(--text2);font-size:11.5px}';
+  document.head.appendChild(s);
+}
+// The API returns at most 1,000 rows a request — page through.
+async function fhPaged(build){ var out=[]; for(var from=0;from<20000;from+=1000){ var r=await build().range(from,from+999); if(r.error) break; out=out.concat(r.data||[]); if(!r.data||r.data.length<1000) break; } return {data:out}; }
+async function fhLoadHome(){
+  var r=await Promise.all([
+    fhPaged(function(){ return sb.from('fan_worklist').select('creator,fan_id,queue,tier,claimed_by,claimed_at,done_at'); }),
+    sb.from('fan_profiles').select('fan_id,care,events').or('care->>level.in.(urgent,no_selling,gentle),events.not.is.null')]);
+  var wl=r[0].data||[], prof=r[1].data||[];
+  var careIds=prof.filter(function(p){return p.care&&p.care.level;}).map(function(p){return p.fan_id;});
+  var evIds=prof.filter(function(p){return (p.events||[]).length;}).map(function(p){return p.fan_id;});
+  var ids=careIds.concat(evIds).filter(function(x,i,a){return a.indexOf(x)===i;}).slice(0,800);
+  var st=ids.length?(await sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').in('fan_id',ids)).data||[]:[];
+  var creators=[]; wl.concat(st).forEach(function(x){ if(x.creator&&creators.indexOf(x.creator)<0&&!/\(deleted\)/i.test(x.creator)) creators.push(x.creator); });
+  var urgent=[], events=[], today=new Date(); today.setHours(0,0,0,0);
+  prof.forEach(function(p){
+    st.filter(function(s){return s.fan_id===p.fan_id;}).forEach(function(s){
+      if(p.care&&p.care.level) urgent.push({creator:s.creator,fan_id:s.fan_id,fan_name:s.fan_name,care:p.care,total_net:s.total_net});
+      (p.events||[]).forEach(function(e){ var d=new Date(e.date+'T00:00:00'); var days=Math.round((d-today)/864e5); if(days>=-1&&days<=2) events.push({creator:s.creator,fan_id:s.fan_id,fan_name:s.fan_name,ev:e,days:days}); });
+    });
+  });
+  urgent.sort(function(a,b){ return (a.care.level==='gentle')-(b.care.level==='gentle') || String(b.care.at||'').localeCompare(String(a.care.at||'')); });
+  FH.home={wl:wl,creators:creators,urgent:urgent,events:events,at:Date.now()};
+}
+function fhCounts(c){
+  var H=FH.home, rows=H.wl.filter(function(r){return r.creator===c&&!r.done_at;});
+  return {bump:rows.filter(function(r){return r.tier==='field'&&r.queue!=='cold'&&r.queue!=='care';}).length, welcome:rows.filter(function(r){return r.queue==='cold';}).length,
+    vip:rows.filter(function(r){return r.tier==='vip';}).length, event:H.events.filter(function(e){return e.creator===c;}).length,
+    urgent:H.urgent.filter(function(u){return u.creator===c&&u.care.level!=='gentle';}).length, gentle:H.urgent.filter(function(u){return u.creator===c&&u.care.level==='gentle';}).length};
+}
+function fhUrgentRows(list){
+  return list.map(function(u){ var R=fhReason(u.care), g=u.care.level==='gentle';
+    return '<div class="fh-urow" onclick="fhOpenModel(\''+fhq(u.creator)+'\',\'urgent\',\''+u.fan_id+'\')"><span class="fh-rs'+(g?' g':'')+'">'+R[1]+'</span><div style="min-width:0"><b>'+escapeHtml(u.fan_name||('fan '+u.fan_id))+'</b> · '+escapeHtml(u.creator)
+      +(u.care.at?' · <span style="color:var(--text2)">'+fsAgo(u.care.at)+'</span>':'')+'<div style="color:'+(g?'#fde68a':'#fecaca')+'">'+escapeHtml(u.care.what||'')+'</div></div></div>'; }).join('');
+}
+function fhAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+function fhq(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+async function fhRenderHome(){
+  var el=document.getElementById('fans-hub'); if(!el) return;
+  if(!FH.home||Date.now()-FH.home.at>120e3){ el.innerHTML='<div class="empty"><p>Loading fans…</p></div>'; await fhLoadHome(); }
+  var H=FH.home, urg=H.urgent.filter(function(u){return u.care.level!=='gentle';});
+  var tiles=(STATE.models||[]).map(function(m){ return {m:m,c:fhCreatorFor(m,H.creators)}; });
+  H.creators.forEach(function(c){ if(!tiles.some(function(t){return t.c===c;})) tiles.push({m:{name:c},c:c}); });
+  tiles.sort(function(a,b){ return (!!b.c)-(!!a.c) || (a.m.name||'').localeCompare(b.m.name||''); });
+  var grads=['#1e4fff,#ec4899','#22c55e,#1e4fff','#f59e0b,#ec4899','#8b5cf6,#06b6d4','#ef4444,#f59e0b','#06b6d4,#22c55e','#6366f1,#a855f7'];
+  var h='<div class="fh-search">🔎<input id="fh-q" placeholder="Search any fan: name, nickname or ID…" value="'+fhAttr(FH.q)+'" onkeydown="if(event.key===\'Enter\')fhSearch(this.value)"><button class="btn btn-sm btn-primary" onclick="fhSearch(document.getElementById(\'fh-q\').value)">Search</button></div><div id="fh-sres"></div>';
+  if(urg.length) h+='<div class="fh-urg"><div class="t">🚨 Urgent · '+urg.length+' fan'+(urg.length===1?' needs':'s need')+' a careful reply — read why before you message</div>'+fhUrgentRows(urg.slice(0,8))+(urg.length>8?'<div class="fh-mut" style="margin-top:6px;">+'+(urg.length-8)+' more inside each model</div>':'')+'</div>';
+  h+='<div class="fh-models">'+tiles.map(function(t,i){
+    var name=t.m.name||t.c, init=(name||'?')[0].toUpperCase(), g=grads[i%grads.length];
+    if(!t.c) return '<div class="fh-mc off"><div class="ph" style="background:linear-gradient(135deg,'+g+')">'+init+'</div><div class="n">'+escapeHtml(name)+'</div><div class="m">No chats imported yet'+(t.m.id?'':'')+'</div></div>';
+    var k=fhCounts(t.c);
+    return '<div class="fh-mc" onclick="fhOpenModel(\''+fhq(t.c)+'\',\''+(k.urgent?'urgent':'today')+'\')">'+(k.urgent?'<span class="u">🚨 '+k.urgent+'</span>':'')
+      +'<div class="ph" style="background:linear-gradient(135deg,'+g+')">'+init+'</div><div class="n">'+escapeHtml(name)+'</div><div class="m">'+(t.c.toLowerCase()!==String(name).toLowerCase()?'Infloww: '+escapeHtml(t.c):'&nbsp;')+'</div>'
+      +'<div class="bar">'+(k.event?'<span>🎉 '+k.event+' event'+(k.event===1?'':'s')+'</span>':'')+'<span>🔁 '+k.bump+' bumps</span><span>👋 '+k.welcome+' welcomes</span><span>💎 '+k.vip+' VIPs</span>'+(k.gentle?'<span>💛 '+k.gentle+' go gently</span>':'')+'</div></div>';
+  }).join('')+'</div>';
+  el.innerHTML=h;
+  if(FH.q) fhSearch(FH.q);
+}
+async function fhSearch(q){
+  FH.q=(q||'').trim(); var box=document.getElementById('fh-sres'); if(!box) return;
+  if(!FH.q){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="fh-mut" style="margin-bottom:10px;">Searching…</div>';
+  var t=FH.q.replace(/[%,()]/g,''), digits=t.replace(/\D/g,'');
+  var r=await Promise.all([
+    sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').or('fan_name.ilike.%'+t+'%'+(digits?',fan_id.eq.'+digits:'')).order('total_net',{ascending:false}).limit(30),
+    sb.from('fan_profiles').select('fan_id,nickname').ilike('nickname','%'+t+'%').limit(30)]);
+  var rows=r[0].data||[], nick={};
+  (r[1].data||[]).forEach(function(p){ nick[p.fan_id]=p.nickname; });
+  var extra=Object.keys(nick).filter(function(id){ return !rows.some(function(x){return x.fan_id===id;}); });
+  if(extra.length){ var e=await sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').in('fan_id',extra); rows=rows.concat(e.data||[]); }
+  if(!document.getElementById('fh-sres')) return;
+  document.getElementById('fh-sres').innerHTML='<div class="fh-list" style="margin-bottom:14px;max-height:340px;">'+(rows.length?rows.map(function(f){
+    return '<div class="fh-fan" onclick="fhOpenModel(\''+fhq(f.creator)+'\',\'today\',\''+f.fan_id+'\')"><div class="fh-av">'+escapeHtml((f.fan_name||'?')[0].toUpperCase())+'</div><div style="min-width:0"><div class="fh-nm">'+escapeHtml(f.fan_name||('fan '+f.fan_id))+(nick[f.fan_id]?' <span class="fh-mut">“'+escapeHtml(nick[f.fan_id])+'”</span>':'')+'</div><div class="fh-mut">'+escapeHtml(f.creator)+' · id '+f.fan_id+'</div></div><span class="fh-tag '+(f.total_net>=500?'whale':f.total_net>=50?'reg':'new')+'">'+fsMoney(f.total_net)+'</span></div>';
+  }).join(''):'<div class="fh-mut" style="padding:10px;">No fan matches “'+escapeHtml(FH.q)+'”.</div>')+'</div>';
+}
+async function fhOpenModel(creator,tab,fanId){
+  FH.view='model'; FH.creator=creator; FH.tab=tab||'today'; FH.show=40; FH.mq='';
+  FH.sel=fanId?{creator:creator,fan_id:fanId}:null;
+  var el=document.getElementById('fans-hub'); if(el) el.innerHTML='<div class="empty"><p>Loading '+escapeHtml(creator)+'…</p></div>';
+  if(!FH.home) await fhLoadHome();
+  var r=await fhPaged(function(){ return sb.from('fan_worklist').select('*').eq('creator',creator); });
+  FH.rows=(r.data||[]).filter(function(x){return !x.done_at;});
+  fhRenderModel();
+  if(FH.sel) fhOpenFan(creator,fanId);
+  window.scrollTo(0,0);
+}
+function fhListFor(){
+  var H=FH.home, c=FH.creator, out=[];
+  if(FH.mq){ var q=FH.mq.toLowerCase(); return FH.rows.filter(function(r){ return (r.fan_name||'').toLowerCase().indexOf(q)>=0||String(r.fan_id)===FH.mq; }).map(function(r){ return {r:r,tag:fhTag(r.queue),why:r.reason}; }); }
+  if(FH.tab==='urgent') return H.urgent.filter(function(u){return u.creator===c;}).map(function(u){ var R=fhReason(u.care); return {r:u,tag:[u.care.level==='gentle'?'💛 Gently':'🚨 Urgent',u.care.level==='gentle'?'whale':'red'],why:R[1]+' · '+(u.care.what||'')}; });
+  if(FH.tab==='vips') return FH.rows.filter(function(r){return r.tier==='vip';}).map(function(r){ return {r:r,tag:['💎 '+(WL_Q[r.queue]||'VIP'),'whale'],why:r.reason}; });
+  H.events.filter(function(e){return e.creator===c;}).sort(function(a,b){return a.days-b.days;}).forEach(function(e){ out.push({r:e,tag:fhTag('event'),why:(e.days<0?'yesterday':e.days===0?'today':e.days===1?'tomorrow':'in 2 days')+' · '+e.ev.text}); });
+  var order={care:0,untapped:1,unopened:2,winback:3,talks:4,cold:5};
+  FH.rows.filter(function(r){return r.tier==='field';}).sort(function(a,b){ return (order[a.queue]==null?9:order[a.queue])-(order[b.queue]==null?9:order[b.queue]); })
+    .forEach(function(r){ var t=fhTag(r.queue); out.push({r:r,tag:t,why:(t[0].indexOf('Bump')>=0?(WL_Q[r.queue]||'')+' · ':'')+(r.reason||'')}); });
+  return out;
+}
+function fhRenderModel(){
+  var el=document.getElementById('fans-hub'); if(!el) return;
+  var c=FH.creator, k=fhCounts(c), list=fhListFor(), me=nqMe();
+  var h='<div class="fh-top"><button class="btn btn-ghost" onclick="FH.view=\'home\';FH.sel=null;fhRenderHome()">← All models</button><div class="fh-av" style="width:44px;height:44px;border-radius:12px;font-size:18px;">'+escapeHtml(c[0].toUpperCase())+'</div><div><div style="font-size:20px;font-weight:800;">'+escapeHtml(c)+'</div><div class="fh-mut">'+FH.rows.length+' fans on the lists</div></div></div>'
+    +'<div class="fh-search">🔎<input placeholder="Search '+escapeHtml(c)+'’s fans…" value="'+fhAttr(FH.mq||'')+'" oninput="FH.mq=this.value.trim();FH.show=40;fhPaintList()"></div>'
+    +'<div class="fh-tabs"><button class="u'+(FH.tab==='urgent'?' on':'')+'" onclick="FH.tab=\'urgent\';FH.show=40;fhRenderModel()">🚨 Urgent '+(k.urgent+k.gentle)+'</button>'
+    +'<button class="'+(FH.tab==='today'?'on':'')+'" onclick="FH.tab=\'today\';FH.show=40;fhRenderModel()">🎯 Today '+(k.event+k.bump+k.welcome)+'</button>'
+    +'<button class="'+(FH.tab==='vips'?'on':'')+'" onclick="FH.tab=\'vips\';FH.show=40;fhRenderModel()">💎 VIPs '+k.vip+'</button></div>'
+    +'<div class="fh-split"><div class="fh-list" id="fh-list"></div><div id="fh-fan">'+(FH.sel?'<div class="empty"><p>Loading…</p></div>':'<div class="fh-card fh-mut">Pick a fan on the left.'+(FH.tab==='today'?' Work the list top to bottom: 🎉 events first, then 🔁 bumps, then 👋 welcomes.':'')+'</div>')+'</div></div>';
+  el.innerHTML=h; fhPaintList();
+}
+function fhPaintList(){
+  var box=document.getElementById('fh-list'); if(!box) return;
+  var list=fhListFor(), me=nqMe();
+  box.innerHTML=(list.length?list.slice(0,FH.show).map(function(x){ var r=x.r, on=FH.sel&&FH.sel.fan_id===r.fan_id;
+    var live=r.claimed_by&&wlClaimLive(r), tag=live&&r.claimed_by!==me?'<span class="fh-tag" style="background:var(--surface2);color:var(--text2)">'+escapeHtml(r.claimed_by)+'</span>':'<span class="fh-tag '+x.tag[1]+'">'+x.tag[0]+'</span>';
+    return '<div class="fh-fan'+(on?' on':'')+'" onclick="fhOpenFan(\''+fhq(r.creator)+'\',\''+r.fan_id+'\')"><div class="fh-av">'+escapeHtml((r.fan_name||'?')[0].toUpperCase())+'</div><div style="min-width:0;flex:1"><div class="fh-nm">'+escapeHtml(r.fan_name||('fan '+r.fan_id))+'</div><div class="fh-mut">'+escapeHtml(String(x.why||'').slice(0,110))+'</div></div>'+tag+'</div>';
+  }).join('')+(list.length>FH.show?'<div style="text-align:center;padding:8px;"><button class="btn btn-sm btn-ghost" onclick="FH.show+=40;fhPaintList()">Show 40 more ('+(list.length-FH.show)+' left)</button></div>':'')
+  :'<div class="fh-mut" style="padding:12px;">'+(FH.mq?'No fan matches.':FH.tab==='urgent'?'Nothing urgent here. Good.':'Nothing on this list.')+'</div>');
+}
+async function fhOpenFan(creator,fanId){
+  FH.sel={creator:creator,fan_id:fanId}; fhPaintList();
+  var box=document.getElementById('fh-fan'); if(box) box.innerHTML='<div class="empty"><p>Loading…</p></div>';
+  var r=await Promise.all([
+    sb.from('fan_stats').select('*').eq('creator',creator).eq('fan_id',fanId).maybeSingle(),
+    sb.from('fan_profiles').select('*').eq('fan_id',fanId).maybeSingle(),
+    sb.from('fan_messages').select('ts,direction,sender,text,price,purchased,status').eq('creator',creator).eq('fan_id',fanId).order('ts',{ascending:false}).limit(40),
+    sb.from('fan_ladder').select('*').eq('creator',creator).eq('fan_id',fanId).order('done_at',{ascending:false})]);
+  if(!FH.sel||FH.sel.fan_id!==fanId) return;
+  FH.stat=r[0].data||null; FH.prof=r[1].data||{fan_id:fanId};
+  FS.sel=FH.stat; FS.msgs=(r[2].data||[]).reverse(); FS.ladder=r[3].data||[];
+  fhPaintFan();
+  if(window.innerWidth<900){ var b=document.getElementById('fh-fan'); if(b) b.scrollIntoView({behavior:'smooth',block:'start'}); }
+}
+function fhSuggest(P){
+  var out={}, facts=P.facts||[];
+  Object.keys(FH_FROM).forEach(function(k){
+    var v=facts.filter(function(f){ return FH_FROM[k].indexOf(f.k)>=0 && (k!=='GF'||/wife|girlfriend|\bgf\b|married|single|divorc|partner/i.test(f.v||'')); }).map(function(f){return f.v;});
+    if(v.length) out[k]=v.slice(0,3).join(' · ');
+  });
+  return out;
+}
+function fhExtras(P){
+  var used=['Age','Location','Work','Hobbies','Into'], dis=P.dismissed_extra||[];
+  return (P.facts||[]).map(function(f,i){ return {f:f,id:(f.k||'')+'|'+(f.v||'')}; }).filter(function(x){ return used.indexOf(x.f.k)<0 && !(x.f.k==='Family'&&/wife|girlfriend|\bgf\b|married|single|divorc|partner/i.test(x.f.v||'')) && dis.indexOf(x.id)<0; });
+}
+function fhPaintFan(){
+  var box=document.getElementById('fh-fan'); if(!box) return;
+  var f=FH.stat, P=FH.prof||{}, N=P.infloww_notes||{}, sug=fhSuggest(P), wl=FH.rows.find(function(r){return r.fan_id===P.fan_id;});
+  if(!f){ box.innerHTML='<div class="fh-card fh-mut">No stats for this fan yet.</div>'; return; }
+  var h='';
+  if(P.care&&P.care.level){ var R=fhReason(P.care), g=P.care.level==='gentle';
+    h+='<div class="fh-why'+(g?' g':'')+'"><div class="lab">'+(g?'💛 Go gently with him':'🚨 Why he’s urgent')+' · '+R[1].replace(/^\S+\s/,'')+'</div>'
+      +(P.care.at?'<div class="fh-mut">'+escapeHtml(fsStale(P.care.at))+'</div>':'')
+      +(P.care.what?'<div style="font-size:13.5px;margin-top:4px;">'+escapeHtml(P.care.what)+'</div>':'')
+      +(P.care.quote?'<q>'+escapeHtml(P.care.quote)+'</q>':'')
+      +(P.care.guidance?'<div style="font-size:13px;line-height:1.5;"><b>What to do:</b> '+escapeHtml(P.care.guidance)+'</div>':'')
+      +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-sm btn-primary" onclick="fhClearCare()">✓ Handled — clear it</button></div></div>';
+  }
+  if(wl&&wl.tier==='field'){
+    var t=fhTag(wl.queue), id="'"+fhq(wl.creator)+"','"+wl.fan_id+"','"+wl.queue+"'", live=wlClaimLive(wl), mine=live&&wl.claimed_by===nqMe();
+    h+='<div class="fh-card" style="border-left:3px solid var(--accent2);"><div class="fh-lab">🎯 Today · '+t[0]+(t[0].indexOf('Bump')>=0?' · '+(WL_Q[wl.queue]||''):'')+'</div><div style="font-size:13.5px;line-height:1.5;">'+escapeHtml(wl.reason||'')+'</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      +(live&&!mine?'<span class="fh-mut">'+escapeHtml(wl.claimed_by)+' is on him</span>':mine?'<span class="fh-mut">yours</span><button class="btn btn-sm btn-primary" onclick="fhDone('+id+',\'messaged\')">Messaged</button><button class="btn btn-sm btn-ghost" onclick="fhDone('+id+',\'sold\')">Sold</button><button class="btn btn-sm btn-ghost" onclick="fhDone('+id+',\'not_now\')">Not now</button>':'<button class="btn btn-sm btn-primary" onclick="fhClaim('+id+')">Claim</button>')+'</div></div>';
+  }
+  // 📝 Infloww notes
+  var filled=FH_KEYS.filter(function(k){return N[k];}).length;
+  h+='<div class="fh-card fh-notes"><div class="fh-lab">📝 Infloww notes · permanent facts · '+filled+'/12<button class="fh-mini" style="margin-left:auto;" onclick="fhCopyNotes()">📋 Copy for Infloww</button></div>';
+  if(filled<4) h+='<div class="fh-warn">⚠ We barely know him. BUILD RAPPORT: ask about his day, job, city and hobbies, and fill these in as you learn them. Every chatter after you depends on it.</div>';
+  h+='<div class="fh-nf"><label>Nickname</label><div><input value="'+fhAttr(P.nickname||'')+'" placeholder="what he likes to be called (searchable)" onchange="fhSaveNick(this.value)"></div>'
+    +FH_KEYS.map(function(k){ var v=N[k]||'';
+      return '<label>'+k+'</label><div><input value="'+fhAttr(v)+'" placeholder="— ask" onchange="fhSaveField(\''+k+'\',this.value)">'
+        +(!v&&sug[k]?'<div class="fh-sug">from chats: '+escapeHtml(sug[k])+'<button onclick="fhSaveField(\''+k+'\','+fhAttr(JSON.stringify(sug[k]))+',true)">✓ Use</button></div>':'')+'</div>'; }).join('')+'</div>';
+  // 🗓 events
+  var today=new Date(); today.setHours(0,0,0,0);
+  var ev=(P.events||[]).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+  h+='<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;"><div style="font-weight:800;font-size:13px;margin-bottom:4px;">🗓 Events <span class="fh-mut" style="font-weight:400;">note the date he mentioned · ✓ Asked removes it so it can’t happen twice</span></div>'
+    +(ev.length?ev.map(function(e,i){ var d=new Date(e.date+'T00:00:00'), days=Math.round((d-today)/864e5);
+      return '<div class="fh-ev'+(days<=1?' due':'')+'"><i>'+(isNaN(d)?escapeHtml(e.date):d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}))+'</i><span style="flex:1">'+escapeHtml(e.text)+(days===0?' <b style="color:#f87171">· today</b>':days===1?' <b style="color:#f87171">· tomorrow</b>':days<0?' <span class="fh-mut">· passed — ask how it went</span>':'')+'</span><button class="fh-mini" onclick="fhEventDone('+fhAttr(JSON.stringify(e.date))+','+fhAttr(JSON.stringify(e.text))+')">✓ Asked</button></div>'; }).join(''):'<div class="fh-mut">None yet.</div>')
+    +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;"><input type="date" id="fh-evd" style="font-size:12.5px;padding:4px 6px;"><input id="fh-evt" placeholder="What’s happening (e.g. job interview, his birthday)" style="flex:1;min-width:160px;font-size:12.5px;padding:4px 8px;" onkeydown="if(event.key===\'Enter\')fhEventAdd()"><button class="btn btn-sm btn-ghost" onclick="fhEventAdd()">＋ Add</button></div>';
+  var loops=(P.loops||[]).filter(function(l){ return !(P.events||[]).some(function(e){return e.text===l.what;}); });
+  if(loops.length) h+='<div class="fh-sug" style="margin-top:6px;">From chats — things to ask him about:</div>'+loops.slice(0,5).map(function(l){ return '<div class="fh-ev"><i style="color:var(--accent2)">'+escapeHtml(l.when||'')+'</i><span style="flex:1">'+escapeHtml(l.what||'')+'</span><button class="fh-mini" onclick="fhLoopToEvent('+fhAttr(JSON.stringify(l.what||''))+')">＋ Event</button></div>'; }).join('');
+  h+='</div></div>';
+  // ➕ additional info
+  var ex=fhExtras(P);
+  if(ex.length) h+='<div class="fh-card"><div class="fh-lab">➕ Additional info (from chats)</div>'+ex.map(function(x){ var f2=x.f;
+    return '<div class="fh-add"><span style="flex:1"><b style="color:var(--text2);font-weight:700;">'+escapeHtml(f2.k||'')+':</b> '+escapeHtml(f2.v||'')+(f2.quote?' <i style="color:var(--text2)">“'+escapeHtml(f2.quote)+'”</i>':'')+'<small>'+escapeHtml(fsStale(f2.at||P.summary_at))+'</small></span>'
+      +'<button class="fh-mini" onclick="fhExtraToNotes('+fhAttr(JSON.stringify(x.id))+')">↑ Move to notes</button><button class="fh-mini" title="Hide" onclick="fhExtraHide('+fhAttr(JSON.stringify(x.id))+')">✕</button></div>'; }).join('')+'</div>';
+  // the full stats card (without its own facts list — that's above now)
+  FS.profile=Object.assign({},P,{facts:[],loops:[],care:null}); FS.hub=true;
+  h+=fsCard(f); FS.hub=false;
+  box.innerHTML=h;
+}
+async function fhSaveProf(patch,msg){
+  var P=FH.prof||{}; var row=Object.assign({fan_id:P.fan_id},patch);
+  var r=await sb.from('fan_profiles').upsert(row,{onConflict:'fan_id'}).select();
+  if(r.error){ alert('Not saved — '+r.error.message); return false; }
+  Object.assign(FH.prof,patch); if(msg&&typeof toast==='function') toast(msg); return true;
+}
+async function fhSaveField(k,v,repaint){ var N=Object.assign({},FH.prof.infloww_notes||{}); v=String(v||'').trim(); if(v) N[k]=v; else delete N[k]; if(await fhSaveProf({infloww_notes:N})&&repaint) fhPaintFan(); }
+async function fhSaveNick(v){ await fhSaveProf({nickname:String(v||'').trim()||null}); }
+async function fhEventAdd(){
+  var d=document.getElementById('fh-evd').value, t=document.getElementById('fh-evt').value.trim();
+  if(!d||!t){ alert('Pick the date and write what’s happening.'); return; }
+  var ev=(FH.prof.events||[]).concat([{date:d,text:t,by:nqMe(),at:new Date().toISOString()}]);
+  if(await fhSaveProf({events:ev})){ if(FH.home) FH.home.at=0; fhPaintFan(); }
+}
+async function fhEventDone(date,text){
+  var ev=(FH.prof.events||[]).filter(function(e){ return !(e.date===date&&e.text===text); });
+  if(await fhSaveProf({events:ev.length?ev:null})){ if(FH.home) FH.home.at=0; fhPaintFan(); }
+}
+function fhLoopToEvent(what){ var t=document.getElementById('fh-evt'); if(t){ t.value=what; document.getElementById('fh-evd').focus(); } }
+async function fhExtraHide(id){ var d=(FH.prof.dismissed_extra||[]).concat([id]); if(await fhSaveProf({dismissed_extra:d})) fhPaintFan(); }
+async function fhExtraToNotes(id){
+  var x=fhExtras(FH.prof).find(function(e){return e.id===id;}); if(!x) return;
+  var N=Object.assign({},FH.prof.infloww_notes||{}), add=(x.f.k?x.f.k+': ':'')+x.f.v;
+  N.Others=N.Others?N.Others+' · '+add:add;
+  if(await fhSaveProf({infloww_notes:N,dismissed_extra:(FH.prof.dismissed_extra||[]).concat([id])})) fhPaintFan();
+}
+function fhCopyNotes(){
+  var N=FH.prof.infloww_notes||{};
+  var t='PERMANENT FACTS (RAPPORT)\n'+FH_KEYS.map(function(k){return k+': '+(N[k]||'');}).join('\n')+'\n\nEvents:\n'+((FH.prof.events||[]).map(function(e){return e.date+' — '+e.text;}).join('\n'));
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ alert('Copied — paste it into his Infloww notes.'); }).catch(function(){ prompt('Copy this into Infloww:',t); });
+}
+async function fhClearCare(){
+  if(!confirm('Mark this as handled? It drops off the urgent list.')) return;
+  if(await fhSaveProf({care:Object.assign({},FH.prof.care||{},{level:null,cleared_by:nqMe(),cleared_at:new Date().toISOString()})})){ if(FH.home){ FH.home.urgent=FH.home.urgent.filter(function(u){return u.fan_id!==FH.prof.fan_id;}); } fhRenderModel(); fhOpenFan(FH.sel.creator,FH.sel.fan_id); }
+}
+async function fhClaim(creator,fanId,queue){ var ok=await wlWrite(creator,fanId,queue,{claimed_by:nqMe(),claimed_at:new Date().toISOString()}); if(ok){ var r=FH.rows.find(function(x){return x.fan_id===fanId&&x.queue===queue;}); if(r){ r.claimed_by=nqMe(); r.claimed_at=new Date().toISOString(); } fhPaintList(); fhPaintFan(); } }
+async function fhDone(creator,fanId,queue,outcome){
+  var ok=await wlWrite(creator,fanId,queue,{claimed_by:nqMe(),claimed_at:new Date().toISOString(),done_by:nqMe(),done_at:new Date().toISOString(),outcome:outcome});
+  if(!ok) return; FH.rows=FH.rows.filter(function(x){return !(x.fan_id===fanId);}); if(FH.home) FH.home.wl=FH.home.wl.filter(function(x){return !(x.creator===creator&&x.fan_id===fanId);});
+  var list=fhListFor(), nx=list[0]; fhRenderModel(); if(nx) fhOpenFan(nx.r.creator,nx.r.fan_id);
+}
+
 // ── Today: the worklist ──────────────────────────────────────────────────────
 // One ordered list of who to message next, built server-side in fan_worklist so
 // every chatter on shift sees the same order and nobody works the same man twice.
@@ -14146,8 +14423,7 @@ function wlPaint(){
 }
 
 function wlOpen(creator, fanId){
-  WL.back=FANS_TAB; FANS_TAB='fans'; renderFans();
-  setTimeout(function(){ fsOpen(creator, fanId); }, 0);
+  FANS_TAB='hub'; renderFans(); fhOpenModel(creator,'today',fanId);
 }
 
 async function wlWrite(creator, fanId, queue, patch){
@@ -14222,15 +14498,15 @@ async function freshAdminBanner(){
 function renderFans(){
   renderFansFresh();
   var el=document.getElementById('fans-tabs'); if(!el) return;
+  if(FANS_TAB==='today'||FANS_TAB==='vips') FANS_TAB='hub';   // Today/VIPs live inside each model now
   el.innerHTML='<div class="tabs" style="margin-bottom:14px;">'
-    +'<div class="tab'+(FANS_TAB==='today'?' active':'')+'" onclick="FANS_TAB=\'today\';WL.tier=\'field\';WL.q=\'\';WL.show=25;renderFans()">🎯 Today</div>'
-    +'<div class="tab'+(FANS_TAB==='vips'?' active':'')+'" onclick="FANS_TAB=\'vips\';WL.tier=\'vip\';WL.q=\'\';WL.show=25;renderFans()">💎 VIPs</div>'
+    +'<div class="tab'+(FANS_TAB==='hub'?' active':'')+'" onclick="FANS_TAB=\'hub\';FH.view=\'home\';FH.sel=null;renderFans()">🧑‍💼 Fans</div>'
     +'<div class="tab'+(FANS_TAB==='new'?' active':'')+'" onclick="FANS_TAB=\'new\';renderFans()">⏰ New subs</div>'
-    +'<div class="tab'+(FANS_TAB==='fans'?' active':'')+'" onclick="FANS_TAB=\'fans\';renderFans()">🧑‍💼 Fan stats</div>'
+    +'<div class="tab'+(FANS_TAB==='fans'?' active':'')+'" onclick="FANS_TAB=\'fans\';renderFans()">📊 All fan stats</div>'
     +'</div>';
-  var t=document.getElementById('today-body'), a=document.getElementById('new-subs-body'), b=document.getElementById('fan-stats-body');
-  t.hidden=(FANS_TAB!=='today'&&FANS_TAB!=='vips'); a.hidden=FANS_TAB!=='new'; b.hidden=FANS_TAB!=='fans';
-  if(FANS_TAB==='today'||FANS_TAB==='vips') renderToday();
+  var hb=document.getElementById('fans-hub'), t=document.getElementById('today-body'), a=document.getElementById('new-subs-body'), b=document.getElementById('fan-stats-body');
+  hb.hidden=FANS_TAB!=='hub'; t.hidden=true; a.hidden=FANS_TAB!=='new'; b.hidden=FANS_TAB!=='fans';
+  if(FANS_TAB==='hub'){ fsCss(); fhCss(); if(FH.view==='model'&&FH.creator) fhRenderModel(); else fhRenderHome(); }
   else if(FANS_TAB==='new') renderNewSubs();
   else renderFanStats();
 }
