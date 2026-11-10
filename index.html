@@ -14047,6 +14047,8 @@ var FANS_TAB = 'hub';
 // from the chats where we can, "build rapport" when empty), 🗓 events with ✓ Asked, ➕ extra
 // facts the chat reader found, then the full stats card.
 var FH={view:'home',creator:null,tab:'today',q:'',sel:null,home:null,rows:[],events:[],busy:false,show:40};
+// Creators in the Infloww exports that aren't ours to work (Liam said ignore).
+var FH_IGNORE=/yasmin zarrinfar|\(deleted\)/i;
 var FH_KEYS=['Age','City','Job','Schedule','Preferences','Hard nos','Hobbies','Proud of','Nationality','Gender','GF','Others'];
 var FH_FROM={Age:['Age'],City:['Location'],Job:['Work'],Hobbies:['Hobbies'],Preferences:['Into'],GF:['Family']};
 var FH_REASON=[[/hospital|sick|ill\b|cancer|surgery|died|passed away|funeral|stroke|accident|depress|suicid|emergenc/i,'🏥 Health / emergency','h'],
@@ -14096,7 +14098,7 @@ async function fhLoadHome(){
   var evIds=prof.filter(function(p){return (p.events||[]).length;}).map(function(p){return p.fan_id;});
   var ids=careIds.concat(evIds).filter(function(x,i,a){return a.indexOf(x)===i;}).slice(0,800);
   var st=ids.length?(await sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').in('fan_id',ids)).data||[]:[];
-  var creators=[]; wl.concat(st).forEach(function(x){ if(x.creator&&creators.indexOf(x.creator)<0&&!/\(deleted\)/i.test(x.creator)) creators.push(x.creator); });
+  var creators=[]; wl.concat(st).forEach(function(x){ if(x.creator&&creators.indexOf(x.creator)<0&&!FH_IGNORE.test(x.creator)) creators.push(x.creator); });
   var urgent=[], events=[], today=new Date(); today.setHours(0,0,0,0);
   prof.forEach(function(p){
     st.filter(function(s){return s.fan_id===p.fan_id;}).forEach(function(s){
@@ -14104,6 +14106,7 @@ async function fhLoadHome(){
       (p.events||[]).forEach(function(e){ var d=new Date(e.date+'T00:00:00'); var days=Math.round((d-today)/864e5); if(days>=-1&&days<=2) events.push({creator:s.creator,fan_id:s.fan_id,fan_name:s.fan_name,ev:e,days:days}); });
     });
   });
+  urgent=urgent.filter(function(u){ return !FH_IGNORE.test(u.creator); }); events=events.filter(function(e){ return !FH_IGNORE.test(e.creator); });
   urgent.sort(function(a,b){ return (a.care.level==='gentle')-(b.care.level==='gentle') || String(b.care.at||'').localeCompare(String(a.care.at||'')); });
   FH.home={wl:wl,creators:creators,urgent:urgent,events:events,at:Date.now()};
 }
@@ -14149,7 +14152,7 @@ async function fhSearch(q){
   var r=await Promise.all([
     sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').or('fan_name.ilike.%'+t+'%'+(digits?',fan_id.eq.'+digits:'')).order('total_net',{ascending:false}).limit(30),
     sb.from('fan_profiles').select('fan_id,nickname').ilike('nickname','%'+t+'%').limit(30)]);
-  var rows=r[0].data||[], nick={};
+  var rows=(r[0].data||[]).filter(function(x){ return !FH_IGNORE.test(x.creator); }), nick={};
   (r[1].data||[]).forEach(function(p){ nick[p.fan_id]=p.nickname; });
   var extra=Object.keys(nick).filter(function(id){ return !rows.some(function(x){return x.fan_id===id;}); });
   if(extra.length){ var e=await sb.from('fan_stats').select('creator,fan_id,fan_name,total_net').in('fan_id',extra); rows=rows.concat(e.data||[]); }
