@@ -14220,6 +14220,12 @@ function fhPaintFan(){
   var f=FH.stat, P=FH.prof||{}, N=P.infloww_notes||{}, sug=fhSuggest(P), wl=FH.rows.find(function(r){return r.fan_id===P.fan_id;});
   if(!f){ box.innerHTML='<div class="fh-card fh-mut">No stats for this fan yet.</div>'; return; }
   var h='';
+  // His language: profiles are written in English, quotes stay in his words. If he writes in
+  // another language the reply has to be in it (absolute rule) — John's Spanish is Spain Spanish.
+  if(P.lang&&!/^english$/i.test(P.lang)){
+    var spain=/spanish/i.test(P.lang)&&/^john$/i.test(String(f&&f.creator||'').trim());
+    h+='<div class="fh-card" style="border-color:rgba(107,143,255,.6);background:rgba(107,143,255,.08);font-size:13.5px;line-height:1.5;"><b>🌍 He writes in '+escapeHtml(P.lang)+'</b> — reply in '+escapeHtml(P.lang)+(spain?' (<b>Spain</b> Spanish: tío, vale, guapo — not Latin American)':'')+'. Everything below is in English; his quotes are in his own words.</div>';
+  }
   if(P.care&&P.care.level){ var R=fhReason(P.care), g=P.care.level==='gentle';
     h+='<div class="fh-why'+(g?' g':'')+'"><div class="lab">'+(g?'💛 Go gently with him':'🚨 Why he’s urgent')+' · '+R[1].replace(/^\S+\s/,'')+'</div>'
       +(P.care.at?'<div class="fh-mut">'+escapeHtml(fsStale(P.care.at))+'</div>':'')
