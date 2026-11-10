@@ -5674,6 +5674,7 @@ function libFiltered(){
   if(LIB_F.factory) items=items.filter(function(i){ return !!i.render_job_id; });   // 🎬 finished reels the factory made
   if(LIB_F.vertical) items=items.filter(function(i){ return LIB_F.vertical==='__none' ? !i.vertical : i.vertical===LIB_F.vertical; });
   if(LIB_F.category==='sexting') items=items.slice().sort(libSetSort);
+  if(LIB_F.lang) items=items.filter(function(i){ return libLangOf(i)===LIB_F.lang; });
   var q=(LIB_F.q||'').toLowerCase().trim();
   if(q) items=items.filter(function(i){
     var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){return x.id===i.source_order_id;}):null;
@@ -5724,6 +5725,28 @@ function libRunwayHtml(key){
     +'<span style="color:'+col+';font-weight:700;">'+label+'</span></div>';
 }
 
+// Search: wait until typing pauses, then redraw and put the cursor back where it was. (Redrawing on
+// every key rebuilt the box under your fingers — letters went missing and focus jumped.)
+var LIB_SEARCH_T=null;
+function libSearch(el){
+  LIB_F.q=el.value; clearTimeout(LIB_SEARCH_T);
+  LIB_SEARCH_T=setTimeout(function(){
+    var pos=el.selectionStart; renderLibraryList();
+    var n=document.getElementById('cl-search'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
+  },250);
+}
+// Spoken-language tags set by the language check on imported reels (spanish / english / no_talking / lang_check).
+var LIB_LANGS={spanish:'🇪🇸 Spanish',english:'🇬🇧 English',no_talking:'🤐 No talking',lang_check:'❓ To check'};
+function libLangOf(i){ var t=String(i.tags||'').toLowerCase().split(/[\s,]+/); for(var k in LIB_LANGS) if(t.indexOf(k)>=0) return k; return ''; }
+function libLangChips(mine){
+  var scoped=mine.filter(function(i){ return !LIB_F.category || (LIB_F.category==='none'?!i.category:libInCat(i,LIB_F.category)); });
+  var cnt={}; scoped.forEach(function(i){ var l=libLangOf(i); if(l) cnt[l]=(cnt[l]||0)+1; });
+  if(!Object.keys(cnt).length) return '';
+  var b=function(k,label,n){ var on=(LIB_F.lang||'')===k;
+    return '<button onclick="LIB_F.lang=\''+k+'\';renderLibraryList()" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:9px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">'+label+(n!=null?' <span style="opacity:.7">'+n+'</span>':'')+'</button>'; };
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><span style="font-size:11.5px;color:var(--text2);margin-right:2px;">🗣 Language:</span>'
+    +b('','Any')+Object.keys(LIB_LANGS).filter(function(k){return cnt[k];}).map(function(k){ return b(k,LIB_LANGS[k],cnt[k]); }).join('')+'</div>';
+}
 function renderLibraryList(){
   var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
   if(!wrap) return;
@@ -5823,12 +5846,13 @@ function renderLibraryList(){
     })()
     +(LIB_F.outcome?'<span style="font-size:11.5px;color:var(--text2);margin-left:4px;">— select all, then <b>Set category</b> to file them</span>':'')
     +'</div>':'')
+    +libLangChips(mine)
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     +(LIB_SHOW_SCANNER?'<select onchange="LIB_F.state=this.value;renderLibraryList()"><option value="">Any state</option>'
     +Object.keys(LIB_STATES).map(function(k){return '<option value="'+k+'"'+(LIB_F.state===k?' selected':'')+'>'+LIB_STATES[k].icon+' '+LIB_STATES[k].label+'</option>';}).join('')+'</select>':'')
     +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +((STATE.verticals||[]).length?'<select onchange="LIB_F.vertical=this.value;renderLibraryList()"><option value="">🏷 Any tag</option>'+vertList('',true).map(function(v){var n=mine.filter(function(i){return i.vertical===v.key;}).length;return '<option value="'+v.key+'"'+(LIB_F.vertical===v.key?' selected':'')+'>'+escapeHtml(v.label)+' ('+n+')</option>';}).join('')+'<option value="__none"'+(LIB_F.vertical==='__none'?' selected':'')+'>Untagged</option></select>':'')
-    +'<input id="cl-search" placeholder="🔎 title / tags / order #" oninput="LIB_F.q=this.value;renderLibraryList()" value="'+escapeHtml(LIB_F.q)+'" style="flex:1;min-width:150px;">'
+    +'<input id="cl-search" type="search" autocomplete="off" placeholder="🔎 title / tags / order #" oninput="libSearch(this)" value="'+escapeHtml(LIB_F.q||'')+'" style="flex:1;min-width:150px;">'
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
     +(libIsPhone()?'<button class="btn btn-ghost btn-sm" onclick="libSaveShownToPhotos()" title="Save every photo/video in the current view to this phone\'s photo album">📲 Save all shown to Photos</button>':'')
     +'<button class="btn btn-ghost btn-sm" onclick="libDownloadShown()" title="Download every file in the current view (model + category + filters)">⬇ Download all shown</button>'
@@ -5861,7 +5885,7 @@ function renderLibraryList(){
     ? (LIB_F.category==='sexting'&&LIB_F.model&&LIB_F.model!=='agency' ? libSextingHtml(items) : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>')
     : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
 }
-function libOpenModel(key){ LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
+function libOpenModel(key){ LIB_F.lang=''; LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
   // Land on New uploads when the model has sent something that still needs sorting.
   var own=(STATE.library||[]).filter(function(i){ return key==='agency'?!i.model_id:i.model_id===key; });
   LIB_F.category=own.some(function(i){return libInCat(i,'inbox');})?'inbox':own.some(function(i){return libInCat(i,'unsure');})?'unsure':'';
@@ -6857,7 +6881,7 @@ function libFocusKey(e){
   if(/^[1-9]$/.test(e.key)){ var b=document.querySelector('#lf-overlay .lf-dest[data-key="'+e.key+'"]'); if(b){ e.preventDefault(); b.click(); } }
 }
 
-function libBackToFolders(){ LIB_F.model=''; LIB_F.category=''; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
+function libBackToFolders(){ LIB_F.lang=''; LIB_F.model=''; LIB_F.category=''; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={}; renderLibraryList(); }
 
 function libPhoneUseFor(i){
   // this item plus everything cut from it (derived_from chain), across all phones
