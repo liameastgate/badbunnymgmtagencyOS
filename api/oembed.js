@@ -30,6 +30,23 @@ module.exports = async (req, res) => {
 
   let thumbnail_url = null, title = null, author_name = null;
 
+  // 0. Instagram: the public /media/?size=l shortcut redirects straight to the post's cover
+  // image (works for /p/, /reel/ and /tv/ links, no login, no API key). Tried first because
+  // the og:image scrape below now usually hits Instagram's login wall.
+  if (platform === 'instagram') {
+    const m = url.match(/instagram\.com\/(?:[^/?#]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+    if (m) {
+      try {
+        const r = await fetch(`https://www.instagram.com/p/${m[2]}/media/?size=l`, {
+          redirect: 'manual',
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' },
+        });
+        const loc = r.headers.get('location');
+        if (loc && /cdninstagram\.com|fbcdn\.net/i.test(loc)) thumbnail_url = loc;
+      } catch (e) { /* fall through */ }
+    }
+  }
+
   // 1. Try the official oEmbed endpoint first -- still useful for TikTok (unaffected),
   // and harmless to keep in case Meta ever restores the Instagram thumbnail field.
   try {
@@ -39,7 +56,7 @@ module.exports = async (req, res) => {
     const r = await fetch(endpoint, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (r.ok) {
       const data = await r.json();
-      thumbnail_url = data.thumbnail_url || null;
+      thumbnail_url = thumbnail_url || data.thumbnail_url || null;
       title = data.title || data.author_name || null;
       author_name = data.author_name || null;
     }
