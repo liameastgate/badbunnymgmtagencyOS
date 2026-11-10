@@ -6638,7 +6638,36 @@ function vedBuildArgs(job,useOrig){
   if(aout) out=out.concat(['-map',aout,'-c:a','aac','-b:a','192k','-ar','44100']); else out.push('-an');
   return out.concat(['-c:v','libx264','-preset','ultrafast','-crf','20','-pix_fmt','yuv420p','-r','30','-t',dur,'-movflags','+faststart','out.mp4']);
 }
+// Renders run in a Web Worker so the page stays usable (the single-thread ffmpeg otherwise blocks
+// the whole tab for the length of the render — it looked like a freeze).
+var VED_WORKER_SRC="self.onmessage=async function(e){var d=e.data,log=[];try{importScripts(d.core);"
+ +"var M=await createFFmpegCore({mainScriptUrlOrBlob:d.core,locateFile:function(p){return d.core.replace(/ffmpeg-core\\.js$/,p);},"
+ +"print:function(m){},printErr:function(m){log.push(m);if(log.length>80)log.shift();var t=/time=(\\d+):(\\d+):([\\d.]+)/.exec(m);if(t)postMessage({t:+t[1]*3600+ +t[2]*60+ +t[3]});}});"
+ +"Object.keys(d.files).forEach(function(n){M.FS.writeFile(n,d.files[n]);});"
+ +"var argv=['./ffmpeg','-nostdin','-y'].concat(d.args),ptr=M._malloc(argv.length*4);"
+ +"argv.forEach(function(s,i){var n=M.lengthBytesUTF8(s)+1,a=M._malloc(n);M.stringToUTF8(s,a,n);M.setValue(ptr+4*i,a,'i32');});"
+ +"try{M.cwrap('main','number',['number','number'])(argv.length,ptr);}catch(x){if(!(x&&(x.name==='ExitStatus'||/exit/i.test(String(x.message||x)))))throw x;}"
+ +"var out=null;try{out=M.FS.readFile('out.mp4');}catch(x){}"
+ +"if(out&&out.length>1000)postMessage({out:out},[out.buffer]);else postMessage({err:'render failed',log:log.join('\\n')});"
+ +"}catch(x){postMessage({err:String(x&&x.message||x),log:log.join('\\n')});}};";
+function vedFFRunWorker(args,files,onTime){
+  return new Promise(function(res,rej){
+    var w; try{ w=new Worker(URL.createObjectURL(new Blob([VED_WORKER_SRC],{type:'application/javascript'}))); }catch(e){ rej(Object.assign(new Error('no worker'),{noWorker:true})); return; }
+    var copy={}, tr=[]; Object.keys(files).forEach(function(n){ copy[n]=files[n]; tr.push(files[n].buffer); });
+    w.onmessage=function(e){ var d=e.data;
+      if(d.t!=null){ if(onTime) onTime(d.t); return; }
+      w.terminate();
+      if(d.out) res(d.out); else { var err=new Error(d.err||'render failed'); err.log=d.log||''; rej(err); } };
+    w.onerror=function(e){ w.terminate(); rej(Object.assign(new Error(e.message||'worker error'),{noWorker:/importScripts|createFFmpegCore/.test(e.message||'')})); };
+    w.postMessage({core:LIB_FF_CORE,args:args,files:copy},tr);
+  });
+}
 async function vedFFRun(args,files,onTime){
+  try{ return await vedFFRunWorker(args,files,onTime); }
+  catch(e){ if(!e.noWorker) throw e; }   // very old browser: fall back to the page (it will pause while rendering)
+  return vedFFRunPage(args,files,onTime);
+}
+async function vedFFRunPage(args,files,onTime){
   await libFF();
   var ff=FFmpeg.createFFmpeg({corePath:LIB_FF_CORE,mainName:'main',log:false}), log=[];
   ff.setLogger(function(m){ var s=m.message||''; log.push(s); if(log.length>60) log.shift(); var mm=s.match(/time=(\d+):(\d+):([\d.]+)/); if(mm&&onTime) onTime(+mm[1]*3600+ +mm[2]*60+ +mm[3]); });
@@ -6657,6 +6686,15 @@ function vedPill(id,html,pct){
     p.style.cssText='position:fixed;right:16px;z-index:10060;background:#171a28;color:#e8eaf2;border:1px solid #2c3150;border-radius:12px;padding:10px 14px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:330px;'; }
   var all=document.querySelectorAll('.ved-pill'); all.forEach(function(x,i){ x.style.bottom=(16+i*74)+'px'; });
   p.innerHTML=html+(pct!=null?'<div style="height:5px;background:#262a40;border-radius:3px;margin-top:6px;overflow:hidden;"><i style="display:block;height:100%;background:#5b6cff;width:'+Math.round(pct*100)+'%;"></i></div>':'');
+}
+// Watch the finished edit straight away (to check the caption / sound came out right).
+async function vedPreview(id){
+  var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  var url; try{ url=await libItemUrl(it); }catch(e){ alert('Could not load the clip'); return; }
+  var o=document.createElement('div'); o.style.cssText='position:fixed;inset:0;z-index:10070;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;';
+  o.innerHTML='<video src="'+url+'" controls autoplay playsinline style="max-height:82vh;max-width:92vw;border-radius:12px;background:#000;"></video><button style="font:inherit;padding:9px 18px;border-radius:10px;border:1px solid #2c3150;background:#171a28;color:#fff;cursor:pointer;">Close</button>';
+  o.onclick=function(e){ if(e.target===o||e.target.tagName==='BUTTON'){ o.remove(); } };
+  document.body.appendChild(o);
 }
 function vedBeforeUnload(e){ if(Object.keys(VED_RENDERS).length){ e.preventDefault(); e.returnValue='A video is still rendering.'; return e.returnValue; } }
 window.addEventListener('beforeunload',vedBeforeUnload);
@@ -6723,7 +6761,7 @@ async function vedRender(job){
     if(middle!==orig) libR2Delete(middle);            // drop the previous edited/trimmed version, keep the original
     if(probe.thumb){ libThumbSet(id,probe.thumb); var tp={}; tp[id]=probe.thumb; libTdbPut(tp); }
     if(typeof LF!=='undefined'&&LF){ delete LF.urls[id]; if(libFocusItem()&&libFocusItem().id===id) libFocusPaint(); } else if(typeof renderLibraryList==='function'&&document.getElementById('cl-list')) renderLibraryList();
-    vedPill(id,'✅ <b>'+name+'</b> edited · '+libFmtT(job.outDur)+' <a onclick="vedPill(\''+id+'\');vedOpen(\''+id+'\')">Re-edit</a> · <a onclick="vedPill(\''+id+'\');libUndoTrim(\''+id+'\')">Undo</a> · <a onclick="vedPill(\''+id+'\')">✕</a>');
+    vedPill(id,'✅ <b>'+name+'</b> edited · '+libFmtT(job.outDur)+' <a onclick="vedPreview(\''+id+'\')">▶ Watch it</a> · <a onclick="vedPill(\''+id+'\');vedOpen(\''+id+'\')">Re-edit</a> · <a onclick="vedPill(\''+id+'\');libUndoTrim(\''+id+'\')">Undo</a> · <a onclick="vedPill(\''+id+'\')">✕</a>');
     setTimeout(function(){ vedPill(id); },15000);
   }catch(e){
     console.error('edit failed',e,e&&e.log);
