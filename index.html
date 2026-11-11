@@ -5195,44 +5195,97 @@ async function libPreview(id){
     scanShow(it.title||'Preview', libIsVideo(it)?'<video src="'+u+'" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000;"></video>':'<img src="'+u+'" style="width:100%;height:100%;object-fit:contain;">');
   }catch(e){ scanShow(it.title||'Preview','<div style="color:var(--red);">Could not load: '+escapeHtml(e.message)+'</div>'); }
 }
-// A real file name for the saved copy: the title, with the stored file's extension if the title lacks one.
+// Saved file name: <model>_<folder>_<title>.<ext>, so a batch of reels lands sorted.
 function libDownloadName(it){
+  var clean=function(x){ return String(x||'').replace(/[\\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').trim(); };
   var ext=((it.r2_key||'').match(/\.([a-z0-9]{2,5})$/i)||[])[1]||'';
-  var base=(it.title||'content').replace(/[\\\/:*?"<>|]+/g,'_').trim()||'content';
-  return (ext && !new RegExp('\\.'+ext+'$','i').test(base)) ? base+'.'+ext : base;
+  var title=clean(it.title||'content').replace(/\.(mp4|mov|m4v|webm|avi|mkv|jpe?g|png|heic|heif|webp|gif|mp3|m4a|wav|aac|ogg)$/i,'');
+  var m=(STATE.models||[]).find(function(x){return x.id===it.model_id;}), c=LIB_CATEGORIES[it.category];
+  var base=[m?clean(m.name):(it.model_id?'':'Agency'), c?clean(c.short||c.label):'', title||'content'].filter(Boolean).join('_');
+  return ext?base+'.'+ext.toLowerCase():base;
 }
-// Save the file to disk (not just open it in a tab, where a video only plays).
-// Pulls it as a blob so the download attribute works cross-origin; if that is
-// refused (CORS / too big for memory) it falls back to opening the signed link.
-async function libSaveFile(it){
-  var url=await libItemUrl(it);
-  try{
-    var res=await fetch(url); if(!res.ok) throw new Error('fetch '+res.status);
-    var blob=await res.blob(), href=URL.createObjectURL(blob);
-    var a=document.createElement('a'); a.href=href; a.download=libDownloadName(it);
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(href); },60000);
-    return 'saved';
-  }catch(e){ window.open(url,'_blank'); return 'opened'; }
+// ── Downloads with a progress panel (12 Nov) ─────────────────────────────────
+// Every download (one card, or the selected files) goes through one queue: the file streams
+// in with a live bar ("34% · 12.4 / 36.1 MB · 8.2 MB/s"), then saves to Downloads. The next
+// file's link is signed while the current one downloads, so there's no pause between files.
+var DL={q:[],total:0,n:0,ok:0,fail:[],running:false,ctl:null,urls:{}};
+function dlMB(b){ return (b/1048576).toFixed(1); }
+function dlPanel(html,state){
+  var p=document.getElementById('dl-panel');
+  if(html==null){ if(p) p.remove(); return; }
+  if(!p){ p=document.createElement('div'); p.id='dl-panel'; document.body.appendChild(p);
+    p.style.cssText='position:fixed;left:16px;bottom:16px;z-index:10060;width:min(360px,calc(100vw - 32px));background:var(--surface,#151826);color:var(--text,#fff);border:1px solid var(--border,#2a2f45);border-radius:14px;padding:12px 14px;font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);'; }
+  p.innerHTML=html; p.dataset.state=state||'';
 }
+function dlRender(cur,got,total,speed){
+  var multi=DL.total>1, pct=total?Math.min(100,Math.round(got/total*100)):0, fn=Math.max(1,DL.n);
+  dlPanel('<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+      +'<b style="flex:1;">⬇ '+(multi?'File '+fn+' of '+DL.total:'Downloading')+'</b>'
+      +'<button onclick="dlCancel()" title="Cancel" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>'
+    +(multi?'<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:8px;"><i style="display:block;height:100%;width:'+Math.max(0,Math.min(100,Math.round((fn-1+(total?got/total:0))/DL.total*100)))+'%;background:#4ade80;"></i></div>':'')
+    +'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2,#9aa0bd);margin-bottom:5px;">'+escapeHtml(cur)+'</div>'
+    +'<div style="height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><i style="display:block;height:100%;width:'+pct+'%;background:var(--accent,#5b6cff);transition:width .15s;"></i></div>'
+    +'<div style="margin-top:5px;font-variant-numeric:tabular-nums;color:var(--text2,#9aa0bd);">'+(total?pct+'% · '+dlMB(got)+' / '+dlMB(total)+' MB':dlMB(got)+' MB')+(speed?' · '+speed.toFixed(1)+' MB/s':'')+'</div>','busy');
+}
+function dlCancel(){ DL.q=[]; DL.cancelled=true; if(DL.ctl) DL.ctl.abort(); }
+function dlSignAhead(it){ if(!it) return null; if(!DL.urls[it.id]){ DL.urls[it.id]=libItemUrl(it); DL.urls[it.id].catch(function(){}); } return DL.urls[it.id]; }
+async function dlOne(it){
+  var name=libDownloadName(it), url=await dlSignAhead(it); delete DL.urls[it.id];
+  dlSignAhead(DL.q[0]);                                   // sign the next one while this downloads
+  var ctl=new AbortController(); DL.ctl=ctl;
+  var res;
+  try{ res=await fetch(url,{signal:ctl.signal}); }
+  catch(e){ if(ctl.signal.aborted) throw e; window.open(url,'_blank'); return 'opened'; }   // CORS refused: open the link instead
+  if(!res.ok) throw new Error('download failed ('+res.status+')');
+  var total=parseInt(res.headers.get('content-length')||'0',10)||it.size_bytes||0;
+  var chunks=[], got=0, t0=performance.now(), last=0;
+  dlRender(name,0,total,0);
+  if(res.body&&res.body.getReader){
+    var rd=res.body.getReader();
+    for(;;){
+      var r=await rd.read(); if(r.done) break;
+      chunks.push(r.value); got+=r.value.length;
+      var now=performance.now(); if(now-last>150){ last=now; dlRender(name,got,total,got/1048576/Math.max(0.2,(now-t0)/1000)); }
+    }
+  } else { var bb=await res.blob(); chunks.push(bb); got=bb.size; }
+  var blob=new Blob(chunks,{type:res.headers.get('content-type')||it.content_type||'application/octet-stream'}); chunks=null;
+  var href=URL.createObjectURL(blob), a=document.createElement('a'); a.href=href; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(href); },60000);
+  return 'saved';
+}
+async function dlRun(){
+  if(DL.running) return; DL.running=true; DL.cancelled=false;
+  while(DL.q.length){
+    var it=DL.q.shift(); DL.n++;
+    try{ await dlOne(it); DL.ok++; }
+    catch(e){ if(DL.cancelled) break; console.warn('download failed',it.title,e); DL.fail.push(it.title||it.id); }
+  }
+  DL.running=false; DL.ctl=null;
+  var msg=DL.cancelled?'✕ Cancelled — '+DL.ok+' saved':(DL.fail.length?'⚠ Saved '+DL.ok+' of '+DL.total+' — failed: '+escapeHtml(DL.fail.slice(0,3).join(', '))+(DL.fail.length>3?'…':''):'✓ Saved '+(DL.total>1?DL.ok+' files':'')+' to Downloads');
+  dlPanel('<div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;color:'+(DL.fail.length||DL.cancelled?'#fbbf24':'#4ade80')+';">'+msg+'</b><button onclick="dlPanel()" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>','done');
+  var keep=DL.fail.length||DL.cancelled;
+  DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.urls={};
+  if(!keep) setTimeout(function(){ var p=document.getElementById('dl-panel'); if(p&&p.dataset.state==='done') dlPanel(); },5000);
+}
+function dlEnqueue(list){
+  if(!DL.running){ DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; }
+  list.forEach(function(it){ DL.q.push(it); DL.total++; });
+  dlSignAhead(DL.q[0]);
+  if(!DL.running) dlRender(libDownloadName(DL.q[0]||list[0]),0,0,0);
+  dlRun();
+}
+async function libSaveFile(it){ dlEnqueue([it]); return 'queued'; }
 async function downloadLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  try{ await libSaveFile(it); }catch(e){ alert('Could not get download link: '+e.message); }
+  dlEnqueue([it]);
 }
-// Download a list of library items one after another (selected, or everything shown in
-// the current model + category view). Sequential, so a big batch doesn't hold every
-// video in memory at once; the browser may ask once to allow multiple downloads.
+// Download the selected files (or everything shown) one after another through the same panel.
 async function libDownloadMany(list){
   if(!list.length){ alert('Nothing to download here.'); return; }
   var bytes=list.reduce(function(t,i){ return t+(i.size_bytes||0); },0);
-  if(list.length>1 && !confirm('Download '+list.length+' file'+(list.length===1?'':'s')+(bytes?' ('+libFmtSize(bytes)+')':'')+'?\n\nIf your browser asks to allow multiple downloads, click Allow.')) return;
-  var st=document.getElementById('cl-upload-status'), ok=0, fail=[];
-  for(var n=0;n<list.length;n++){
-    if(st){ st.style.display='block'; st.textContent='⬇ Downloading '+(n+1)+'/'+list.length+' · '+(list[n].title||''); }
-    try{ await libSaveFile(list[n]); ok++; }catch(e){ fail.push(list[n].title||list[n].id); }
-    await new Promise(function(r){ setTimeout(r,350); });
-  }
-  if(st){ st.style.display='block'; st.textContent='⬇ Downloaded '+ok+' of '+list.length+(fail.length?' — failed: '+fail.slice(0,5).join(', ')+(fail.length>5?'…':''):''); }
+  if(list.length>1 && !confirm('Download '+list.length+' files'+(bytes?' ('+libFmtSize(bytes)+')':'')+'?\n\nIf Chrome asks to allow multiple downloads, click Allow.')) return;
+  dlEnqueue(list);
 }
 function libBulkDownload(){
   var L=STATE.library||[]; libDownloadMany(L.filter(function(i){ return LIB_SEL[i.id]; }));
