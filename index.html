@@ -5328,11 +5328,22 @@ function dlEnqueue(list){
 async function libSaveFile(it){ dlEnqueue([it]); return 'queued'; }
 async function downloadLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
+  if(DL_DONE[it.id]&&!confirm('You already downloaded this file on this computer ('+new Date(DL_DONE[it.id]).toLocaleDateString()+').\n\nDownload it again?')) return;
   dlEnqueue([it]);
 }
 // Download the selected files (or everything shown) one after another through the same panel.
 async function libDownloadMany(list){
   if(!list.length){ alert('Nothing to download here.'); return; }
+  // Duplicates: skip files this computer has already downloaded (unless you choose to get them again).
+  var already=list.filter(function(i){ return DL_DONE[i.id]; });
+  if(already.length){
+    if(already.length===list.length&&list.length===1){
+      if(!confirm('You already downloaded this file on this computer ('+new Date(DL_DONE[list[0].id]).toLocaleDateString()+').\n\nDownload it again?')) return;
+    } else if(confirm(already.length+' of these '+list.length+' files were already downloaded on this computer.\n\nOK = skip them (download only the '+(list.length-already.length)+' new ones)\nCancel = download all '+list.length+' again')){
+      list=list.filter(function(i){ return !DL_DONE[i.id]; });
+      if(!list.length){ alert('Nothing new to download — you already have all of these.'); return; }
+    }
+  }
   var bytes=list.reduce(function(t,i){ return t+(i.size_bytes||0); },0);
   if(list.length>1 && !confirm('Download '+list.length+' files'+(bytes?' ('+libFmtSize(bytes)+')':'')+'?'
     +(list.length>10?'\n\n⚠ IMPORTANT: Chrome will show "This site is trying to download multiple files" (top of the window). Click ALLOW — otherwise Chrome silently drops the rest.':'\n\nIf Chrome asks to allow multiple downloads, click Allow.'))) return;
