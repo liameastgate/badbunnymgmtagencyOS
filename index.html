@@ -5609,14 +5609,23 @@ function libOutcomeOf(i){
 var LIB_SEL={};                                   // id -> true, for bulk actions
 
 function libSelCount(){ return Object.keys(LIB_SEL).length; }
-function libClearSel(){ LIB_SEL={}; renderLibraryList(); }
-function libToggleSel(id,on){ if(on) LIB_SEL[id]=true; else delete LIB_SEL[id]; renderLibraryList(); }
+var LIB_PAGE=120, LIB_SHOWN=120, LIB_SHOWN_SIG='', LIB_MORE_OBS=null;
+function libShowMore(){ LIB_SHOWN+=LIB_PAGE; var y=window.scrollY; renderLibraryList(); window.scrollTo(0,y); }
+function libSelRefresh(ids){
+  var b=document.getElementById('cl-selbar'); if(b) b.innerHTML=libSelBarHtml();
+  (ids||[]).forEach(function(id){ var c=document.querySelector('[data-libcard="'+id+'"]'); if(!c) return;
+    c.style.borderColor=LIB_SEL[id]?'var(--accent)':''; var cb=c.querySelector('input[type=checkbox]'); if(cb) cb.checked=!!LIB_SEL[id]; });
+}
+function libClearSel(){ var ids=Object.keys(LIB_SEL); LIB_SEL={}; libSelRefresh(ids); }
+function libToggleSel(id,on){ if(on) LIB_SEL[id]=true; else delete LIB_SEL[id]; libSelRefresh([id]); }
 function libSelectAllShown(){
   var shown=libFiltered();
   var all=shown.every(function(i){ return LIB_SEL[i.id]; });
   shown.forEach(function(i){ if(all) delete LIB_SEL[i.id]; else LIB_SEL[i.id]=true; });
-  renderLibraryList();
+  libSelRefresh(shown.map(function(i){ return i.id; }));
 }
+// The Actions dropdown is filled in only when opened (each card used to carry ~30 options).
+function libFillActs(sel,id){ if(sel.dataset.filled) return; var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return; sel.dataset.filled='1'; sel.innerHTML=libCardActionOptions(it); }
 function libOwnerKey(i){ return i.model_id || 'agency'; }
 function libOwnerName(key){
   if(key==='agency') return '🏢 Agency';
@@ -5859,6 +5868,20 @@ function libLangChips(mine){
   return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><span style="font-size:11.5px;color:var(--text2);margin-right:2px;">🗣 Language:</span>'
     +b('','Any')+Object.keys(LIB_LANGS).filter(function(k){return cnt[k];}).map(function(k){ return b(k,LIB_LANGS[k],cnt[k]); }).join('')+'</div>';
 }
+function libSelBarHtml(){
+  return libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
+    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+libMoveOptions('','',libSelModel())+'</select>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
+    +((STATE.verticals||[]).length?'<select class="btn btn-sm btn-ghost" style="cursor:pointer;" onchange="libBulkTag(this)"><option value="">🏷 Tag as…</option>'+vertList('').map(function(v){return '<option value="'+v.key+'">'+escapeHtml(v.label)+'</option>';}).join('')+'<option value="__none">✕ Remove tag</option></select>':'')
+    +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
+    +'<button class="btn btn-sm '+(libIsPhone()?'btn-ghost':'btn-primary')+'" onclick="libBulkDownload()">⬇ Download</button>'
+    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
+    +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
+    +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
+
+}
 function renderLibraryList(){
   var head=document.getElementById('cl-head'), pools=document.getElementById('cl-pools'), wrap=document.getElementById('cl-list');
   if(!wrap) return;
@@ -5983,21 +6006,20 @@ function renderLibraryList(){
     +(low.length?'<div style="background:rgba(230,180,40,.08);border:1px solid rgba(230,180,40,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#e6b428;margin:-4px 0 14px;">⚠ Fresh pool running low (&lt;'+LIB_LOW_STOCK+'): '+low.map(function(x){return '<b>'+escapeHtml(x.m.name)+'</b> ('+x.f+')';}).join(' · ')+'</div>':'');
 
   var items=libFiltered();
-  var bar=libSelCount()?'<div style="position:sticky;top:0;z-index:5;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-    +'<b style="font-size:13px;">'+libSelCount()+' selected</b>'
-    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'model\')">↪ Move to model</button>'
-    +'<select class="btn btn-sm btn-primary" style="cursor:pointer;" onchange="libBulkMoveTo(this)"><option value="">📂 Move to…</option>'+libMoveOptions('','',libSelModel())+'</select>'
-    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'also\')" title="Add the selected files to a second category without moving them">➕ Also in…</button>'
-    +((STATE.verticals||[]).length?'<select class="btn btn-sm btn-ghost" style="cursor:pointer;" onchange="libBulkTag(this)"><option value="">🏷 Tag as…</option>'+vertList('').map(function(v){return '<option value="'+v.key+'">'+escapeHtml(v.label)+'</option>';}).join('')+'<option value="__none">✕ Remove tag</option></select>':'')
-    +(libIsPhone()?'<button class="btn btn-sm btn-primary" onclick="libBulkSaveToPhotos()">📲 Save to Photos</button>':'')
-    +'<button class="btn btn-sm '+(libIsPhone()?'btn-ghost':'btn-primary')+'" onclick="libBulkDownload()">⬇ Download</button>'
-    +'<button class="btn btn-sm btn-ghost" onclick="libBulkMove(\'state\')">🔄 Set state</button>'
-    +'<button class="btn btn-sm btn-danger" onclick="libBulkDelete()">✕ Delete</button>'
-    +'<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="libClearSel()">Clear</button></div>':'';
-
-  wrap.innerHTML=bar+(items.length
-    ? (LIB_F.category==='sexting'&&LIB_F.model&&LIB_F.model!=='agency' ? libSextingHtml(items) : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+items.map(libCardHtml).join('')+'</div>')
+  // Big folders (Hector has 700+) drew every card at once and redrew them all on each tick of a
+  // checkbox. Now: cards come in pages of LIB_PAGE as you scroll, and ticking only updates that
+  // card and the selection bar.
+  var sig=[LIB_F.model,LIB_F.vault,LIB_F.category,LIB_F.state,LIB_F.outcome,LIB_F.vertical,LIB_F.lang,LIB_F.q,LIB_F.factory].join('|');
+  if(sig!==LIB_SHOWN_SIG){ LIB_SHOWN_SIG=sig; LIB_SHOWN=LIB_PAGE; }
+  var sexting=LIB_F.category==='sexting'&&LIB_F.model&&LIB_F.model!=='agency';
+  var page=sexting?items:items.slice(0,LIB_SHOWN);
+  wrap.innerHTML='<div id="cl-selbar">'+libSelBarHtml()+'</div>'+(items.length
+    ? (sexting ? libSextingHtml(items) : '<div id="cl-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'+page.map(libCardHtml).join('')+'</div>'
+        +(items.length>page.length?'<div id="cl-more" style="text-align:center;padding:18px;"><button class="btn btn-ghost" onclick="libShowMore()">Show more ('+(items.length-page.length)+' left)</button></div>':''))
     : '<div class="empty" style="margin-top:24px;"><div class="empty-icon">📁</div><p>Nothing here'+(mine.length?' with these filters':' yet — hit <strong>Upload</strong>')+'.</p></div>');
+  var more=document.getElementById('cl-more');
+  if(LIB_MORE_OBS){ LIB_MORE_OBS.disconnect(); LIB_MORE_OBS=null; }
+  if(more&&window.IntersectionObserver){ LIB_MORE_OBS=new IntersectionObserver(function(es){ if(es[0].isIntersecting){ LIB_MORE_OBS.disconnect(); LIB_MORE_OBS=null; libShowMore(); } },{rootMargin:'600px'}); LIB_MORE_OBS.observe(more); }
 }
 function libOpenModel(key){ LIB_F.lang=''; LIB_F.model=key; LIB_F.vault='model'; LIB_F.vertical=''; LIB_F.state=''; LIB_F.outcome=''; LIB_F.q=''; LIB_SEL={};
   // Land on New uploads when the model has sent something that still needs sorting.
@@ -7295,7 +7317,7 @@ function libCardHtml(i){
   var stateBtns=(st==='retired'?'<button class="btn btn-sm btn-ghost" title="Back to Fresh" onclick="libSetState(\''+i.id+'\',\'fresh\')">↩</button>'
     :'<button class="btn btn-sm btn-ghost" title="Retire" onclick="libSetState(\''+i.id+'\',\'retired\')">💤</button>')
     +(st==='in_use'?'<button class="btn btn-sm btn-ghost" title="Force Reusable" onclick="libSetState(\''+i.id+'\',\'reusable\')">☁️</button>':'');
-  return '<div class="card" style="margin:0;padding:12px;display:flex;gap:10px;align-items:flex-start;'+(LIB_SEL[i.id]?'border-color:var(--accent);':'')+'">'
+  return '<div class="card" data-libcard="'+i.id+'" style="margin:0;padding:12px;display:flex;gap:10px;align-items:flex-start;'+(LIB_SEL[i.id]?'border-color:var(--accent);':'')+'">'
     +'<input type="checkbox" '+(LIB_SEL[i.id]?'checked':'')+' onchange="libToggleSel(\''+i.id+'\',this.checked)" style="flex:0 0 17px;width:17px;height:17px;min-width:17px;max-width:17px;margin:3px 0 0;align-self:flex-start;cursor:pointer;accent-color:var(--accent);">'
     +libThumbHtml(i,104)
     +'<div style="flex:1;min-width:0;">'
@@ -7303,8 +7325,8 @@ function libCardHtml(i){
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
     +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+libCaptionChip(i)+libDlChip(i)+(i.edit_spec&&i.edit_spec.edit?'<span class="cscan cscan-grey" title="Edited '+fmtDate(i.edit_spec.edit.at)+'">🎬 Edited</span>':'')+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'
-    +'<select class="lib-act" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
-    +libCardActionOptions(i)
+    +'<select class="lib-act" onmousedown="libFillActs(this,\''+i.id+'\')" onfocus="libFillActs(this,\''+i.id+'\')" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
+    +'<option value="">Actions…</option>'
     +'</select>'
     +'</div></div></div>';
 }
