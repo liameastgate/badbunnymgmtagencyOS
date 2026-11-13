@@ -4529,10 +4529,20 @@ async function bulkAddContentOrders(){
 // orders). Admin/VA use the Content Library (every item, filtered by model / category /
 // lifecycle state, with the belt controls). Both write content_library rows with the media
 // probed on the device first, so the HD rule is enforced before a byte leaves the phone.
+// 13 Nov: "Failed to send a request to the Edge Function" = the request never left the browser
+// (a wifi blip). Try again a few times before giving up.
 async function r2SignedUrl(key,method){
-  const{data,error}=await sb.functions.invoke('r2-sign',{body:{key,method}});
-  if(error||!data||!data.url) throw new Error((error&&error.message)||(data&&data.error)||'Could not sign URL');
-  return data.url;
+  var last=null;
+  for(var t=0;t<4;t++){
+    try{
+      const{data,error}=await sb.functions.invoke('r2-sign',{body:{key,method}});
+      if(!error&&data&&data.url) return data.url;
+      last=new Error((error&&error.message)||(data&&data.error)||'Could not sign URL');
+      if(data&&data.error&&!/fetch|network|send a request/i.test(last.message)) break;   // a real refusal: don't hammer it
+    }catch(e){ last=e; }
+    await new Promise(function(r){ setTimeout(r,600*(t+1)*(t+1)); });
+  }
+  throw last||new Error('Could not sign URL');
 }
 async function loadContentLibrary(){
   // 27 Oct: the API hands back at most 1,000 rows per request, and the shared
@@ -5219,7 +5229,7 @@ function dlPanel(html,state){
 }
 function dlRender(cur,got,total,speed){
   var multi=DL.total>1, pct=total?Math.min(100,Math.round(got/total*100)):0, fn=Math.max(1,DL.n);
-  dlPanel('<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+  dlPanel(dlDupesHtml()+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
       +'<b style="flex:1;">⬇ '+(multi?'File '+fn+' of '+DL.total:'Downloading')+'</b>'
       +'<button onclick="dlCancel()" title="Cancel" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>'
     +(multi?'<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:8px;"><i style="display:block;height:100%;width:'+Math.max(0,Math.min(100,Math.round((fn-1+(total?got/total:0))/DL.total*100)))+'%;background:#4ade80;"></i></div>':'')
@@ -5251,7 +5261,7 @@ async function dlFetchAll(it,name,url){
     if(DL.cancelled) throw new Error('cancelled');
     var ctl=new AbortController(); DL.ctl=ctl;
     try{
-      if(tries>1){ url=await libItemUrl(it); }                       // fresh link on every retry
+      if(tries>1||!url){ url=await libItemUrl(it); }                 // fresh link on every retry
       var res=await fetch(url,{signal:ctl.signal,headers:got?{Range:'bytes='+got+'-'}:{}});
       if(got&&res.status===200){ chunks=[]; got=0; }                 // server ignored the Range: start over
       else if(!res.ok&&res.status!==206) throw new Error('HTTP '+res.status);
@@ -5275,8 +5285,8 @@ async function dlFetchAll(it,name,url){
   throw lastErr||new Error('download failed');
 }
 async function dlOne(it){
-  var name=libDownloadName(it), url;
-  try{ url=await dlSignAhead(it); }catch(e){ url=await libItemUrl(it); }
+  var name=libDownloadName(it), url=null;
+  try{ url=await dlSignAhead(it); }catch(e){ url=null; }        // signed again inside the retry loop if this failed
   delete DL.urls[it.id];
   dlSignAhead(DL.q[0]);                                   // sign the next one while this downloads
   var blob=await dlFetchAll(it,name,url);
@@ -5307,10 +5317,11 @@ async function dlRun(){
       +'<button class="btn btn-sm btn-ghost" onclick="dlSelectFailed()">☑ Select them</button>'
       +'<button class="btn btn-sm btn-ghost" onclick="dlCopyFailed()">📋 Copy names</button></div>';
   }
-  dlPanel('<div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;color:'+(fails.length||cancelled?'#fbbf24':'#4ade80')+';">'+head+'</b><button onclick="dlPanel()" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>'
+  var dupesHtml=dlDupesHtml(), hadDupes=(DL.dupes||[]).length;
+  dlPanel(dupesHtml+'<div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;color:'+(fails.length||cancelled?'#fbbf24':'#4ade80')+';">'+head+'</b><button onclick="dlPanel()" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>'
     +body+(total>1&&!fails.length&&!cancelled?'<div style="font-size:11.5px;color:var(--text2,#9aa0bd);margin-top:4px;">Missing some in your Downloads? Chrome may have blocked them — click Allow on its "multiple downloads" prompt, then use <b>⬇ Not downloaded yet</b>.</div>':''),'done');
   DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.urls={};
-  if(!fails.length&&!cancelled&&total===1) setTimeout(function(){ var p=document.getElementById('dl-panel'); if(p&&p.dataset.state==='done') dlPanel(); },5000);
+  if(!fails.length&&!cancelled&&total===1&&!hadDupes) setTimeout(function(){ var p=document.getElementById('dl-panel'); if(p&&p.dataset.state==='done') dlPanel(); },5000);
   if(typeof renderLibraryList==='function'&&document.getElementById('cl-list')&&!LF) renderLibraryList();
 }
 function dlRetryFailed(){ var L=(DL.lastFail||[]).slice(); DL.lastFail=[]; if(L.length) dlEnqueue(L); }
@@ -5318,8 +5329,29 @@ function dlSelectFailed(){ LIB_SEL={}; (DL.lastFail||[]).forEach(function(i){ LI
 function dlCopyFailed(){ var t=(DL.lastFail||[]).map(libDownloadName).join('\n'); try{ navigator.clipboard.writeText(t); }catch(e){} alert('Copied '+(DL.lastFail||[]).length+' file names.'); }
 // Select every file in the current view that hasn't been downloaded on this computer yet.
 function dlSelectNotDownloaded(){ LIB_SEL={}; var n=0; libFiltered().forEach(function(i){ if(!DL_DONE[i.id]){ LIB_SEL[i.id]=true; n++; } }); renderLibraryList(); if(!n) alert('Everything shown here has been downloaded on this computer.'); }
+// Same clip sitting in both 🎞️ Raw reels and ✅ Ready to post (same model + same file size, or same
+// title and length). Shown in the download panel — never blocks the download.
+function dlCrossDupes(list){
+  var other={raw:'social',social:'raw'}, out=[];
+  list.forEach(function(it){
+    var o=other[it.category]; if(!o) return;
+    var hit=(STATE.library||[]).find(function(x){ return x.id!==it.id&&x.model_id===it.model_id&&libInCat(x,o)&&
+      ((x.size_bytes&&x.size_bytes===it.size_bytes)||(x.title&&x.title===it.title&&Math.abs((x.duration_sec||0)-(it.duration_sec||0))<0.3)); });
+    if(hit) out.push({it:it,other:hit,where:LIB_CATEGORIES[o].label});
+  });
+  return out;
+}
+function dlDupesHtml(){
+  var d=DL.dupes||[]; if(!d.length) return '';
+  return '<div style="margin-bottom:8px;padding:7px 9px;border-radius:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);font-size:12px;">'
+    +'⚠ <b>'+d.length+' duplicate'+(d.length===1?'':'s')+'</b> — also in '+escapeHtml(d[0].where)+(d.length>1&&d.some(function(x){return x.where!==d[0].where;})?' / '+escapeHtml(d.find(function(x){return x.where!==d[0].where;}).where):'')+':'
+    +'<div style="max-height:70px;overflow-y:auto;margin-top:3px;color:var(--text2,#9aa0bd);">'+d.map(function(x){ return escapeHtml(x.it.title||''); }).join('<br>')+'</div>'
+    +'<button class="btn btn-sm btn-ghost" style="margin-top:5px;" onclick="dlSelectDupes()">☑ Select them</button></div>';
+}
+function dlSelectDupes(){ LIB_SEL={}; (DL.dupes||[]).forEach(function(x){ LIB_SEL[x.it.id]=true; }); renderLibraryList(); }
 function dlEnqueue(list){
-  if(!DL.running){ DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.cancelled=false; }
+  if(!DL.running){ DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.cancelled=false; DL.dupes=[]; }
+  DL.dupes=(DL.dupes||[]).concat(dlCrossDupes(list));
   list.forEach(function(it){ DL.q.push(it); DL.total++; });
   dlSignAhead(DL.q[0]);
   if(!DL.running) dlRender(libDownloadName(DL.q[0]||list[0]),0,0,0);
@@ -5328,25 +5360,11 @@ function dlEnqueue(list){
 async function libSaveFile(it){ dlEnqueue([it]); return 'queued'; }
 async function downloadLibraryItem(id){
   const it=(STATE.library||[]).find(function(x){return x.id===id;}); if(!it) return;
-  if(DL_DONE[it.id]&&!confirm('You already downloaded this file on this computer ('+new Date(DL_DONE[it.id]).toLocaleDateString()+').\n\nDownload it again?')) return;
   dlEnqueue([it]);
 }
 // Download the selected files (or everything shown) one after another through the same panel.
 async function libDownloadMany(list){
   if(!list.length){ alert('Nothing to download here.'); return; }
-  // Duplicates: skip files this computer has already downloaded (unless you choose to get them again).
-  var already=list.filter(function(i){ return DL_DONE[i.id]; });
-  if(already.length){
-    if(already.length===list.length&&list.length===1){
-      if(!confirm('You already downloaded this file on this computer ('+new Date(DL_DONE[list[0].id]).toLocaleDateString()+').\n\nDownload it again?')) return;
-    } else if(confirm(already.length+' of these '+list.length+' files were already downloaded on this computer.\n\nOK = skip them (download only the '+(list.length-already.length)+' new ones)\nCancel = download all '+list.length+' again')){
-      list=list.filter(function(i){ return !DL_DONE[i.id]; });
-      if(!list.length){ alert('Nothing new to download — you already have all of these.'); return; }
-    }
-  }
-  var bytes=list.reduce(function(t,i){ return t+(i.size_bytes||0); },0);
-  if(list.length>1 && !confirm('Download '+list.length+' files'+(bytes?' ('+libFmtSize(bytes)+')':'')+'?'
-    +(list.length>10?'\n\n⚠ IMPORTANT: Chrome will show "This site is trying to download multiple files" (top of the window). Click ALLOW — otherwise Chrome silently drops the rest.':'\n\nIf Chrome asks to allow multiple downloads, click Allow.'))) return;
   dlEnqueue(list);
 }
 function libBulkDownload(){
