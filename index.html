@@ -5229,29 +5229,61 @@ function dlRender(cur,got,total,speed){
 }
 function dlCancel(){ DL.q=[]; DL.cancelled=true; if(DL.ctl) DL.ctl.abort(); }
 function dlSignAhead(it){ if(!it) return null; if(!DL.urls[it.id]){ DL.urls[it.id]=libItemUrl(it); DL.urls[it.id].catch(function(){}); } return DL.urls[it.id]; }
-async function dlOne(it){
-  var name=libDownloadName(it), url=await dlSignAhead(it); delete DL.urls[it.id];
-  dlSignAhead(DL.q[0]);                                   // sign the next one while this downloads
-  var ctl=new AbortController(); DL.ctl=ctl;
-  var res;
-  try{ res=await fetch(url,{signal:ctl.signal}); }
-  catch(e){ if(ctl.signal.aborted) throw e; window.open(url,'_blank'); return 'opened'; }   // CORS refused: open the link instead
-  if(!res.ok) throw new Error('download failed ('+res.status+')');
-  var total=parseInt(res.headers.get('content-length')||'0',10)||it.size_bytes||0;
-  var chunks=[], got=0, t0=performance.now(), last=0;
-  dlRender(name,0,total,0);
-  if(res.body&&res.body.getReader){
-    var rd=res.body.getReader();
-    for(;;){
-      var r=await rd.read(); if(r.done) break;
-      chunks.push(r.value); got+=r.value.length;
-      var now=performance.now(); if(now-last>150){ last=now; dlRender(name,got,total,got/1048576/Math.max(0.2,(now-t0)/1000)); }
+// 13 Nov: reliability. Each file gets up to 4 tries; a dropped connection resumes from where it
+// stopped (Range request) with a freshly signed link. Nothing is silently skipped: files that
+// still fail are listed by name with Retry / Select-them buttons, and every file that saved is
+// remembered on this computer (⬇ Saved chip on its card) so leftovers are easy to spot.
+var DL_TRIES=4;
+var DL_DONE=(function(){ try{ return JSON.parse(localStorage.getItem('dl_done')||'{}')||{}; }catch(e){ return {}; } })();
+var DL_FAILED=(function(){ try{ return JSON.parse(localStorage.getItem('dl_failed')||'{}')||{}; }catch(e){ return {}; } })();
+function dlSaveMarks(){ try{ localStorage.setItem('dl_done',JSON.stringify(DL_DONE)); localStorage.setItem('dl_failed',JSON.stringify(DL_FAILED)); }catch(e){} }
+function dlMarkDone(id){ DL_DONE[id]=Date.now(); delete DL_FAILED[id]; dlSaveMarks(); dlChipPaint(id); }
+function dlMarkFailed(id,err){ DL_FAILED[id]=String(err||'').slice(0,80)||'failed'; dlSaveMarks(); dlChipPaint(id); }
+function dlChipPaint(id){ document.querySelectorAll('[data-dlchip="'+id+'"]').forEach(function(el){ var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) el.outerHTML=libDlChip(it); }); }
+function libDlChip(i){
+  if(DL_FAILED[i.id]) return '<span class="cscan cscan-red" data-dlchip="'+i.id+'" title="Last download failed: '+escapeHtml(DL_FAILED[i.id])+'">⚠ Download failed</span>';
+  return '<span class="cscan cscan-green" data-dlchip="'+i.id+'" title="Downloaded on this computer" style="'+(DL_DONE[i.id]?'':'display:none;')+'">⬇ Saved</span>';
+}
+async function dlFetchAll(it,name,url){
+  var chunks=[], got=0, total=0, t0=performance.now(), last=0, type=null, tries=0, lastErr=null;
+  while(tries<DL_TRIES){
+    tries++;
+    if(DL.cancelled) throw new Error('cancelled');
+    var ctl=new AbortController(); DL.ctl=ctl;
+    try{
+      if(tries>1){ url=await libItemUrl(it); }                       // fresh link on every retry
+      var res=await fetch(url,{signal:ctl.signal,headers:got?{Range:'bytes='+got+'-'}:{}});
+      if(got&&res.status===200){ chunks=[]; got=0; }                 // server ignored the Range: start over
+      else if(!res.ok&&res.status!==206) throw new Error('HTTP '+res.status);
+      type=type||res.headers.get('content-type');
+      if(!total){ total=parseInt(res.headers.get('content-length')||'0',10)||it.size_bytes||0; }
+      dlRender(name+(tries>1?' (try '+tries+')':''),got,total,0);
+      var rd=res.body.getReader();
+      for(;;){
+        var r=await rd.read(); if(r.done) break;
+        chunks.push(r.value); got+=r.value.length;
+        var now=performance.now(); if(now-last>150){ last=now; dlRender(name+(tries>1?' (try '+tries+')':''),got,total,got/1048576/Math.max(0.2,(now-t0)/1000)); }
+      }
+      if(total&&got<total) throw new Error('connection dropped at '+dlMB(got)+' / '+dlMB(total)+' MB');
+      return new Blob(chunks,{type:type||it.content_type||'application/octet-stream'});
+    }catch(e){
+      if(DL.cancelled||ctl.signal.aborted&&DL.cancelled) throw new Error('cancelled');
+      lastErr=e; console.warn('download try',tries,'failed for',name,e);
+      if(tries<DL_TRIES) await new Promise(function(r){ setTimeout(r,800*tries*tries); });
     }
-  } else { var bb=await res.blob(); chunks.push(bb); got=bb.size; }
-  var blob=new Blob(chunks,{type:res.headers.get('content-type')||it.content_type||'application/octet-stream'}); chunks=null;
+  }
+  throw lastErr||new Error('download failed');
+}
+async function dlOne(it){
+  var name=libDownloadName(it), url;
+  try{ url=await dlSignAhead(it); }catch(e){ url=await libItemUrl(it); }
+  delete DL.urls[it.id];
+  dlSignAhead(DL.q[0]);                                   // sign the next one while this downloads
+  var blob=await dlFetchAll(it,name,url);
   var href=URL.createObjectURL(blob), a=document.createElement('a'); a.href=href; a.download=name;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(function(){ URL.revokeObjectURL(href); },60000);
+  setTimeout(function(){ URL.revokeObjectURL(href); },120000);
+  dlMarkDone(it.id);
   return 'saved';
 }
 async function dlRun(){
@@ -5259,17 +5291,35 @@ async function dlRun(){
   while(DL.q.length){
     var it=DL.q.shift(); DL.n++;
     try{ await dlOne(it); DL.ok++; }
-    catch(e){ if(DL.cancelled) break; console.warn('download failed',it.title,e); DL.fail.push(it.title||it.id); }
+    catch(e){ if(DL.cancelled) break; console.warn('download failed',it.title,e); DL.fail.push({it:it,err:String(e&&e.message||e)}); dlMarkFailed(it.id,e&&e.message||e); }
+    await new Promise(function(r){ setTimeout(r,120); });   // let Chrome register each saved file
   }
   DL.running=false; DL.ctl=null;
-  var msg=DL.cancelled?'✕ Cancelled — '+DL.ok+' saved':(DL.fail.length?'⚠ Saved '+DL.ok+' of '+DL.total+' — failed: '+escapeHtml(DL.fail.slice(0,3).join(', '))+(DL.fail.length>3?'…':''):'✓ Saved '+(DL.total>1?DL.ok+' files':'')+' to Downloads');
-  dlPanel('<div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;color:'+(DL.fail.length||DL.cancelled?'#fbbf24':'#4ade80')+';">'+msg+'</b><button onclick="dlPanel()" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>','done');
-  var keep=DL.fail.length||DL.cancelled;
+  var fails=DL.fail.slice(), ok=DL.ok, total=DL.total, cancelled=DL.cancelled, left=DL.q.slice();
+  DL.lastFail=fails.map(function(f){ return f.it; });
+  var head=cancelled?'✕ Cancelled — '+ok+' of '+total+' saved':(fails.length?'⚠ Saved '+ok+' of '+total+' — '+fails.length+' failed':'✓ Saved '+(total>1?'all '+total+' files':'')+' to Downloads');
+  var body='';
+  if(fails.length){
+    body='<div style="max-height:150px;overflow-y:auto;margin:8px 0;font-size:12px;border:1px solid var(--border,#2a2f45);border-radius:8px;padding:6px 8px;">'
+      +fails.map(function(f){ return '<div style="padding:2px 0;"><b>'+escapeHtml(libDownloadName(f.it))+'</b><br><span style="color:var(--text2,#9aa0bd);">'+escapeHtml(f.err.slice(0,80))+'</span></div>'; }).join('')+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      +'<button class="btn btn-sm btn-primary" onclick="dlRetryFailed()">↻ Retry '+fails.length+' failed</button>'
+      +'<button class="btn btn-sm btn-ghost" onclick="dlSelectFailed()">☑ Select them</button>'
+      +'<button class="btn btn-sm btn-ghost" onclick="dlCopyFailed()">📋 Copy names</button></div>';
+  }
+  dlPanel('<div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;color:'+(fails.length||cancelled?'#fbbf24':'#4ade80')+';">'+head+'</b><button onclick="dlPanel()" style="border:1px solid var(--border,#2a2f45);background:transparent;color:inherit;border-radius:8px;padding:2px 9px;cursor:pointer;">✕</button></div>'
+    +body+(total>1&&!fails.length&&!cancelled?'<div style="font-size:11.5px;color:var(--text2,#9aa0bd);margin-top:4px;">Missing some in your Downloads? Chrome may have blocked them — click Allow on its "multiple downloads" prompt, then use <b>⬇ Not downloaded yet</b>.</div>':''),'done');
   DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.urls={};
-  if(!keep) setTimeout(function(){ var p=document.getElementById('dl-panel'); if(p&&p.dataset.state==='done') dlPanel(); },5000);
+  if(!fails.length&&!cancelled&&total===1) setTimeout(function(){ var p=document.getElementById('dl-panel'); if(p&&p.dataset.state==='done') dlPanel(); },5000);
+  if(typeof renderLibraryList==='function'&&document.getElementById('cl-list')&&!LF) renderLibraryList();
 }
+function dlRetryFailed(){ var L=(DL.lastFail||[]).slice(); DL.lastFail=[]; if(L.length) dlEnqueue(L); }
+function dlSelectFailed(){ LIB_SEL={}; (DL.lastFail||[]).forEach(function(i){ LIB_SEL[i.id]=true; }); renderLibraryList(); }
+function dlCopyFailed(){ var t=(DL.lastFail||[]).map(libDownloadName).join('\n'); try{ navigator.clipboard.writeText(t); }catch(e){} alert('Copied '+(DL.lastFail||[]).length+' file names.'); }
+// Select every file in the current view that hasn't been downloaded on this computer yet.
+function dlSelectNotDownloaded(){ LIB_SEL={}; var n=0; libFiltered().forEach(function(i){ if(!DL_DONE[i.id]){ LIB_SEL[i.id]=true; n++; } }); renderLibraryList(); if(!n) alert('Everything shown here has been downloaded on this computer.'); }
 function dlEnqueue(list){
-  if(!DL.running){ DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; }
+  if(!DL.running){ DL.total=0; DL.n=0; DL.ok=0; DL.fail=[]; DL.cancelled=false; }
   list.forEach(function(it){ DL.q.push(it); DL.total++; });
   dlSignAhead(DL.q[0]);
   if(!DL.running) dlRender(libDownloadName(DL.q[0]||list[0]),0,0,0);
@@ -5284,7 +5334,8 @@ async function downloadLibraryItem(id){
 async function libDownloadMany(list){
   if(!list.length){ alert('Nothing to download here.'); return; }
   var bytes=list.reduce(function(t,i){ return t+(i.size_bytes||0); },0);
-  if(list.length>1 && !confirm('Download '+list.length+' files'+(bytes?' ('+libFmtSize(bytes)+')':'')+'?\n\nIf Chrome asks to allow multiple downloads, click Allow.')) return;
+  if(list.length>1 && !confirm('Download '+list.length+' files'+(bytes?' ('+libFmtSize(bytes)+')':'')+'?'
+    +(list.length>10?'\n\n⚠ IMPORTANT: Chrome will show "This site is trying to download multiple files" (top of the window). Click ALLOW — otherwise Chrome silently drops the rest.':'\n\nIf Chrome asks to allow multiple downloads, click Allow.'))) return;
   dlEnqueue(list);
 }
 function libBulkDownload(){
@@ -5916,6 +5967,7 @@ function renderLibraryList(){
     +'<input id="cl-search" type="search" autocomplete="off" placeholder="🔎 title / tags / order #" oninput="libSearch(this)" value="'+escapeHtml(LIB_F.q||'')+'" style="flex:1;min-width:150px;">'
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
     +(libIsPhone()?'<button class="btn btn-ghost btn-sm" onclick="libSaveShownToPhotos()" title="Save every photo/video in the current view to this phone\'s photo album">📲 Save all shown to Photos</button>':'')
+    +'<button class="btn btn-ghost btn-sm" onclick="dlSelectNotDownloaded()" title="Tick every file shown here that hasn\'t been downloaded on this computer yet">⬇ Not downloaded yet</button>'
     +'<button class="btn btn-ghost btn-sm" onclick="libDownloadShown()" title="Download every file in the current view (model + category + filters)">⬇ Download all shown</button>'
     +'</div><div id="cl-upload-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none;"></div></div>';
 
@@ -7015,7 +7067,7 @@ function libCardHtml(i){
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(i.title||'')+'">'+escapeHtml(i.title||'—')+'</div>'
     +'<div style="font-size:10.5px;color:var(--text2);margin:2px 0 6px;">'+escapeHtml(mdl?mdl.name:(i.model_id?'—':'Agency'))+(meta?' · '+meta:'')+'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+libCaptionChip(i)+(i.edit_spec&&i.edit_spec.edit?'<span class="cscan cscan-grey" title="Edited '+fmtDate(i.edit_spec.edit.at)+'">🎬 Edited</span>':'')+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">'+libStateChip(i)+libCatChip(i)+vertChip(i)+libCaptionChip(i)+libDlChip(i)+(i.edit_spec&&i.edit_spec.edit?'<span class="cscan cscan-grey" title="Edited '+fmtDate(i.edit_spec.edit.at)+'">🎬 Edited</span>':'')+orderChip+postedChip+phoneChip+hdWarn+(LIB_SHOW_SCANNER&&libIsVideo(i)?libCompliancePill(i):'')+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +'<select class="lib-act" onchange="libCardAction(\''+i.id+'\',this)" style="font-size:11.5px;padding:4px 6px;border-radius:7px;background:var(--bg2,#151826);color:var(--text);border:1px solid var(--border,#2a2f45);max-width:100%;">'
     +libCardActionOptions(i)
