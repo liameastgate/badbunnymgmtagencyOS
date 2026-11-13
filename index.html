@@ -5381,9 +5381,12 @@ function libDownloadShown(){ libDownloadMany(libFiltered()); }
 // that, so it's two taps: Prepare (download into memory, with progress) -> Save N to Photos.
 // Batches are capped so a pile of big videos can't run Safari out of memory and kill the tab.
 // Android: normal downloads already appear in the Gallery, so it just downloads them.
-// Two batches can be in memory at once (one on the share sheet, the next prefetching), so
-// each is capped at 250 MB to keep Safari's peak around 500 MB.
-var LIB_PHOTOS_BATCH_BYTES=250*1048576, LIB_PHOTOS_BATCH_MAX=20, LIB_PHOTOS_PARALLEL=4;
+// 14 Nov: Safari was being killed after a batch (out of memory). Now only ONE batch is ever in
+// memory: the next batch starts downloading after the share sheet closes, not while it's open
+// (iOS copies every shared file again, and the tab is at its most fragile then). Each file is
+// also built straight from the downloaded pieces (one copy instead of two), and batches are
+// capped at 150 MB.
+var LIB_PHOTOS_BATCH_BYTES=150*1048576, LIB_PHOTOS_BATCH_MAX=20, LIB_PHOTOS_PARALLEL=4;
 function libIsIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1); }
 function libIsPhone(){ return libIsIOS()||/Android/i.test(navigator.userAgent); }
 function libMimeOf(it){
@@ -5409,7 +5412,7 @@ function libSaveShownToPhotos(){ libSaveToPhotos(libFiltered()); }
 // patchy wifi, so parallel is much faster than one-by-one). onProgress(bytesDone, filesDone).
 // Keep trying one file until it arrives: fresh signed link each try, resumes where it stopped.
 // Gives up only if storage says it doesn't exist (404) 5 times, or the sheet is closed.
-async function libFetchRetry(it,state,onBytes,onRetry){
+async function libFetchRetry(it,state,onBytes,onRetry,fileName){
   var chunks=[], got=0, total=0, tries=0, n404=0, type=null;
   for(;;){
     if(state.cancelled) return null;
@@ -5420,7 +5423,7 @@ async function libFetchRetry(it,state,onBytes,onRetry){
       else if(!res.ok&&res.status!==206){ if(res.status===404) n404++; else n404=0; throw new Error('HTTP '+res.status); }
       type=type||res.headers.get('content-type');
       if(!total){ var cl=parseInt(res.headers.get('content-length')||'0',10); total=cl?got+cl:(it.size_bytes||0); }
-      if(!res.body||!res.body.getReader){ var b=await res.blob(); onBytes(b.size); return b; }
+      if(!res.body||!res.body.getReader){ var b=await res.blob(); onBytes(b.size); return fileName?new File([b],fileName,{type:libMimeOf(it)}):b; }
       var rd=res.body.getReader();
       for(;;){
         var r=await rd.read(); if(r.done) break;
@@ -5428,7 +5431,8 @@ async function libFetchRetry(it,state,onBytes,onRetry){
         if(state.cancelled){ try{ rd.cancel(); }catch(x){} return null; }
       }
       if(total&&got<total) throw new Error('connection dropped');
-      return new Blob(chunks,{type:type||libMimeOf(it)});
+      var out=fileName?new File(chunks,fileName,{type:libMimeOf(it)}):new Blob(chunks,{type:type||libMimeOf(it)});
+      chunks.length=0; return out;
     }catch(e){
       if(state.cancelled) return null;
       console.warn('photo fetch try',tries,'failed for',it.title,e);
@@ -5445,10 +5449,10 @@ function libFetchBatch(batch,state,onProgress){
       var k=next++, it=batch[k];
       try{
         var blob=await libFetchRetry(it,state,function(d){ bytes+=d; onProgress&&onProgress(bytes,doneN); },
-          function(n){ state.retrying[it.id]=n; onProgress&&onProgress(bytes,doneN); });
+          function(n){ state.retrying[it.id]=n; onProgress&&onProgress(bytes,doneN); }, libDownloadName(it));
         delete state.retrying[it.id];
         if(!blob) return;
-        files[k]=new File([blob],libDownloadName(it),{type:libMimeOf(it)});
+        files[k]=blob;
       }catch(e){ delete state.retrying[it.id]; state.failed.push((it.title||it.id)+' (missing from storage)'); }
       doneN++; onProgress&&onProgress(bytes,doneN);
     }
@@ -5501,18 +5505,17 @@ async function libSaveToPhotos(list){
     files=got;
     var nv=got.filter(function(f){return /^video\//.test(f.type);}).length, kind=nv===got.length?'Video':(nv===0?'Image':'Item');
     msg.textContent='Ready. Tap the button, then choose "Save '+(got.length===1?kind:got.length+' '+kind+'s')+'".'+(state.failed.length?' ('+state.failed.length+' couldn\'t be fetched)':'');
-    sub.textContent=i+1<batches.length?'Next batch is loading in the background…':'';
+    sub.textContent=i+1<batches.length?(batches.length-i-1)+' more batch'+(batches.length-i-1===1?'':'es')+' after this one.':'';
     bar.style.width='100%';
     go.textContent='Save '+got.length+' to Photos'+lbl(i); go.disabled=false;
-    start(i+1);   // prefetch while the share sheet is up
   }
   go.onclick=async function(){
     if(!files||!files.length) return;
     var f=files; go.disabled=true;
     try{ await navigator.share({files:f}); done+=f.length; }
     catch(e){ go.disabled=false; msg.textContent=(e&&e.name==='AbortError')?'Cancelled — tap again to save these.':'Could not open the share sheet: '+(e&&e.message||e); return; }
-    delete pending[bi]; files=null; bi++;
-    if(bi<batches.length) ready(bi);
+    delete pending[bi]; files=null; f=null; bi++;
+    if(bi<batches.length) setTimeout(function(){ ready(bi); },600);   // give iOS a moment to free the shared copies
     else finish('Done — '+done+' saved to Photos'+(state.failed.length?', '+state.failed.length+' failed: '+state.failed.slice(0,3).join(', '):'')+'.');
   };
   ready(0);
