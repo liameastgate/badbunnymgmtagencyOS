@@ -5239,11 +5239,14 @@ function dlRender(cur,got,total,speed){
 }
 function dlCancel(){ DL.q=[]; DL.cancelled=true; if(DL.ctl) DL.ctl.abort(); }
 function dlSignAhead(it){ if(!it) return null; if(!DL.urls[it.id]){ DL.urls[it.id]=libItemUrl(it); DL.urls[it.id].catch(function(){}); } return DL.urls[it.id]; }
-// 13 Nov: reliability. Each file gets up to 4 tries; a dropped connection resumes from where it
+// 14 Nov: a file is retried until it arrives (wait grows to 15 s between tries) — it only gives
+// up if storage says the file doesn't exist 5 times in a row, or you press Cancel.
+// 13 Nov: reliability. Each file gets several tries; a dropped connection resumes from where it
 // stopped (Range request) with a freshly signed link. Nothing is silently skipped: files that
 // still fail are listed by name with Retry / Select-them buttons, and every file that saved is
 // remembered on this computer (⬇ Saved chip on its card) so leftovers are easy to spot.
-var DL_TRIES=4;
+var DL_GIVEUP_404=5;
+function dlBackoff(n){ return Math.min(15000,800*n*n); }
 var DL_DONE=(function(){ try{ return JSON.parse(localStorage.getItem('dl_done')||'{}')||{}; }catch(e){ return {}; } })();
 var DL_FAILED=(function(){ try{ return JSON.parse(localStorage.getItem('dl_failed')||'{}')||{}; }catch(e){ return {}; } })();
 function dlSaveMarks(){ try{ localStorage.setItem('dl_done',JSON.stringify(DL_DONE)); localStorage.setItem('dl_failed',JSON.stringify(DL_FAILED)); }catch(e){} }
@@ -5255,8 +5258,8 @@ function libDlChip(i){
   return '<span class="cscan cscan-green" data-dlchip="'+i.id+'" title="Downloaded on this computer" style="'+(DL_DONE[i.id]?'':'display:none;')+'">⬇ Saved</span>';
 }
 async function dlFetchAll(it,name,url){
-  var chunks=[], got=0, total=0, t0=performance.now(), last=0, type=null, tries=0, lastErr=null;
-  while(tries<DL_TRIES){
+  var chunks=[], got=0, total=0, t0=performance.now(), last=0, type=null, tries=0, n404=0;
+  for(;;){
     tries++;
     if(DL.cancelled) throw new Error('cancelled');
     var ctl=new AbortController(); DL.ctl=ctl;
@@ -5264,9 +5267,9 @@ async function dlFetchAll(it,name,url){
       if(tries>1||!url){ url=await libItemUrl(it); }                 // fresh link on every retry
       var res=await fetch(url,{signal:ctl.signal,headers:got?{Range:'bytes='+got+'-'}:{}});
       if(got&&res.status===200){ chunks=[]; got=0; }                 // server ignored the Range: start over
-      else if(!res.ok&&res.status!==206) throw new Error('HTTP '+res.status);
+      else if(!res.ok&&res.status!==206){ if(res.status===404) n404++; else n404=0; throw new Error('HTTP '+res.status); }
       type=type||res.headers.get('content-type');
-      if(!total){ total=parseInt(res.headers.get('content-length')||'0',10)||it.size_bytes||0; }
+      if(!total){ var cl=parseInt(res.headers.get('content-length')||'0',10); total=cl?got+cl:(it.size_bytes||0); }
       dlRender(name+(tries>1?' (try '+tries+')':''),got,total,0);
       var rd=res.body.getReader();
       for(;;){
@@ -5278,11 +5281,12 @@ async function dlFetchAll(it,name,url){
       return new Blob(chunks,{type:type||it.content_type||'application/octet-stream'});
     }catch(e){
       if(DL.cancelled||ctl.signal.aborted&&DL.cancelled) throw new Error('cancelled');
-      lastErr=e; console.warn('download try',tries,'failed for',name,e);
-      if(tries<DL_TRIES) await new Promise(function(r){ setTimeout(r,800*tries*tries); });
+      console.warn('download try',tries,'failed for',name,e);
+      if(n404>=DL_GIVEUP_404) throw new Error('missing from storage (404)');
+      dlRender(name+' — retrying (try '+(tries+1)+')',got,total,0);
+      await new Promise(function(r){ setTimeout(r,dlBackoff(tries)); });
     }
   }
-  throw lastErr||new Error('download failed');
 }
 async function dlOne(it){
   var name=libDownloadName(it), url=null;
@@ -5403,20 +5407,49 @@ function libBulkSaveToPhotos(){ var L=STATE.library||[]; libSaveToPhotos(L.filte
 function libSaveShownToPhotos(){ libSaveToPhotos(libFiltered()); }
 // Fetch one batch, LIB_PHOTOS_PARALLEL at a time (per-file connection setup dominates on
 // patchy wifi, so parallel is much faster than one-by-one). onProgress(bytesDone, filesDone).
+// Keep trying one file until it arrives: fresh signed link each try, resumes where it stopped.
+// Gives up only if storage says it doesn't exist (404) 5 times, or the sheet is closed.
+async function libFetchRetry(it,state,onBytes,onRetry){
+  var chunks=[], got=0, total=0, tries=0, n404=0, type=null;
+  for(;;){
+    if(state.cancelled) return null;
+    tries++;
+    try{
+      var res=await fetch(await libItemUrl(it),{headers:got?{Range:'bytes='+got+'-'}:{}});
+      if(got&&res.status===200){ onBytes(-got); chunks=[]; got=0; }      // server ignored the Range: start over
+      else if(!res.ok&&res.status!==206){ if(res.status===404) n404++; else n404=0; throw new Error('HTTP '+res.status); }
+      type=type||res.headers.get('content-type');
+      if(!total){ var cl=parseInt(res.headers.get('content-length')||'0',10); total=cl?got+cl:(it.size_bytes||0); }
+      if(!res.body||!res.body.getReader){ var b=await res.blob(); onBytes(b.size); return b; }
+      var rd=res.body.getReader();
+      for(;;){
+        var r=await rd.read(); if(r.done) break;
+        chunks.push(r.value); got+=r.value.length; onBytes(r.value.length);
+        if(state.cancelled){ try{ rd.cancel(); }catch(x){} return null; }
+      }
+      if(total&&got<total) throw new Error('connection dropped');
+      return new Blob(chunks,{type:type||libMimeOf(it)});
+    }catch(e){
+      if(state.cancelled) return null;
+      console.warn('photo fetch try',tries,'failed for',it.title,e);
+      if(n404>=DL_GIVEUP_404) throw new Error('missing from storage');
+      onRetry&&onRetry(tries+1);
+      await new Promise(function(r){ setTimeout(r,dlBackoff(tries)); });
+    }
+  }
+}
 function libFetchBatch(batch,state,onProgress){
   var files=new Array(batch.length), next=0, bytes=0, doneN=0;
   async function worker(){
     while(next<batch.length && !state.cancelled){
       var k=next++, it=batch[k];
       try{
-        var res=await fetch(await libItemUrl(it)); if(!res.ok) throw new Error('HTTP '+res.status);
-        var chunks=[], reader=res.body&&res.body.getReader?res.body.getReader():null, blob;
-        if(reader){
-          for(;;){ var r=await reader.read(); if(r.done) break; chunks.push(r.value); bytes+=r.value.length; onProgress&&onProgress(bytes,doneN); if(state.cancelled){ try{reader.cancel();}catch(e){} return; } }
-          blob=new Blob(chunks);
-        } else { blob=await res.blob(); bytes+=blob.size; }
+        var blob=await libFetchRetry(it,state,function(d){ bytes+=d; onProgress&&onProgress(bytes,doneN); },
+          function(n){ state.retrying[it.id]=n; onProgress&&onProgress(bytes,doneN); });
+        delete state.retrying[it.id];
+        if(!blob) return;
         files[k]=new File([blob],libDownloadName(it),{type:libMimeOf(it)});
-      }catch(e){ state.failed.push(it.title||it.id); }
+      }catch(e){ delete state.retrying[it.id]; state.failed.push((it.title||it.id)+' (missing from storage)'); }
       doneN++; onProgress&&onProgress(bytes,doneN);
     }
   }
@@ -5428,7 +5461,7 @@ async function libSaveToPhotos(list){
   if(!list.length){ alert('Nothing to save — only photos and videos can go in the photo album.'); return; }
   if(!libIsIOS()){ return libDownloadMany(list); }          // Android/desktop: downloads land in Gallery / Downloads
   if(!(navigator.canShare&&navigator.share)){ alert('This browser can\'t save to Photos. Open AgencyOS in Safari and try again.'); return; }
-  var batches=libPhotoBatches(list), bi=0, files=null, state={cancelled:false,failed:[]}, pending={}, done=0;
+  var batches=libPhotoBatches(list), bi=0, files=null, state={cancelled:false,failed:[],retrying:{}}, pending={}, done=0;
   var ov=document.getElementById('lib-photos-sheet'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='lib-photos-sheet';
   ov.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:10000;background:var(--surface,#11131c);border-top:1px solid var(--border,#2a2f45);padding:16px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.5);';
@@ -5454,7 +5487,8 @@ async function libSaveToPhotos(list){
     var secs=Math.max(.5,(Date.now()-p.t0)/1000), mbps=p.bytes/1048576/secs;
     msg.textContent='Getting '+Math.min(p.n+1,b.length)+' of '+b.length+lbl(i)+'…';
     sub.textContent=(p.bytes/1048576).toFixed(0)+(p.total?' / '+(p.total/1048576).toFixed(0):'')+' MB · '+mbps.toFixed(1)+' MB/s'
-      +(mbps<1&&secs>4?' — your connection is the bottleneck':'');
+      +(mbps<1&&secs>4?' — your connection is the bottleneck':'')
+      +(function(){ var r=Object.keys(state.retrying).length; return r?' · retrying '+r+' file'+(r===1?'':'s')+' until they come through':''; })();
     bar.style.width=Math.round((p.total?p.bytes/p.total:p.n/b.length)*100)+'%';
   }
   function finish(text){ msg.textContent=text; sub.textContent=''; bar.style.width='100%'; go.textContent='Close'; go.disabled=false; go.onclick=function(){ ov.remove(); }; }
