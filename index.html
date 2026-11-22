@@ -1091,6 +1091,10 @@
     <!-- Model Upload (model role only). Deliberately dumb: three big buttons + their open
          orders. No naming, no folders, no picking a destination. HD is enforced on the device
          before anything is sent. -->
+    <div class="page" id="page-model-library">
+      <div class="page-title" id="ml-title">My content</div>
+      <div id="ml-body"></div>
+    </div>
     <div class="page" id="page-model-upload">
       <div class="page-title">Upload</div>
       <div id="mu-body"></div>
@@ -3411,6 +3415,7 @@ var NAV = [
   { id: 'model-guides', icon: '📕', label: 'Guides',            roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'content',    icon: '📹', label: 'Content Orders',      roles: ['admin','va','model'],                     section: 'Models' },
   { id: 'model-upload', icon: '📤', label: 'Upload',             roles: ['model'],                                  section: 'Models' },
+  { id: 'model-library', icon: '🗂️', label: 'My content',        roles: ['model'],                                  section: 'Models' },
   { id: 'content-upload', icon: '📁', label: 'Content Library',  roles: ['admin','va'],                             section: 'Models' },
   { id: 'onboarding', icon: '🤝', label: 'Onboarding',         roles: ['admin','va'],                             section: 'Models' },
   { id: 'contentperf',icon: '📈', label: 'Content Performance', roles: ['admin','va','model'],                     section: 'Models' },
@@ -4014,6 +4019,7 @@ function navigate(page) {
   if (page === 'ideas') loadContentIdeas();
   if (page === 'content-upload') renderContentUpload();
   if (page === 'model-upload') renderModelUpload();
+  if (page === 'model-library') renderModelLibrary();
   if (page === 'contentperf') loadContentPerformance();
   if (page === 'content-schedule') loadContentSchedule();
   if (page === 'content-factory') renderContentFactory();
@@ -4594,7 +4600,7 @@ function libMovePatch(it,cat,from){
   return {category:cat, categories:ex};
 }
 function libSoundOnly(i){ return i.category==='sounds'; }
-var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical,caption';
+var LIB_COLS='id,model_id,owner_type,folder,title,tags,r2_key,size_bytes,content_type,uploaded_by_email,created_at,review_status,reviewed_by,reviewed_at,category,state,storage_bucket,source_order_id,width,height,duration_sec,bitrate_kbps,state_changed_at,derived_from,edit_spec,render_job_id,categories,vertical,caption,downloaded_at,downloaded_by';
 // ── Thumbnails on demand ─────────────────────────────────────────────────────
 // id -> data URL (or null = this file has no thumbnail). Filled from this device's cache
 // (IndexedDB) first, then from the database 40 at a time, three requests in parallel.
@@ -4677,8 +4683,10 @@ var LIB_CATEGORIES={
   stories: {vault:'factory', label:'Story CTA bank',     short:'Stories', icon:'📖', accept:'image/*',         hint:'Curated photos the phones post as link-sticker stories — only what you put here is used'},
   // Hector (John) only: his Spanish-speaking clips, kept out of the US-targeted reels. Nothing posts from here.
   spanish: {vault:'factory', label:'Spanish reels',      short:'Spanish', icon:'🇪🇸', accept:'video/*',         onlyModel:'cf292803-dbd1-45ce-a975-2d5eb2457fdc', hint:'Hector\'s clips where he speaks Spanish — kept apart from the US-targeted reels. The phones never post from here.'},
-  // Hector (John) only: his Spanish-speaking clips, kept out of the US-targeted reels. Nothing posts from here.
-  spanish: {vault:'factory', label:'Spanish reels',      short:'Spanish', icon:'🇪🇸', accept:'video/*',         onlyModel:'cf292803-dbd1-45ce-a975-2d5eb2457fdc', hint:'Hector\'s clips where he speaks Spanish — kept apart from the US-targeted reels. The phones never post from here.'},
+  // Nov 2026: physical phones. Put reels in Phone download; a VA on the phone taps 📲 Download to this
+  // phone, the reels save to its camera roll, and each one moves itself to Archived once it's saved.
+  phone_dl:{vault:'factory', label:'Phone download',     short:'Phone DL',icon:'📲', accept:'video/*,image/*', hint:'Reels waiting for a physical phone to pick up — open this on the phone and tap 📲 Download to this phone. Each reel goes to Archived once it\'s saved.'},
+  archived:{vault:'factory', label:'Archived',           short:'Archived',icon:'🗄️', accept:'video/*,image/*', hint:'Reels a phone has already downloaded — kept here so nothing is picked up twice'},
   sounds:  {vault:'factory', label:'Sounds',             short:'Sounds',  icon:'🎵', accept:'audio/*',         hint:'The model\'s sound bank — the Content Factory lays these under captioned clips'}
 };
 var LIB_VAULTS={
@@ -5250,7 +5258,7 @@ function dlBackoff(n){ return Math.min(15000,800*n*n); }
 var DL_DONE=(function(){ try{ return JSON.parse(localStorage.getItem('dl_done')||'{}')||{}; }catch(e){ return {}; } })();
 var DL_FAILED=(function(){ try{ return JSON.parse(localStorage.getItem('dl_failed')||'{}')||{}; }catch(e){ return {}; } })();
 function dlSaveMarks(){ try{ localStorage.setItem('dl_done',JSON.stringify(DL_DONE)); localStorage.setItem('dl_failed',JSON.stringify(DL_FAILED)); }catch(e){} }
-function dlMarkDone(id){ DL_DONE[id]=Date.now(); delete DL_FAILED[id]; dlSaveMarks(); dlChipPaint(id); }
+function dlMarkDone(id){ DL_DONE[id]=Date.now(); delete DL_FAILED[id]; dlSaveMarks(); dlChipPaint(id); if(PHONE_DL_PENDING[id]) phoneDlArchive([id]); }
 function dlMarkFailed(id,err){ DL_FAILED[id]=String(err||'').slice(0,80)||'failed'; dlSaveMarks(); dlChipPaint(id); }
 function dlChipPaint(id){ document.querySelectorAll('[data-dlchip="'+id+'"]').forEach(function(el){ var it=(STATE.library||[]).find(function(x){return x.id===id;}); if(it) el.outerHTML=libDlChip(it); }); }
 function libDlChip(i){
@@ -5442,6 +5450,42 @@ async function libFetchRetry(it,state,onBytes,onRetry,fileName){
     }
   }
 }
+// ── 📲 Phone download (Nov 2026) ─────────────────────────────────────────────
+// On a physical phone, open the Library on Phone download and tap the button. The reels are
+// claimed for this phone first (phone_dl_claim: two phones tapping at once never get the same
+// reel; a claim lapses after 30 min if the save never finishes), then saved to the camera roll
+// (iPhone: share sheet "Save N Videos"; Android: normal downloads). Each reel that saved is moved
+// to 🗄️ Archived by phone_dl_done — anything cancelled or failed stays in Phone download.
+var PHONE_DL_PENDING={}, PHONE_DL_N=(function(){ try{ return localStorage.getItem('phone_dl_n')||'10'; }catch(e){ return '10'; } })();
+function phoneDlDevice(){ var ua=navigator.userAgent, d=/iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android':'Computer'; return (STATE.profile?.email||'?')+' · '+d; }
+function phoneDlWaiting(list){ var now=Date.now(); return list.filter(function(i){ return i.category==='phone_dl'; }).length; }
+function phoneDlBar(mine){
+  var n=phoneDlWaiting(mine);
+  return '<span style="display:inline-flex;gap:6px;align-items:center;background:rgba(30,79,255,.12);border:1px solid rgba(30,79,255,.4);border-radius:10px;padding:4px 6px 4px 10px;">'
+    +'<b style="font-size:12.5px;">'+n+' waiting</b>'
+    +'<select onchange="PHONE_DL_N=this.value;try{localStorage.setItem(\'phone_dl_n\',this.value);}catch(e){}" style="padding:4px 6px;">'+['5','10','20','50'].map(function(v){ return '<option value="'+v+'"'+(PHONE_DL_N===v?' selected':'')+'>'+v+'</option>'; }).join('')+'</select>'
+    +'<button class="btn btn-sm btn-primary" '+(n?'':'disabled ')+'onclick="phoneDlStart()">📲 Download to this phone</button></span>';
+}
+async function phoneDlStart(){
+  var mid=LIB_F.model; if(!mid||mid==='agency') return;
+  var r=await sb.rpc('phone_dl_claim',{p_model:mid,p_n:parseInt(PHONE_DL_N,10)||10,p_device:phoneDlDevice()});
+  if(r.error){ alert('Could not reserve reels: '+r.error.message); return; }
+  var ids=(r.data||[]).map(function(x){ return x.id||x; });
+  if(!ids.length){ alert('Nothing to download — every reel in Phone download is already being saved on another phone.'); return; }
+  var items=(STATE.library||[]).filter(function(i){ return ids.indexOf(i.id)>=0; });
+  items.forEach(function(i){ PHONE_DL_PENDING[i.id]=1; });
+  if(libIsIOS()) libSaveToPhotos(items,{onSaved:phoneDlArchive}); else dlEnqueue(items);
+}
+// Called with the ids that saved: iPhone after the share sheet's Save, other devices from dlMarkDone.
+async function phoneDlArchive(ids){
+  ids=(ids||[]).filter(function(id){ return PHONE_DL_PENDING[id]; }); if(!ids.length) return;
+  ids.forEach(function(id){ delete PHONE_DL_PENDING[id]; });
+  var r=await sb.rpc('phone_dl_done',{p_ids:ids,p_device:phoneDlDevice()});
+  if(r.error){ console.warn('phone_dl_done',r.error); ids.forEach(function(id){ PHONE_DL_PENDING[id]=1; }); return; }
+  var now=new Date().toISOString();
+  (STATE.library||[]).forEach(function(i){ if(ids.indexOf(i.id)>=0){ i.category='archived'; i.categories=(i.categories||[]).filter(function(k){ return k!=='phone_dl'; }); i.downloaded_at=now; i.downloaded_by=phoneDlDevice(); } });
+  clearTimeout(phoneDlArchive.t); phoneDlArchive.t=setTimeout(function(){ if(document.getElementById('cl-list')) renderLibraryList(); },800);
+}
 function libFetchBatch(batch,state,onProgress){
   var files=new Array(batch.length), next=0, bytes=0, doneN=0;
   async function worker(){
@@ -5452,6 +5496,7 @@ function libFetchBatch(batch,state,onProgress){
           function(n){ state.retrying[it.id]=n; onProgress&&onProgress(bytes,doneN); }, libDownloadName(it));
         delete state.retrying[it.id];
         if(!blob) return;
+        blob._libId=it.id;          // so the caller knows which Library item each saved file was
         files[k]=blob;
       }catch(e){ delete state.retrying[it.id]; state.failed.push((it.title||it.id)+' (missing from storage)'); }
       doneN++; onProgress&&onProgress(bytes,doneN);
@@ -5460,7 +5505,8 @@ function libFetchBatch(batch,state,onProgress){
   var ws=[]; for(var w=0;w<Math.min(LIB_PHOTOS_PARALLEL,batch.length);w++) ws.push(worker());
   return Promise.all(ws).then(function(){ return files.filter(Boolean); });
 }
-async function libSaveToPhotos(list){
+async function libSaveToPhotos(list,opts){
+  opts=opts||{};
   list=(list||[]).filter(function(i){ return /^(image|video)\//.test(libMimeOf(i)); });
   if(!list.length){ alert('Nothing to save — only photos and videos can go in the photo album.'); return; }
   if(!libIsIOS()){ return libDownloadMany(list); }          // Android/desktop: downloads land in Gallery / Downloads
@@ -5512,7 +5558,7 @@ async function libSaveToPhotos(list){
   go.onclick=async function(){
     if(!files||!files.length) return;
     var f=files; go.disabled=true;
-    try{ await navigator.share({files:f}); done+=f.length; }
+    try{ await navigator.share({files:f}); done+=f.length; if(opts.onSaved) opts.onSaved(f.map(function(x){ return x._libId; })); }
     catch(e){ go.disabled=false; msg.textContent=(e&&e.name==='AbortError')?'Cancelled — tap again to save these.':'Could not open the share sheet: '+(e&&e.message||e); return; }
     delete pending[bi]; files=null; f=null; bi++;
     if(bi<batches.length) setTimeout(function(){ ready(bi); },600);   // give iOS a moment to free the shared copies
@@ -6055,6 +6101,8 @@ function renderLibraryList(){
     +'<button onclick="LIB_F.factory=!LIB_F.factory;renderLibraryList()" title="Only finished reels the Content Factory made (Prep for posting output)" style="border:1px solid '+(LIB_F.factory?'var(--accent)':'var(--border)')+';background:'+(LIB_F.factory?'rgba(30,79,255,.14)':'var(--surface2)')+';color:'+(LIB_F.factory?'#fff':'var(--text2)')+';border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;">🎬 Factory reels</button>'
     +((STATE.verticals||[]).length?'<select onchange="LIB_F.vertical=this.value;renderLibraryList()"><option value="">🏷 Any tag</option>'+vertList('',true).map(function(v){var n=mine.filter(function(i){return i.vertical===v.key;}).length;return '<option value="'+v.key+'"'+(LIB_F.vertical===v.key?' selected':'')+'>'+escapeHtml(v.label)+' ('+n+')</option>';}).join('')+'<option value="__none"'+(LIB_F.vertical==='__none'?' selected':'')+'>Untagged</option></select>':'')
     +'<input id="cl-search" type="search" autocomplete="off" placeholder="🔎 title / tags / order #" oninput="libSearch(this)" value="'+escapeHtml(LIB_F.q||'')+'" style="flex:1;min-width:150px;">'
+    +(LIB_F.model&&LIB_F.model!=='agency'?'<button class="btn btn-ghost btn-sm" onclick="mlOpenAs(LIB_F.model)" title="See the My content page exactly as this model sees it">👁 Model\'s view</button>':'')
+    +(LIB_F.category==='phone_dl'?phoneDlBar(mine):'')
     +'<button class="btn btn-ghost btn-sm" onclick="libSelectAllShown()">☑ Select all shown</button>'
     +(libIsPhone()?'<button class="btn btn-ghost btn-sm" onclick="libSaveShownToPhotos()" title="Save every photo/video in the current view to this phone\'s photo album">📲 Save all shown to Photos</button>':'')
     +'<button class="btn btn-ghost btn-sm" onclick="dlSelectNotDownloaded()" title="Tick every file shown here that hasn\'t been downloaded on this computer yet">⬇ Not downloaded yet</button>'
@@ -7782,9 +7830,12 @@ async function renderModelUpload(){
   const openOrders=(STATE.contentOrders||[]).filter(function(o){ return o.model_id===me.id && o.status!=='done'; });
   const mine=(STATE.library||[]).filter(function(i){ return i.model_id===me.id; }).slice(0,40);
   const all=(STATE.library||[]).filter(function(i){ return i.model_id===me.id; });
+  const sent=mlMine(me);
   const card=function(k){
     const c=LIB_CATEGORIES[k], o=MU_MKT[k]||{}, label=o.label||c.label, hint=o.hint||c.hint, grad=o.grad||c.grad||'#6b8fff,#1e4fff';
-    const L=all.filter(function(i){ return i.category===k; });
+    // counted by where SHE sent it, so the number doesn't drop when the team sorts her files
+    const grp=k==='inbox'?'marketing':k;
+    const L=sent.filter(function(i){ return mlGroupOf(i)===grp; });
     let n='';
     if(k==='sexting'){ const sets={}; L.forEach(function(i){ const s=libSetInfo(i); sets[s?s.id:i.id]=1; }); const c2=Object.keys(sets).length; n=c2?c2+' set'+(c2===1?'':'s'):''; }
     else if(L.length){ const last=L.reduce(function(m,i){ return i.created_at>m?i.created_at:m; },''); const d=Math.floor((Date.now()-new Date(last))/86400000); n=L.length+' sent · latest '+(d<=0?'today':d===1?'yesterday':d+'d ago'); }
@@ -7818,7 +7869,8 @@ async function renderModelUpload(){
       +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(i.title||'')+'</div><div style="font-size:11px;color:var(--text2);">'+what+(what?' · ':'')+fmtDate(i.created_at)+'</div></div>'+chip+'</div>';
   };
   el.innerHTML=
-     '<div id="mu-status" style="display:none;background:rgba(107,143,255,.12);border:1px solid rgba(107,143,255,.35);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>'
+     '<button class="mo-other" style="margin:0 0 12px;" onclick="navigate(\'model-library\')">🗂️ '+moT(me,'See everything you\'ve sent','Ver todo lo que has enviado')+' ('+sent.length+')</button>'
+    +'<div id="mu-status" style="display:none;background:rgba(107,143,255,.12);border:1px solid rgba(107,143,255,.35);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>'
     +(openOrders.length?'<div class="mo-hd"><b>🎯 '+moT(me,'Your orders','Tus pedidos')+'</b><span>'+openOrders.filter(function(o){return !o.video_path;}).length+' '+moT(me,'to film','por grabar')+'</span></div>'
       +'<div class="mo-tip">'+moT(me,'🎬 <b>Film 3–4 versions of every order.</b> Change one small thing each time: the background, the first line (hook) or your outfit. Experiment a little — we test the extras as trial reels.',
         '🎬 <b>Graba 3–4 versiones de cada pedido.</b> Cambia una cosa pequeña cada vez: el fondo, la primera frase (el gancho) o la ropa. Experimenta un poco — usamos las extra como trial reels.')+'</div>'
@@ -7834,6 +7886,67 @@ async function renderModelUpload(){
     +'<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px;">Recent uploads</div>'
     +(mine.length?'<div class="card" style="padding:4px 12px;">'+mine.map(histRow).join('')+'</div>':'<div style="font-size:12px;color:var(--text2);">Nothing yet.</div>');
   moTranslate(openOrders,me);
+}
+// ── 🗂️ My content (Nov 2026) ────────────────────────────────────────────────
+// Models asked to check everything they've sent actually arrived. Shows ONLY files the model
+// uploaded herself (her login email) — never the agency's edits/renders, sounds or imports —
+// grouped by where she sent it, whichever folder the team has since moved it to.
+// Admins open the same page from the Library ("👁 Model's view") to see exactly what she sees.
+var ML_F={grp:'',when:'',shown:60};
+var ML_GROUPS=[['ppv','💎','PPV videos','Vídeos PPV'],['sexting','💬','Sexting sets','Sets de sexting'],['teasing','🧱','OF wall','Muro OF'],['explicit','🔥','Explicit photos','Fotos explícitas'],
+  ['marketing','📣','Reels & videos for socials','Reels y vídeos para redes'],['photos','📸','Non-nude photos','Fotos sin desnudos'],['unsure','🤷','Unsure','No sé']];
+function mlGroupOf(i){ var k=i.category; if(k==='ppv'||k==='sexting'||k==='teasing'||k==='explicit'||k==='unsure') return k; if(k==='photos'||k==='stories') return 'photos'; return 'marketing'; }
+function mlModel(){ return STATE.profile?.role==='model'?myOwnModel():(STATE.models||[]).find(function(m){ return m.id===STATE._mlModel; })||null; }
+function mlMine(m){
+  if(!m) return [];
+  var ems={}; [m.email, STATE.profile?.role==='model'?STATE.profile.email:null].forEach(function(e){ if(e) ems[String(e).trim().toLowerCase()]=1; });
+  return (STATE.library||[]).filter(function(i){ return i.model_id===m.id && !i.render_job_id && !i.derived_from && i.category!=='sounds' && ems[String(i.uploaded_by_email||'').trim().toLowerCase()]; });
+}
+function mlSince(w){ var d=new Date(); d.setHours(0,0,0,0); if(w==='week') d.setDate(d.getDate()-((d.getDay()+6)%7)); else if(w==='month') d.setDate(1); else if(w!=='today') return null; return d; }
+function mlSet(k,v){ ML_F[k]=v; ML_F.shown=60; renderModelLibrary(); }
+function mlOpenAs(mid){ STATE._mlModel=mid; ML_F={grp:'',when:'',shown:60}; navigate('model-library'); }
+async function renderModelLibrary(){
+  var el=document.getElementById('ml-body'); if(!el) return;
+  var m=mlModel(), isModel=STATE.profile?.role==='model';
+  if(!m){ el.innerHTML='<div class="empty"><div class="empty-icon">🗂️</div><p>'+(isModel?'Your login isn\'t linked to a model profile yet — message the team and we\'ll sort it.':'Pick a model in the Content Library first.')+'</p></div>'; return; }
+  if(!STATE.library){ el.innerHTML='<div style="color:var(--text2);padding:20px;">Loading…</div>'; await loadContentLibrary(); }
+  var t=document.getElementById('ml-title'); if(t) t.textContent=isModel?moT(m,'My content','Mi contenido'):'👁 '+m.name+'\'s view — My content';
+  var all=mlMine(m), since=mlSince(ML_F.when);
+  var inWhen=all.filter(function(i){ return !since||new Date(i.created_at)>=since; });
+  var L=inWhen.filter(function(i){ return !ML_F.grp||mlGroupOf(i)===ML_F.grp; });
+  var vids=all.filter(libIsVideo).length, wk=mlSince('week'), thisWeek=all.filter(function(i){ return new Date(i.created_at)>=wk; }).length;
+  var gb=all.reduce(function(t,i){ return t+(i.size_bytes||0); },0)/1073741824;
+  var stat=function(n,l){ return '<div style="flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;"><div style="font-size:22px;font-weight:800;">'+n+'</div><div style="font-size:11.5px;color:var(--text2);">'+l+'</div></div>'; };
+  var chip=function(on,label,click){ return '<button onclick="'+click+'" style="border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(30,79,255,.16)':'var(--surface2)')+';color:'+(on?'#fff':'var(--text2)')+';border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;">'+label+'</button>'; };
+  var whenC=[['',moT(m,'All time','Todo')],['today',moT(m,'Today','Hoy')],['week',moT(m,'This week','Esta semana')],['month',moT(m,'This month','Este mes')]]
+    .map(function(w){ return chip(ML_F.when===w[0],w[1],'mlSet(\'when\',\''+w[0]+'\')'); }).join('');
+  var grpC=chip(!ML_F.grp,moT(m,'Everything','Todo')+' <span style="opacity:.7">'+inWhen.length+'</span>','mlSet(\'grp\',\'\')')
+    +ML_GROUPS.map(function(g){ var n=inWhen.filter(function(i){ return mlGroupOf(i)===g[0]; }).length; return n?chip(ML_F.grp===g[0],g[1]+' '+moT(m,g[2],g[3])+' <span style="opacity:.7">'+n+'</span>','mlSet(\'grp\',\''+g[0]+'\')'):''; }).join('');
+  var gl={}; ML_GROUPS.forEach(function(g){ gl[g[0]]=g[1]+' '+moT(m,g[2],g[3]); });
+  var tile=function(i){
+    if(i.thumb_data===undefined){ if(i.id in LIB_THUMBS) i.thumb_data=LIB_THUMBS[i.id]; else libThumbWant(i.id); }
+    if(i.thumb_data===null&&libIsHeic(i)) libHeicQueue(i);
+    var o=i.source_order_id?(STATE.contentOrders||[]).find(function(x){ return x.id===i.source_order_id; }):null;
+    var used=(i.state==='in_use'||i.state==='reusable'||i.category==='archived');
+    var d=new Date(i.created_at);
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+      +'<div onclick="libPreview(\''+i.id+'\')" data-thumb="'+i.id+'" style="position:relative;width:100%;aspect-ratio:3/4;cursor:pointer;background:var(--surface2);">'+libThumbInner(i)+'</div>'
+      +'<div style="padding:7px 9px;font-size:11.5px;line-height:1.35;">'
+      +'<div style="font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(o?moT(m,'Order','Pedido')+' #'+String(o.order_number||'').padStart(3,'0'):gl[mlGroupOf(i)]||'')+'</div>'
+      +'<div style="color:var(--text2);">'+d.toLocaleDateString(undefined,{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})+(i.size_bytes?' · '+libFmtSize(i.size_bytes):'')+'</div>'
+      +'<div style="margin-top:3px;color:'+(used?'#4ade80':'var(--text2)')+';">'+(used?'✅ '+moT(m,'Used','Usado'):'📥 '+moT(m,'Received','Recibido'))+'</div>'
+      +'</div></div>';
+  };
+  var shown=L.slice(0,ML_F.shown);
+  el.innerHTML=(isModel?'':'<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" onclick="navigate(\'content-upload\')">← Back to Content Library</button><span style="font-size:12px;color:var(--text2);">This is exactly what '+escapeHtml(m.name)+' sees.</span></div>')
+    +'<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+moT(m,'Everything you\'ve sent us — check it all arrived. Tap any one to watch it.','Todo lo que nos has enviado — comprueba que ha llegado todo. Toca cualquiera para verlo.')+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'+stat(all.length,moT(m,'files sent','archivos enviados'))+stat(vids,moT(m,'videos','vídeos'))+stat(all.length-vids,moT(m,'photos','fotos'))+stat(thisWeek,moT(m,'this week','esta semana'))+(gb>=0.01?stat(gb.toFixed(gb<10?2:1)+' GB',moT(m,'total size','tamaño total')):'')+'</div>'
+    +'<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;">'+whenC+'</div>'
+    +'<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;">'+grpC+'</div>'
+    +(L.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;">'+shown.map(tile).join('')+'</div>'
+      +(L.length>shown.length?'<button class="btn btn-ghost" style="width:100%;margin-top:12px;" onclick="ML_F.shown+=60;renderModelLibrary()">'+moT(m,'Show more','Ver más')+' ('+(L.length-shown.length)+')</button>':'')
+      :'<div class="empty"><div class="empty-icon">🗂️</div><p>'+moT(m,'Nothing here yet.','Aún no hay nada aquí.')+'</p></div>')
+    +'<div style="font-size:12px;color:var(--text2);margin:16px 0 30px;line-height:1.5;">'+moT(m,'Something missing? It may not have finished uploading — open 📤 Upload and send it again. Files the team has deleted won\'t show here.','¿Falta algo? Puede que no terminara de subirse — abre 📤 Subir y envíalo otra vez. Los archivos que el equipo ha borrado no aparecen aquí.')+'</div>';
 }
 // Order notes in the model's own language (models.lang). Translated once by the
 // order-translate edge function and cached on the order; edited notes are re-translated.
