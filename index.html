@@ -3324,7 +3324,7 @@
       <div class="form-group"><label>Week To</label><input type="date" id="minv-edit-week-end"></div>
       <div class="form-group full"><label>Amount ($)</label><input type="number" id="minv-edit-amount" step="0.01" min="0"></div>
       <div class="form-group full"><label>What's this for?</label><input type="text" id="minv-edit-desc" placeholder="e.g. Bonus, correction, off-cycle payout"></div>
-      <div class="form-group full"><label>Status</label><select id="minv-edit-status"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div>
+      <div class="form-group full"><label>Status</label><select id="minv-edit-status"><option value="unpaid">Unpaid</option><option value="partial">Part paid</option><option value="paid">Paid</option></select></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveEditModelInvoice()">💾 Save</button>
@@ -7894,7 +7894,7 @@ async function renderModelUpload(){
 // Admins open the same page from the Library ("👁 Model's view") to see exactly what she sees.
 var ML_F={grp:'',when:'',shown:60};
 var ML_GROUPS=[['ppv','💎','PPV videos','Vídeos PPV'],['sexting','💬','Sexting sets','Sets de sexting'],['teasing','🧱','OF wall','Muro OF'],['explicit','🔥','Explicit photos','Fotos explícitas'],
-  ['marketing','📣','Reels & videos for socials','Reels y vídeos para redes'],['photos','📸','Non-nude photos','Fotos sin desnudos'],['unsure','🤷','Unsure','No sé']];
+  ['marketing','📣','Reels & socials','Reels y redes'],['photos','📸','Non-nude photos','Fotos sin desnudos'],['unsure','🤷','Unsure','No sé']];
 function mlGroupOf(i){ var k=i.category; if(k==='ppv'||k==='sexting'||k==='teasing'||k==='explicit'||k==='unsure') return k; if(k==='photos'||k==='stories') return 'photos'; return 'marketing'; }
 function mlModel(){ return STATE.profile?.role==='model'?myOwnModel():(STATE.models||[]).find(function(m){ return m.id===STATE._mlModel; })||null; }
 function mlMine(m){
@@ -13504,6 +13504,29 @@ var MODEL_INVOICE_FILTER='unpaid';
 // Shares STATE_MODEL_INVOICES + the mark-paid/edit/delete functions and modal below with the
 // standalone Model Invoices page — only the container ids and the date-range filter differ.
 var INV_MODEL_FILTER='unpaid';
+// Part payments (Nov 2026): a model who can only pay some of an invoice (e.g. financial issues).
+// Each payment is kept in invoices.payments [{amount,at,note,by}]; amount_paid is their sum.
+// Status: unpaid -> partial -> paid (paid once the balance reaches zero). "Unpaid" filters and
+// totals use what is still owed, so a part-paid invoice only counts for its balance.
+function invPaidAmt(i){ return i.status==='paid'?parseFloat(i.amount||0):parseFloat(i.amount_paid||0); }
+function invOwed(i){ return Math.max(0,parseFloat(i.amount||0)-invPaidAmt(i)); }
+function invMatch(i,f){ return !f||(f==='unpaid'?i.status!=='paid':i.status===f); }
+async function recordModelPayment(id){
+  const inv=STATE_MODEL_INVOICES.find(x=>x.id===id); if(!inv) return;
+  const owed=invOwed(inv);
+  const v=prompt('Amount '+(inv.submitted_by_name||'the model')+' paid now (USD). Still owed: $'+fmt(owed),owed.toFixed(2)); if(v===null) return;
+  const amt=Math.round(parseFloat(String(v).replace(/[$,\s]/g,''))*100)/100;
+  if(!(amt>0)) return alert('Enter an amount above 0.');
+  const note=prompt('Note (optional) — e.g. "part payment, financial issues", or the rest is due next week:','')||'';
+  const payments=(Array.isArray(inv.payments)?inv.payments:[]).concat([{amount:amt,at:new Date().toISOString(),note:note.trim(),by:STATE.profile?.email||null}]);
+  const paidSum=Math.round(payments.reduce((t,x)=>t+parseFloat(x.amount||0),0)*100)/100;
+  const full=paidSum>=parseFloat(inv.amount||0)-0.005;
+  const upd={payments:payments,amount_paid:paidSum,status:full?'paid':'partial',paid_at:full?new Date().toISOString():null};
+  const{error}=await sb.from('invoices').update(upd).eq('id',id);
+  if(error) return alert(error.message);
+  Object.assign(inv,upd);
+  renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
+}
 
 async function loadInvoicesModelsSection(){
   const{data,error}=await sb.from('invoices').select('*').eq('role','model').order('week_of',{ascending:false});
@@ -13525,9 +13548,9 @@ function renderInvoiceModelsSection(){
   const{start,end}=getInvoicesDateRange();
   let list=STATE_MODEL_INVOICES;
   if(start||end) list=list.filter(i=>overlaps(i.week_of,i.week_end,start||end,end||start));
-  if(INV_MODEL_FILTER) list=list.filter(i=>i.status===INV_MODEL_FILTER);
-  const unpaidTotal=list.filter(i=>i.status!=='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
-  const paidTotal=list.filter(i=>i.status==='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  if(INV_MODEL_FILTER) list=list.filter(i=>invMatch(i,INV_MODEL_FILTER));
+  const unpaidTotal=list.reduce((s,i)=>s+invOwed(i),0);
+  const paidTotal=list.reduce((s,i)=>s+invPaidAmt(i),0);
   const sumEl=document.getElementById('inv-models-summary');
   if(sumEl) sumEl.innerHTML=statCard('Unpaid','$'+fmt(unpaidTotal),'accent','red')+statCard('Paid','$'+fmt(paidTotal),'accent','green')+statCard('Invoices',list.length,'white','purple');
   const empty=document.getElementById('inv-models-empty');
@@ -13561,10 +13584,10 @@ async function renderModelInvoicePage(){
 function renderModelInvoiceSummary(){
   const el=document.getElementById('minv-summary'); if(!el)return;
   const isAdmin=STATE.profile?.role==='admin';
-  const unpaidTotal=STATE_MODEL_INVOICES.filter(i=>i.status!=='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  const unpaidTotal=STATE_MODEL_INVOICES.reduce((s,i)=>s+invOwed(i),0);
   // Models only ever see what they currently owe — never a running total of what they've paid us.
   if(!isAdmin){ el.innerHTML=statCard('Money owed','$'+fmt(unpaidTotal),'accent','red'); return; }
-  const paidTotal=STATE_MODEL_INVOICES.filter(i=>i.status==='paid').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+  const paidTotal=STATE_MODEL_INVOICES.reduce((s,i)=>s+invPaidAmt(i),0);
   el.innerHTML=statCard('Unpaid','$'+fmt(unpaidTotal),'accent','red')+statCard('Paid (all time)','$'+fmt(paidTotal),'accent','green')+statCard('Invoices',STATE_MODEL_INVOICES.length,'white','purple');
 }
 
@@ -13580,7 +13603,7 @@ function renderModelInvoiceCards(){
   const isAdmin=STATE.profile?.role==='admin';
   const wrap=document.getElementById('minv-cards'); const empty=document.getElementById('minv-empty');
   if(!wrap)return;
-  const list=MODEL_INVOICE_FILTER?STATE_MODEL_INVOICES.filter(i=>i.status===MODEL_INVOICE_FILTER):STATE_MODEL_INVOICES;
+  const list=MODEL_INVOICE_FILTER?STATE_MODEL_INVOICES.filter(i=>invMatch(i,MODEL_INVOICE_FILTER)):STATE_MODEL_INVOICES;
   wrap.innerHTML='';
   if(!list.length){empty.style.display='block';return;} empty.style.display='none';
   list.forEach(inv=>{wrap.innerHTML+=modelInvoiceCardHtml(inv,isAdmin);});
@@ -13588,25 +13611,31 @@ function renderModelInvoiceCards(){
 
 function modelInvoiceCardHtml(inv,isAdmin){
   const period=inv.week_end?`${fmtDate(inv.week_of)} – ${fmtDate(inv.week_end)}`:fmtDate(inv.week_of);
-  const isPaid=inv.status==='paid';
+  const isPaid=inv.status==='paid', isPart=!isPaid&&parseFloat(inv.amount_paid||0)>0;
   const agencyPct=inv.split_pct!=null?parseFloat(inv.split_pct):null;
+  const pays=Array.isArray(inv.payments)?inv.payments:[];
+  const pct=Math.min(100,Math.round(invPaidAmt(inv)/(parseFloat(inv.amount||0)||1)*100));
+  const partHtml=(isPart||(isPaid&&pays.length>1))?`<div style="margin:-6px 0 12px;"><div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${isPaid?'var(--green)':'#e6b428'};"></div></div>
+      <div style="font-size:12px;margin-top:5px;"><b style="color:#fff;">$${fmt(invPaidAmt(inv))}</b> paid · <b style="color:${isPaid?'var(--green)':'#e6b428'};">$${fmt(invOwed(inv))}</b> still owed</div>
+      ${isAdmin?pays.map(x=>`<div style="font-size:11px;color:var(--text2);">• $${fmt(x.amount)} on ${fmtDate(x.at)}${x.note?' — '+escapeHtml(x.note):''}</div>`).join(''):''}</div>`:'';
   return `<div class="card minv-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
       <div>
         ${isAdmin?`<div style="font-size:13px;font-weight:700;color:#fff;">${inv.submitted_by_name||'—'}</div>`:''}
         <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">${period}</div>
       </div>
-      <span style="background:${isPaid?'rgba(46,196,120,.15)':'rgba(230,180,40,.15)'};color:${isPaid?'var(--green)':'#e6b428'};text-transform:uppercase;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.05em;white-space:nowrap;">${inv.status}</span>
+      <span style="background:${isPaid?'rgba(46,196,120,.15)':'rgba(230,180,40,.15)'};color:${isPaid?'var(--green)':'#e6b428'};text-transform:uppercase;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.05em;white-space:nowrap;">${isPart?'part paid':inv.status}</span>
     </div>
     <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px;">$${fmt(inv.amount)}</div>
     <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">${agencyPct!=null?`Agency cut · ${agencyPct}% split of $${fmt(inv.gross_earnings||0)} gross`:(inv.description||'Agency commission')}</div>
+    ${partHtml}
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;">
       <span>${isPaid?`Paid ${fmtDate(inv.paid_at)}`:`Payable ${fmtDate(inv.payout_date)}`}</span>
       <span>${inv.source==='auto'?'Auto-generated':'Manual'}</span>
     </div>
     <div class="btn-row" style="margin-top:12px;"><button class="btn btn-sm btn-primary" onclick="printModelInvoice('${inv.id}')">🧾 Print invoice</button></div>
     ${isAdmin?`<div class="btn-row" style="margin-top:8px;">
-      ${isPaid?`<button class="btn btn-sm btn-ghost" onclick="markModelInvoiceUnpaid('${inv.id}')">↺ Mark Unpaid</button>`:`<button class="btn btn-sm btn-green" onclick="markModelInvoicePaid('${inv.id}')">✓ Mark Paid</button>`}
+      ${isPaid?`<button class="btn btn-sm btn-ghost" onclick="markModelInvoiceUnpaid('${inv.id}')">↺ Mark Unpaid</button>`:`<button class="btn btn-sm btn-green" onclick="markModelInvoicePaid('${inv.id}')">✓ Mark Paid</button><button class="btn btn-sm btn-ghost" onclick="recordModelPayment('${inv.id}')" title="They paid part of it — record what came in">💵 Part payment</button>`}
       <button class="btn btn-sm btn-ghost" onclick="editModelInvoice('${inv.id}')">✏</button>
       <button class="btn btn-sm btn-danger" onclick="delModelInvoice('${inv.id}')" title="Delete permanently">🗑</button>
     </div>`:''}
@@ -13669,8 +13698,9 @@ function invoiceHtml(inv,s){
     +'<tr><td>'+esc(desc)+'</td><td class="r">$'+fmt(gstOn?net:amt)+'</td></tr></tbody></table>'
     +'<div class="totals">'
     +(gstOn?('<div><span>Subtotal</span><span>$'+fmt(net)+'</span></div><div><span>GST (10%)</span><span>$'+fmt(gst)+'</span></div>'):'')
-    +'<div class="grand"><span>Total'+(gstOn?' (incl. GST)':'')+'</span><span>$'+fmt(amt)+'</span></div></div>'
-    +'<div>'+(paid?'<span class="status paid">PAID'+(inv.paid_at?' · '+fmtDate(inv.paid_at):'')+'</span>':'<span class="status unpaid">UNPAID'+(inv.payout_date?' · due '+fmtDate(inv.payout_date):'')+'</span>')+'</div>'
+    +'<div class="grand"><span>Total'+(gstOn?' (incl. GST)':'')+'</span><span>$'+fmt(amt)+'</span></div>'
+    +(!paid&&parseFloat(inv.amount_paid||0)>0?('<div><span>Paid to date</span><span>−$'+fmt(inv.amount_paid)+'</span></div><div class="grand"><span>Balance due</span><span>$'+fmt(invOwed(inv))+'</span></div>'):'')+'</div>'
+    +'<div>'+(!paid&&parseFloat(inv.amount_paid||0)>0?'<span class="status unpaid">PART PAID · $'+fmt(invOwed(inv))+' still due</span>':paid?'<span class="status paid">PAID'+(inv.paid_at?' · '+fmtDate(inv.paid_at):'')+'</span>':'<span class="status unpaid">UNPAID'+(inv.payout_date?' · due '+fmtDate(inv.payout_date):'')+'</span>')+'</div>'
     +'<div class="foot">'+esc(s.business_name||'BadBunnyManagement')+' · '+esc(s.contact_email||'')+(s.abn?(' · ABN '+esc(s.abn)):'')+'<br>Commission for OnlyFans account management services rendered during the billing period.'+(gstOn?'':' No GST has been charged on this invoice.')+'</div>'
     +'</div></body></html>';
 }
@@ -13688,16 +13718,21 @@ async function editInvoiceSettings(){
 
 async function markModelInvoicePaid(id){
   const paidAt=new Date().toISOString();
-  const{error}=await sb.from('invoices').update({status:'paid',paid_at:paidAt}).eq('id',id);
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id);
+  const upd={status:'paid',paid_at:paidAt};
+  // paying off a part-paid invoice: record the final payment so the history adds up
+  if(inv&&parseFloat(inv.amount_paid||0)>0){ const rest=invOwed(inv); upd.payments=(inv.payments||[]).concat(rest>0.005?[{amount:Math.round(rest*100)/100,at:paidAt,note:'Balance paid',by:STATE.profile?.email||null}]:[]); upd.amount_paid=parseFloat(inv.amount||0); }
+  const{error}=await sb.from('invoices').update(upd).eq('id',id);
   if(error) return alert(error.message);
-  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='paid';inv.paid_at=paidAt;}
+  if(inv) Object.assign(inv,upd);
   renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
 }
 
 async function markModelInvoiceUnpaid(id){
-  const{error}=await sb.from('invoices').update({status:'unpaid',paid_at:null}).eq('id',id);
+  const upd={status:'unpaid',paid_at:null,payments:[],amount_paid:0};
+  const{error}=await sb.from('invoices').update(upd).eq('id',id);
   if(error) return alert(error.message);
-  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv){inv.status='unpaid';inv.paid_at=null;}
+  const inv=STATE_MODEL_INVOICES.find(i=>i.id===id); if(inv) Object.assign(inv,upd);
   renderModelInvoiceSummary(); renderModelInvoiceCards(); renderInvoiceModelsSection();
 }
 
