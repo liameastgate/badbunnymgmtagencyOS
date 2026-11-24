@@ -4094,9 +4094,13 @@ function switchAuthTab(tab) {
 // "Forgot your password?" emails a reset link (Supabase). Opening that link signs them in and
 // fires PASSWORD_RECOVERY, which pops the "Set a new password" box. Anyone signed in can also
 // change theirs from the sidebar, and admins can send a reset link from Team Access.
+var APP_URL='https://badbunnymgmtagency-os.vercel.app/';
 var PW_RECOVERY=/type=recovery/.test(location.hash||'');
 async function sendResetLink(email){
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  // Always send people back to the live app. Using location.origin meant a reset asked for from an
+  // old Vercel deployment link (badbunnymgmtagency-xxxx-...vercel.app) pointed back to that deployment,
+  // which Vercel later deletes -> "page doesn't exist" when the email link is opened.
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: APP_URL });
   return error;
 }
 async function forgotPassword(){
